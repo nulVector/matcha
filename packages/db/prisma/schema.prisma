@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  OFFLINE
+  ONLINE
+}
+
+enum QueueStatus {
+  IDLE
+  LOOKING
+  BUSY
+}
+
+enum ConnectionStatus {
+  MATCHED
+  FRIEND
+  ARCHIVED
+  UNFRIENDED
+}
+
+enum ConnectionRequest {
+  NONE
+  EXTENSION
+  PERMANENT
+}
+
+enum RequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum RequestOrigin {
+  SEARCH
+  ARCHIVE
+}
+
+enum MessageType {
+  TEXT
+  SYSTEM
+}
+
+model User {
+  id            String              @id @default(cuid(2))
+  email         String              @unique
+  password      String
+  createdAt     DateTime            @default(now())
+  deletedAt     DateTime?
+  reactivatedAt DateTime?
+  profile       UserProfile?
+  token         PasswordResetToken?
+  // jwtVersion    Int
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid(2))
+  token     String   @unique
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  expiresAt DateTime
+}
+
+//TODO- remove inqueue and rely on redis
+model UserProfile {
+  id               String          @id @default(cuid(2))
+  username         String          @unique
+  aboutMe          String?
+  isActive         Boolean         @default(true)
+  status           UserStatus      @default(OFFLINE)
+  inQueue          QueueStatus     @default(IDLE)
+  allowDiscovery   Boolean         @default(false)
+  openingQues      String?
+  avatarId         String
+  avatar           Avatar          @relation(fields: [avatarId], references: [id])
+  interest         Interest[]
+  userId           String?         @unique
+  user             User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  locationId       String?
+  location         Location?       @relation(fields: [locationId], references: [id])
+  matchAsUser1     Connection[]    @relation("MatchUser1")
+  matchAsUser2     Connection[]    @relation("MatchUser2")
+  sentRequests     FriendRequest[] @relation("SentRequests")
+  receivedRequests FriendRequest[] @relation("ReceivedRequests")
+  sentMessages     Message[]
+
+  @@index([isActive, status, allowDiscovery])
+}
+
+//TODO- seed file for avatar,location,interest
+model Avatar {
+  id        String        @id @default(cuid(2))
+  avatarUrl String
+  users     UserProfile[]
+}
+
+model Location {
+  id       String        @id @default(cuid(2))
+  location String        @unique
+  users    UserProfile[]
+}
+
+model Interest {
+  id       String        @id @default(cuid(2))
+  interest String        @unique
+  users    UserProfile[]
+}
+
+model Connection {
+  id             String            @id @default(cuid(2))
+  createdAt      DateTime          @default(now())
+  status         ConnectionStatus  @default(MATCHED)
+  expiresAt      DateTime?
+  user1Id        String
+  user1          UserProfile       @relation("MatchUser1", fields: [user1Id], references: [id])
+  user2Id        String
+  user2          UserProfile       @relation("MatchUser2", fields: [user2Id], references: [id])
+  user1Agreed    Boolean           @default(false)
+  user2Agreed    Boolean           @default(false)
+  pendingRequest ConnectionRequest @default(NONE)
+  messages       Message[]
+  user1DeletedAt DateTime?
+  user2DeletedAt DateTime?
+  finalDeleteAt  DateTime?
+  //TODO - add index here
+  // @@index([user1Id, user1DeletedAt])
+  // @@index([user2Id, user2DeletedAt])
+
+  @@unique([user1Id, user2Id])
+}
+
+model FriendRequest {
+  id         String        @id @default(cuid(2))
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  origin     RequestOrigin
+  matchId    String?
+  senderId   String
+  receiverId String
+  status     RequestStatus @default(PENDING)
+  sender     UserProfile   @relation("SentRequests", fields: [senderId], references: [id])
+  receiver   UserProfile   @relation("ReceivedRequests", fields: [receiverId], references: [id])
+
+  @@unique([senderId, receiverId])
+}
+
+model Message {
+  id           String      @id @default(cuid(2))
+  createdAt    DateTime    @default(now())
+  content      String
+  isRead       Boolean     @default(false)
+  type         MessageType @default(TEXT)
+  senderId     String
+  connectionId String
+  sender       UserProfile @relation(fields: [senderId], references: [id])
+  connection   Connection  @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+}

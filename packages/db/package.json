@@ -1,0 +1,33 @@
+{
+  "name": "@matcha/prisma",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    }
+  },
+  "scripts": {
+    "build": "prisma generate && tsc",
+    "dev": "prisma generate && tsc -w",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "clean": "rimraf dist .turbo"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.2.0",
+    "@prisma/client": "^7.2.0",
+    "dotenv": "^17.2.3",
+    "pg": "^8.16.3",
+    "prisma": "^7.2.0"
+  },
+  "devDependencies": {
+    "@matcha/typescript-config": "workspace:*",
+    "@types/node": "^25.0.3",
+    "@types/pg": "^8.16.0"
+  }
+}

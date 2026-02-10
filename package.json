@@ -1,15 +1,17 @@
 {
-  "name": "HelloWorld",
+  "name": "matcha",
   "private": true,
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "clean": "turbo run clean && rimraf node_modules .turbo",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types"
   },
   "devDependencies": {
     "prettier": "^3.7.4",
+    "rimraf": "^6.1.2",
     "turbo": "^2.6.3",
     "typescript": "5.9.2"
   },
