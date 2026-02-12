@@ -7,28 +7,11 @@ datasource db {
   provider = "postgresql"
 }
 
-enum UserStatus {
-  OFFLINE
-  ONLINE
-}
-
-enum QueueStatus {
-  IDLE
-  LOOKING
-  BUSY
-}
-
 enum ConnectionStatus {
   MATCHED
   FRIEND
   ARCHIVED
   UNFRIENDED
-}
-
-enum ConnectionRequest {
-  NONE
-  EXTENSION
-  PERMANENT
 }
 
 enum RequestStatus {
@@ -47,117 +30,117 @@ enum MessageType {
   SYSTEM
 }
 
+//TODO - Google signup
 model User {
-  id            String              @id @default(cuid(2))
-  email         String              @unique
+  id            String       @id @default(cuid(2))
+  email         String       @unique
   password      String
-  createdAt     DateTime            @default(now())
+  createdAt     DateTime     @default(now())
   deletedAt     DateTime?
   reactivatedAt DateTime?
   profile       UserProfile?
-  token         PasswordResetToken?
-  // jwtVersion    Int
+  updatedAt     DateTime     @updatedAt
+  tokenVersion  Int          @default(1)
 }
 
-model PasswordResetToken {
-  id        String   @id @default(cuid(2))
-  token     String   @unique
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id])
-  expiresAt DateTime
-}
-
-//TODO- remove inqueue and rely on redis
 model UserProfile {
-  id               String          @id @default(cuid(2))
-  username         String          @unique
-  aboutMe          String?
-  isActive         Boolean         @default(true)
-  status           UserStatus      @default(OFFLINE)
-  inQueue          QueueStatus     @default(IDLE)
-  allowDiscovery   Boolean         @default(false)
-  openingQues      String?
-  avatarId         String
-  avatar           Avatar          @relation(fields: [avatarId], references: [id])
-  interest         Interest[]
-  userId           String?         @unique
-  user             User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
-  locationId       String?
-  location         Location?       @relation(fields: [locationId], references: [id])
-  matchAsUser1     Connection[]    @relation("MatchUser1")
-  matchAsUser2     Connection[]    @relation("MatchUser2")
-  sentRequests     FriendRequest[] @relation("SentRequests")
-  receivedRequests FriendRequest[] @relation("ReceivedRequests")
-  sentMessages     Message[]
-
-  @@index([isActive, status, allowDiscovery])
+  id                String          @id @default(cuid(2))
+  username          String          @unique
+  aboutMe           String?
+  isActive          Boolean         @default(true)
+  lastSeen          DateTime?
+  allowDiscovery    Boolean         @default(false)
+  openingQues       String?
+  updatedAt         DateTime        @updatedAt
+  avatarUrl         String
+  location          String
+  locationLatitude  Float
+  locationLongitude Float
+  interest          String[]
+  userId            String?         @unique
+  user              User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  matchAsUser1      Connection[]    @relation("MatchUser1")
+  matchAsUser2      Connection[]    @relation("MatchUser2")
+  sentRequests      FriendRequest[] @relation("SentRequests")
+  receivedRequests  FriendRequest[] @relation("ReceivedRequests")
+  sentMessages      Message[]
 }
 
-//TODO- seed file for avatar,location,interest
+//Catalog model
 model Avatar {
-  id        String        @id @default(cuid(2))
-  avatarUrl String
-  users     UserProfile[]
+  id  String @id @default(cuid(2))
+  url String
 }
 
 model Location {
-  id       String        @id @default(cuid(2))
-  location String        @unique
-  users    UserProfile[]
+  id        String @id @default(cuid(2))
+  name      String @unique
+  latitude  Float
+  longitude Float
 }
 
 model Interest {
-  id       String        @id @default(cuid(2))
-  interest String        @unique
-  users    UserProfile[]
+  id   String @id @default(cuid(2))
+  name String @unique
 }
 
 model Connection {
-  id             String            @id @default(cuid(2))
-  createdAt      DateTime          @default(now())
-  status         ConnectionStatus  @default(MATCHED)
-  expiresAt      DateTime?
-  user1Id        String
-  user1          UserProfile       @relation("MatchUser1", fields: [user1Id], references: [id])
-  user2Id        String
-  user2          UserProfile       @relation("MatchUser2", fields: [user2Id], references: [id])
-  user1Agreed    Boolean           @default(false)
-  user2Agreed    Boolean           @default(false)
-  pendingRequest ConnectionRequest @default(NONE)
-  messages       Message[]
-  user1DeletedAt DateTime?
-  user2DeletedAt DateTime?
-  finalDeleteAt  DateTime?
-  //TODO - add index here
-  // @@index([user1Id, user1DeletedAt])
-  // @@index([user2Id, user2DeletedAt])
+  id              String           @id @default(cuid(2))
+  createdAt       DateTime         @default(now())
+  status          ConnectionStatus @default(MATCHED)
+  updatedAt       DateTime         @updatedAt
+  expiresAt       DateTime?
+  user1Id         String
+  user1           UserProfile      @relation("MatchUser1", fields: [user1Id], references: [id])
+  user2Id         String
+  user2           UserProfile      @relation("MatchUser2", fields: [user2Id], references: [id])
+  messages        Message[]
+  friendRequest   FriendRequest[]
+  user1LastReadId String?
+  user1LastReadAt DateTime?
+  user2LastReadId String?
+  user2LastReadAt DateTime?
+  user1LastRead   Message?         @relation("User1Read", fields: [user1LastReadId], references: [id])
+  user2LastRead   Message?         @relation("User2Read", fields: [user2LastReadId], references: [id])
+  user1DeletedAt  DateTime?
+  user2DeletedAt  DateTime?
+  finalDeleteAt   DateTime?
 
   @@unique([user1Id, user2Id])
+  @@index([user1Id, user1DeletedAt])
+  @@index([user2Id, user2DeletedAt])
+  @@index([finalDeleteAt])
 }
 
 model FriendRequest {
-  id         String        @id @default(cuid(2))
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
-  origin     RequestOrigin
-  matchId    String?
-  senderId   String
-  receiverId String
-  status     RequestStatus @default(PENDING)
-  sender     UserProfile   @relation("SentRequests", fields: [senderId], references: [id])
-  receiver   UserProfile   @relation("ReceivedRequests", fields: [receiverId], references: [id])
+  id           String        @id @default(cuid(2))
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  origin       RequestOrigin
+  connectionId String?
+  connection   Connection?   @relation(fields: [connectionId], references: [id])
+  senderId     String
+  receiverId   String
+  status       RequestStatus @default(PENDING)
+  sender       UserProfile   @relation("SentRequests", fields: [senderId], references: [id])
+  receiver     UserProfile   @relation("ReceivedRequests", fields: [receiverId], references: [id])
 
   @@unique([senderId, receiverId])
+  @@index([receiverId, status])
+  @@index([senderId, status])
 }
 
 model Message {
-  id           String      @id @default(cuid(2))
-  createdAt    DateTime    @default(now())
-  content      String
-  isRead       Boolean     @default(false)
-  type         MessageType @default(TEXT)
-  senderId     String
-  connectionId String
-  sender       UserProfile @relation(fields: [senderId], references: [id])
-  connection   Connection  @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  id                    String       @id @default(cuid(2))
+  createdAt             DateTime     @default(now())
+  content               String
+  type                  MessageType  @default(TEXT)
+  senderId              String?
+  connectionId          String
+  sender                UserProfile? @relation(fields: [senderId], references: [id])
+  connection            Connection   @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  readByConnectionUser1 Connection[] @relation("User1Read")
+  readByConnectionUser2 Connection[] @relation("User2Read")
+
+  @@index([connectionId, createdAt(sort: Desc)])
 }
