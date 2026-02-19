@@ -1,11 +1,11 @@
 import Redis from "ioredis";
-import { RATE_LIMIT_SCRIPT, UserAuthProfile, UserSession } from "../common";
+import { RATE_LIMIT_SCRIPT, UserSession } from "../common";
 
 export class AuthManager {
   constructor (private redis:Redis) {}
 
-  async cacheSession(userId:string, email:string, tokenVersion: number, profile:UserAuthProfile){
-    const data:UserSession = {userId,email,tokenVersion,profile};
+  async cacheSession(userId:string, tokenVersion: number, userProfileId:string | null){
+    const data:UserSession = {userId,tokenVersion,userProfileId};
     await this.redis.set(`session:${userId}`,JSON.stringify(data),"EX",60 * 60 * 24 * 7);
   } 
   async getSession(userId:string): Promise<UserSession | null>{
@@ -18,7 +18,7 @@ export class AuthManager {
   async setResetToken(token:string,userId:string){
     await this.redis.set(`reset:${token}`,userId,"EX",60 * 10)
   }
-  async getResetToken(token:string){
+  async getUserIdByResetToken(token:string){
     return await this.redis.get(`reset:${token}`);
   }
   async consumeResetToken(token:string){

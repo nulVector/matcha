@@ -36,13 +36,10 @@ export interface UserProfile {
   interest: string[];
 }
 
-export type UserAuthProfile = Pick<UserProfile, 'id' | 'username' | 'avatarUrl'>;
-
 export interface UserSession {
   userId: string;
-  email: string;
   tokenVersion: number;
-  profile: UserAuthProfile;
+  userProfileId: string | null
 }
 
 export interface CachedMessage {

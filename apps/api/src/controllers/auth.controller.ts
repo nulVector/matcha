@@ -1,41 +1,45 @@
 import prisma from "@matcha/prisma";
 import { requestPasswordResetType, resetPasswordType, signupType } from "@matcha/zod";
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import passport from 'passport';
 import { COOKIE_OPTIONS } from "../constant/cookie";
+import { redisManager } from "../services/redis";
 
 const jwtSecret = process.env.JWT_SECRET;
 if (!jwtSecret){
   throw new Error("Environment variables not available");
 }
-//TODO- Cache email and ip address to rate limit
+
 export const signup = async (req:Request, res:Response,next:NextFunction) =>{
   try{
     const {email,password}:signupType = req.validatedData.body;
     const hashedPassword = await bcrypt.hash(password,10);
-    const newUserId = await prisma.user.create({
+    const newUser = await prisma.user.create({
       data:{
         email,
         password:hashedPassword
       },select:{
-        id:true
+        id:true,
+        tokenVersion:true
       }
     });
+    await redisManager.auth.cacheSession(newUser.id,newUser.tokenVersion,null);
     const token = jwt.sign({
-      id:newUserId
+      id:newUser.id,
+      tokenVersion:newUser.tokenVersion
     },jwtSecret,{expiresIn:'7d'});
     res.cookie("token",token,COOKIE_OPTIONS);
-    res.status(201).json({message:"User created successfully"});
-    return;
+    return res.status(201).json({message:"User created successfully"});
   }catch(err){
     next(err)
   }
 }
 
 export const login = async (req:Request,res:Response,next:NextFunction)=>{
-  passport.authenticate('local',{session:false},(err:Error,user: Express.User | false,info:{message:string}|undefined)=>{
+  passport.authenticate('local',{session:false},async (err:Error,user: Express.User | false,info:{message:string}|undefined)=>{
     if (err) {
       next(err);
       return;
@@ -46,72 +50,66 @@ export const login = async (req:Request,res:Response,next:NextFunction)=>{
       });
       return;
     }
+    await redisManager.auth.cacheSession(user.id,user.tokenVersion,user.profile ? user.profile.id : null);
     const token = jwt.sign({
-      id:user.id
+      id:user.id,
+      tokenVersion:user.tokenVersion
     },jwtSecret,{expiresIn:'7d'});
     res.cookie("token",token,COOKIE_OPTIONS);
-    res.json({message:"Logged in successfully"});
-    return;
+    return res.json({message:"Logged in successfully"});
   })(req,res,next);
 }
 
-export const requestReset = async (req:Request,res:Response,next:NextFunction) => {
+export const requestResetPassword = async (req:Request,res:Response,next:NextFunction) => {
   try {
     const {email}:requestPasswordResetType = req.validatedData.body;
-    const user = await prisma.user.count({
-      where: { 
-        email
-      }
-    }) > 0;
-
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true }
+    });
     if (user) {
-      
-       //TODO - generate otp and send to email
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      await redisManager.auth.setResetToken(resetToken, user.id);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
+      // TODO - send email to user via Nodemailer/Resend/SendGrid
     }
-    res.json({ message: "If an account exists, a reset code has been sent." });
-    return;
+    return res.json({ message: "If an account exists, a reset code has been sent." });
   } catch (err) {
     next(err)
   }
 }
 
-export const confirmReset = async (req: Request, res: Response,next:NextFunction) => {
+export const confirmResetPassword = async (req: Request, res: Response,next:NextFunction) => {
   try {
     const {token,password}:resetPasswordType = req.validatedData!.body;
-    const tokenRecord = await prisma.passwordResetToken.findUnique({
-      where:{
-        token
-      }
-    })
-    if(!tokenRecord || tokenRecord.expiresAt < new Date()){
-      res.status(400).json({ message: "Invalid or expired token"});
-      return
+    const userId = await redisManager.auth.getUserIdByResetToken(token);
+    if (!userId) {
+      return res.status(400).json({ message: "Invalid or expired reset token." });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { 
-          id:tokenRecord.userId
-        },
-        data: { 
-          password: hashedPassword 
-        }
-      }),
-      prisma.passwordResetToken.delete({
-        where:{
-          id:tokenRecord.id
-        }
-      })
-    ])
-    return res.json({ message: "Password updated successfully." });
+    await prisma.user.update({
+      where: { id:userId },
+      data: { 
+        password: hashedPassword,
+        tokenVersion: { increment: 1 }
+      }
+    });
+    await redisManager.auth.consumeResetToken(token);
+    await redisManager.auth.invalidateSession(userId);
+    return res.json({ message: "Password has been successfully reset. Please log in." });
   } catch (err) {
     next(err)
   }
 };
-//TODO - Cache JWT to blacklist after logout and check in auth to not allow blacklisted jwt | is it needed if i add session mangement?
-export const logout = async (req:Request,res:Response)=>{
-  res.clearCookie("token",{...COOKIE_OPTIONS,maxAge:0});
-  res.json({message:"logged out"});
-  return;
+
+export const logout = async (req:Request,res:Response,next:NextFunction)=>{
+  try {
+    const userId = req.user!.id;
+    await redisManager.auth.invalidateSession(userId);
+    res.clearCookie("token", COOKIE_OPTIONS);
+    return res.json({ message: "Logged out successfully" });
+  } catch (err) {
+    next(err);
+  }
 }
-//TODO - how does redis help with auth in Websocket

@@ -1,11 +1,13 @@
-import { UserProfile } from "@matcha/prisma";
+export {};
 
 declare global {
   namespace Express {
     interface User {
       id: string;
-      email?: string;
-      profile?: UserProfile | null;
+      tokenVersion:number;
+      profile: {
+        id:string;
+      } | null;
     }
     interface Request {
       validatedData: {

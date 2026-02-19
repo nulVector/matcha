@@ -3,13 +3,15 @@ import bcrypt from "bcrypt";
 import { PassportStatic } from "passport";
 import { ExtractJwt, Strategy as JwtStrategy } from "passport-jwt";
 import { Strategy as LocalStrategy } from "passport-local";
+import { redisManager } from "../services/redis";
 
 interface JwtPayload {
-  id:string
+  id:string,
+  tokenVersion:number
 }
 const jwtSecret = process.env.JWT_SECRET;
 if(!jwtSecret){
-    throw new Error("Environment variables not availble");
+  throw new Error("Environment variables not availble");
 }
 
 export const configurePassport = (passport:PassportStatic) =>{
@@ -24,6 +26,7 @@ export const configurePassport = (passport:PassportStatic) =>{
           select:{
             id:true,
             password:true,
+            tokenVersion:true,
             deletedAt:true,
             profile: {
               select:{
@@ -56,7 +59,11 @@ export const configurePassport = (passport:PassportStatic) =>{
             }
           })
         }
-        return done(null, {id:user.id});                  
+        return done(null, {
+          id:user.id,
+          tokenVersion:user.tokenVersion,
+          profile: hasProfile ? {id:user.profile!.id} : null 
+        });                  
       }catch(err){
         return done(err)
       }
@@ -77,25 +84,16 @@ export const configurePassport = (passport:PassportStatic) =>{
     },
     async (jwt_payload:JwtPayload,done) => {
       try {
-        const user = await prisma.user.findUnique({
-          where:{
-            id: jwt_payload.id
-          },
-          select:{
-            id: true,
-            profile: {
-              select:{
-                id:true,
-                username:true,
-                avatar:true
-              }
-            },
-          }
-        });
-        if(!user) {
-          return done(null,false);
+        const session = await redisManager.auth.getSession(jwt_payload.id);
+        if (!session || session.tokenVersion !== jwt_payload.tokenVersion) {
+          return done(null, false);
         }
-        return done(null,user);
+        const user: Express.User = {
+          id: session.userId,
+          tokenVersion: session.tokenVersion,
+          profile: session.userProfileId ? { id: session.userProfileId } : null
+        };
+        return done(null, user);
       }catch(err){
         return done(err)
       }
