@@ -12,13 +12,13 @@
     "clean": "rimraf dist .turbo"
   },
   "dependencies": {
-    "@repo/ui": "workspace:*",
+    "@matcha/ui": "workspace:*",
     "next": "16.0.10",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
-    "@repo/eslint-config": "workspace:*",
+    "@matcha/eslint-config": "workspace:*",
     "@matcha/typescript-config": "workspace:*",
     "@types/node": "^22.15.3",
     "@types/react": "19.2.2",

@@ -38,7 +38,6 @@ export const seedDB = async (req:Request,res:Response,next:NextFunction) =>{
   }
 }
 
-
 export const checkUsername = async (req:Request,res:Response,next:NextFunction) =>{
   try{
     const {username}:usernameCheckType= req.validatedData.query;

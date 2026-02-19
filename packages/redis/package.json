@@ -1,11 +1,23 @@
 {
-  "name": "redis",
+  "name": "@matcha/redis",
   "version": "1.0.0",
   "private": true,
   "type": "commonjs",
-  "main": "index.js",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc",
+    "dev": "tsc -w",
+    "clean": "rimraf dist .turbo"
   },
   "devDependencies": {
     "@matcha/typescript-config": "workspace:*"
