@@ -39,4 +39,7 @@ export class AuthManager {
     const result = await this.redis.set(`idempotency:${requestId}`, "processed", "EX", expireTime, "NX");
     return result === 'OK';
   }
+  async consumeIdempotency(requestId:string){
+    await this.redis.del(`idempotency:${requestId}`);
+  }
 }

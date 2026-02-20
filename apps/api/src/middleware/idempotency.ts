@@ -9,12 +9,18 @@ export const idempotencyGuard = (action: string, expireTimeSeconds: number) => {
         res.status(400).json({ message: "x-idempotency-key header is required" });
         return;
       }
-      const isFirstRequest = await redisManager.auth.checkIdempotency(`${action}:${idempotencyKey}`, expireTimeSeconds);
+      const redisKey = `${action}:${idempotencyKey}`;
+      const isFirstRequest = await redisManager.auth.checkIdempotency(redisKey, expireTimeSeconds);
       
       if (!isFirstRequest) {
         res.status(409).json({ message: "Request already processed or currently processing." });
         return;
       }
+      res.on('finish', async () => {
+        if (res.statusCode >= 400) {
+          await redisManager.auth.consumeIdempotency(redisKey);
+        }
+      });
       next();
     } catch (error) {
       next(error);

@@ -10,11 +10,6 @@ export enum ConnectionListType {
   ARCHIVED = "ARCHIVED"
 }
 
-export enum RequestListType {
-  SENT = "SENT",
-  RECEIVED = "RECEIVED",
-}
-
 export enum MessageType {
   TEXT = "TEXT",
   SYSTEM = "SYSTEM"
@@ -23,11 +18,11 @@ export enum MessageType {
 export interface UserProfile {
   id: string;
   username: string;
-  aboutMe: string;
+  aboutMe: string | null;
   isActive: boolean;
-  lastSeen: string;
+  lastSeen: string | null;
   allowDiscovery: boolean;
-  openingQues: string;
+  openingQues: string | null;
   updatedAt: string;
   avatarUrl: string;
   location: string;

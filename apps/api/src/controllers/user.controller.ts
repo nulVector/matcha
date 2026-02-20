@@ -1,9 +1,21 @@
 import prisma from '@matcha/prisma';
-import { connectionIdType, deactivatePasswordType, getConnectionsListType, getFriendRequestsType, initiateProfileType, requestHandleType, requestIdType, sendRequestType, updateAvatarType, updateDiscoveryType, updatePasswordType, updateProfileType, userIdType, usernameCheckType } from '@matcha/zod';
+import { ConnectionListType } from '@matcha/redis';
+import { connectionIdType, deactivatePasswordType, getConnectionsListType, getFriendRequestsType, initiateProfileType, requestHandleType, requestIdType, sendRequestType, updatePasswordType, updateProfileType, userIdType, usernameCheckType, vibeCheckType } from '@matcha/zod';
 import bcrypt from "bcrypt";
 import { NextFunction, Request, Response } from "express";
+import jwt from "jsonwebtoken";
 import { COOKIE_OPTIONS } from '../constant/cookie';
-import { USERNAME_VIBES, VibeType } from '../constant/usernameList';
+import { USERNAME_VIBES } from '../constant/usernameList';
+import { redisManager } from '../services/redis';
+
+type LocationMetadata = { id: string; name: string; latitude: number; longitude: number };
+type InterestMetadata = { id: string; name: string };
+type AvatarMetadata = { id: string; url: string; };
+
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret) {
+  throw new Error("Environment variables not available");
+}
 
 export const seedDB = async (req:Request,res:Response,next:NextFunction) =>{
   try {
@@ -21,13 +33,13 @@ export const seedDB = async (req:Request,res:Response,next:NextFunction) =>{
 
   await Promise.all([
     Promise.all(avatarUrls.map(url => 
-      prisma.avatar.create({ data: { avatarUrl: url } })
+      prisma.avatar.create({ data: { url: url } })
     )),
     Promise.all(cityNames.map(name => 
-      prisma.location.create({ data: { location: name } })
+      prisma.location.create({ data: { name: name, latitude:1,longitude:0} })
     )),
     Promise.all(interestNames.map(name => 
-      prisma.interest.create({ data: { interest: name } })
+      prisma.interest.create({ data: { name: name } })
     )),
   ]);
   res.json({
@@ -41,19 +53,18 @@ export const seedDB = async (req:Request,res:Response,next:NextFunction) =>{
 export const checkUsername = async (req:Request,res:Response,next:NextFunction) =>{
   try{
     const {username}:usernameCheckType= req.validatedData.query;
+    const mightExist = await redisManager.bloom.exists('bf:usernames', username);
+    if (!mightExist) {
+      return res.status(200).json({ available: true, message: "Username available." });
+    }
     const existingUser = await prisma.userProfile.findUnique({
-      where:{
-        username
-      },
-      select:{
-        username:true
-      }
+      where:{ username },
+      select:{ username:true }
     })
     if(existingUser){
-      res.status(200).json({"available": false,message:"Username already taken."});
-      return;
+      return res.status(200).json({available: false,message:"Username already taken."});
     }
-    res.status(200).json({"available": true,message:"Username available."})
+    res.status(200).json({available: true,message:"Username available."})
   }catch(err) {
     next(err)
   }
@@ -64,24 +75,16 @@ export const generateUsername = async (req:Request,res:Response,next:NextFunctio
   let attempts = 0;
   const maxAttempts = 50;
   try{
-    //TODO - zod enum
-    const vibe = (req.query.vibe as VibeType) || 'chaos';
+    const {vibe} = (req.validatedData.query as vibeCheckType) || 'chaos';
     const {adjectives,nouns} = USERNAME_VIBES[vibe];
     const getRandom = (arr:string[]) => arr[Math.floor(Math.random()*arr.length)]?.replace(/\s+/g, '');
     while (generatedList.length < 5 && attempts < maxAttempts){
       attempts++;
       const generatedUsername = `${getRandom(adjectives)}_${getRandom(nouns)}_${Math.floor(100 + Math.random() * 900)}`;
       if (generatedList.includes(generatedUsername)) continue;
-      const existingUser = await prisma.userProfile.findUnique({
-        where:{
-          username:generatedUsername
-        },select:{
-          username:true
-        }
-      })
-      if (!existingUser) {
-        generatedList.push(generatedUsername);
-      }
+      const mightExist = await redisManager.bloom.exists('bf:usernames', generatedUsername);
+      if (mightExist) continue;
+      generatedList.push(generatedUsername);
     }
     res.json({
       usernames: generatedList
@@ -93,30 +96,64 @@ export const generateUsername = async (req:Request,res:Response,next:NextFunctio
 
 export const initiateProfile = async (req:Request, res:Response,next:NextFunction) => {
   try {
-    const {username,avatarId}:initiateProfileType = req.validatedData.body;
-    //TODO- add default avatar id in the frontend
+    const {
+      username,
+      avatarUrl,
+      aboutMe,
+      openingQues,
+      location,
+      locationLatitude,
+      locationLongitude,
+      interest
+    }:initiateProfileType = req.validatedData.body;
     const userId = req.user!.id;
+    const tokenVersion = req.user!.tokenVersion;
     const userProfile = await prisma.userProfile.create({
       data: {
+        userId,
         username,
-        avatarId,
-        userId
+        avatarUrl,
+        aboutMe,
+        openingQues,
+        location,
+        locationLatitude,
+        locationLongitude,
+        interest
       },
       select: {
+        id: true,
         username: true,
-        avatar: {
-          select: {
-            avatarUrl:true
-          }
-        }
+        avatarUrl: true
       }
     });
+    //TODO - push to a queue(bullmq)
+    await redisManager.bloom.add('bf:usernames', userProfile.username);
+    await redisManager.auth.cacheSession(userId, tokenVersion, userProfile.id);
+    await redisManager.userDetail.cacheProfile(userProfile.id, {
+      id: userProfile.id,
+      username: userProfile.username,
+      avatarUrl: userProfile.avatarUrl,
+      aboutMe,
+      openingQues,
+      location,
+      locationLatitude,
+      locationLongitude,
+      interest,
+      isActive: true,
+      allowDiscovery: false
+    });
+    await redisManager.match.updateUserStatus(
+      userProfile.id, 
+      locationLatitude, 
+      locationLongitude, 
+      interest
+    );
     res.status(201).json({
       success:true,
       message: "Profile created successfully",
       data: {
         username:userProfile.username,
-        avatar:userProfile.avatar.avatarUrl
+        avatar:userProfile.avatarUrl
       }
     });
     return;
@@ -127,13 +164,38 @@ export const initiateProfile = async (req:Request, res:Response,next:NextFunctio
 
 export const getMetadata = async (req:Request,res:Response,next:NextFunction) =>{
   try {
-    const [locations,interests] = await Promise.all([
-      prisma.location.findMany({orderBy:{location:"asc"}}),
-      prisma.interest.findMany({orderBy:{interest:"asc"}})
+    const [cachedLocations,cachedInterests,cachedAvatars] = await Promise.all([
+      redisManager.metaData.getMetadata<LocationMetadata>('locations'),
+      redisManager.metaData.getMetadata<InterestMetadata>('interests'),
+      redisManager.metaData.getMetadata<AvatarMetadata>('avatars'),
     ]);
+    if (cachedLocations && cachedInterests && cachedAvatars) {
+      return res.json({
+        success: true,
+        data: {
+          locations: cachedLocations,
+          interests: cachedInterests,
+          avatars: cachedAvatars
+        }
+      });
+    }
+    const [locations, interests, avatars] = await Promise.all([
+      cachedLocations || prisma.location.findMany({ orderBy: { name: 'asc' } }),
+      cachedInterests || prisma.interest.findMany({ orderBy: { name: 'asc' } }),
+      cachedAvatars || prisma.avatar.findMany()
+    ]);
+    const cachePromises: Promise<void>[] = [];
+    if (!cachedLocations) cachePromises.push(redisManager.metaData.cacheMetadata('locations', locations));
+    if (!cachedInterests) cachePromises.push(redisManager.metaData.cacheMetadata('interests', interests));
+    if (!cachedAvatars) cachePromises.push(redisManager.metaData.cacheMetadata('avatars', avatars));
+    Promise.all(cachePromises).catch(err => console.error("Failed to cache metadata:", err));
     res.json({
-      locations,
-      interests
+      success: true,
+      data: {
+        locations,
+        interests,
+        avatars
+      }
     })
   }catch(err){
     next(err);
@@ -142,29 +204,54 @@ export const getMetadata = async (req:Request,res:Response,next:NextFunction) =>
 
 export const updateProfile = async (req:Request,res:Response,next:NextFunction) =>{
   try{
-    const {aboutMe, openingQues, locationId, interestsId}:updateProfileType = req.validatedData.body;
-    const userId = req.user!.profile!.id;
-    const updateData:any= {
+    const {
+      avatarUrl,
       aboutMe,
       openingQues,
-      locationId
-    };
-    //TODO - understand set function 
-    if (interestsId) {
-      updateData.interest = {
-        set: interestsId.map((id: string) => ({ id }))
-      };
+      location,
+      locationLatitude,
+      locationLongitude,
+      interest,
+      allowDiscovery
+    }:updateProfileType = req.validatedData.body;
+    const profileId = req.user!.profile!.id;
+    const updateData: any = {};
+    if (aboutMe !== undefined) updateData.aboutMe = aboutMe;
+    if (openingQues !== undefined) updateData.openingQues = openingQues;
+    if (location !== undefined) updateData.location = location;
+    if (locationLatitude !== undefined) updateData.locationLatitude = locationLatitude;
+    if (locationLongitude !== undefined) updateData.locationLongitude = locationLongitude;
+    if (interest !== undefined) updateData.interest = interest;
+    if (avatarUrl !== undefined) updateData.avatarUrl = avatarUrl;
+    if (allowDiscovery !== undefined) updateData.allowDiscovery = allowDiscovery;
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ success: false, message: "No fields provided to update" });
     }
-    //TODO - what if profile doesn't update?
-    await prisma.userProfile.update({
-      where:{
-        id:userId
-      },
-      data:updateData
+
+    const updatedProfile = await prisma.userProfile.update({
+      where: { id: profileId },
+      data: updateData,
+      select: {
+        interest: true,
+        locationLatitude: true,
+        locationLongitude: true,
+        allowDiscovery: true
+      }
     });
+    await redisManager.userDetail.updateProfileFields(profileId, updateData);
+    if (interest || (locationLatitude && locationLongitude)) {
+      await redisManager.match.updateUserStatus(
+        profileId, 
+        updatedProfile.locationLatitude, 
+        updatedProfile.locationLongitude, 
+        updatedProfile.interest
+      );
+    }
     res.json({
       success:true,
       message: "Profile updated successfully",
+      allowDiscovery: updatedProfile.allowDiscovery
     });
     return;
   }catch(err){
@@ -172,112 +259,44 @@ export const updateProfile = async (req:Request,res:Response,next:NextFunction) 
   }
 }
 
-export const updateAvatar = async (req:Request,res:Response,next:NextFunction) => {
-  try {
-    const {avatarId}:updateAvatarType = req.validatedData.body;
-    const userProfileId = req.user!.profile!.id;
-    const updatedProfile = await prisma.userProfile.update({
-      where:{
-        id:userProfileId
-      },
-      data:{
-        avatarId
-      },
-      select:{
-        avatar:{
-          select:{
-            avatarUrl:true
-          }
-        }
-      }
-    });
-    if (!updatedProfile.avatar) {
-      res.status(404).json({
-        success: false,
-        message: "Avatar record not found."
-      });
-      return;
-    }
-    res.json({
-      success:true,
-      avatar:updatedProfile.avatar.avatarUrl
-    })
-  } catch (err){
-    next(err)
-  }
-}
-
-export const updateDiscovery = async (req:Request,res:Response,next:NextFunction) => {
-  try {
-    const {allowDiscovery}:updateDiscoveryType = req.validatedData.body;
-    const userProfileId = req.user!.profile!.id;
-    const updatedProfile = await prisma.userProfile.update({
-      where:{
-        id:userProfileId
-      },
-      data:{
-        allowDiscovery
-      },
-      select:{
-        allowDiscovery:true
-      }
-    });
-    res.json({
-      success:true,
-      allowDiscovery:updatedProfile.allowDiscovery
-    })
-  } catch (err){
-    next(err)
-  }
-}
-
 export const getProfile = async (req:Request,res:Response, next:NextFunction) =>{
   try {
-    const userId = req.user!.profile!.id;
+    const profileId = req.user!.profile!.id;
+    const cachedProfile = await redisManager.userDetail.getProfile(profileId);
+    
+    if (cachedProfile) {
+      return res.json({
+        success: true,
+        data: cachedProfile
+      });
+    }
     const userProfile = await prisma.userProfile.findUnique({
-      where:{
-        id:userId
-      },select:{
-        username:true,
-        aboutMe:true,
-        allowDiscovery:true,
-        openingQues:true,
-        avatar:{
-          select:{
-            avatarUrl:true
-          }
-        },
-        location:{
-          select:{
-            location:true
-          }
-        },
-        interest:{
-          select:{
-            interest:true
-          }
-        }
+      where: { id: profileId },
+      select: {
+        id: true,
+        username: true,
+        aboutMe: true,
+        allowDiscovery: true,
+        openingQues: true,
+        avatarUrl: true,
+        location: true,
+        interest: true,
+        isActive: true
       }
-    })
+    });
     if (!userProfile) {
-      res.status(404).json({ 
+      return res.status(404).json({
+        success: false,
         message: "Profile not found. Please complete onboarding." 
       });
-      return;
     }
-    const interests = userProfile.interest.map(i => i.interest);
+    redisManager.userDetail.cacheProfile(profileId, userProfile).catch(err => {
+      console.error("Failed to cache profile", err);
+    });
     res.json({
-      success:true,
-      data: {
-        username:userProfile.username,
-        aboutMe: userProfile.aboutMe,
-        allowDiscovery: userProfile.allowDiscovery,
-        openingQuestion: userProfile.openingQues,
-        location: userProfile.location?.location,
-        avatar: userProfile.avatar.avatarUrl,
-        interests
-      }
-    })
+      success: true,
+      data: userProfile
+    });
   } catch (err) {
     next(err)
   }
@@ -285,41 +304,42 @@ export const getProfile = async (req:Request,res:Response, next:NextFunction) =>
 
 export const updatePassword = async (req:Request,res:Response, next:NextFunction) =>{
   try{
-    //TODO - add session, logout from other devies and new jwt issue
     const {currentPassword,newPassword}:updatePasswordType = req.validatedData.body;
     const userId = req.user!.id;
+    const profileId = req.user!.profile!.id;
     const existingUser = await prisma.user.findUnique({
-      where:{
-        id:userId
-      },
-      select:{
-        password:true
-      }
+      where:{ id:userId },
+      select:{ password:true }
     });
     if (!existingUser) {
-      res.status(404).json({
+      return res.status(404).json({
         success: false,
         message: "User not found"
       });
-      return;
     }
     const isMatch = await bcrypt.compare(currentPassword,existingUser.password);
     if(!isMatch){
-      res.status(400).json({
+      return res.status(400).json({
         messgage:"Password is invalid"
       })
-      return
     }
     const hashedPassword = await bcrypt.hash(newPassword,10);
-    await prisma.user.update({
-      where:{
-        id:userId
-      },
+    const updatedUser = await prisma.user.update({
+      where:{ id:userId },
       data:{
-        password:hashedPassword
-      }
+        password:hashedPassword,
+        tokenVersion: { increment: 1 }
+      },
+      select: { tokenVersion: true }
     })
-    res.json({
+    await redisManager.auth.cacheSession(userId, updatedUser.tokenVersion, profileId);
+    const token = jwt.sign({ 
+        id: userId, 
+        tokenVersion: updatedUser.tokenVersion 
+      },jwtSecret,{ expiresIn: '7d' });
+
+    res.cookie("token", token, COOKIE_OPTIONS);
+    return res.json({
       success:true,
       message:"Password changed successfully."
     })
@@ -344,8 +364,8 @@ export const getConnectionsList = async (req: Request, res: Response, next: Next
       },
       select: {
         id: true,
-        user1: { select: { id: true, username: true, isActive: true, avatar: { select: { avatarUrl: true } } } },
-        user2: { select: { id: true, username: true, isActive: true, avatar: { select: { avatarUrl: true } } } }
+        user1: { select: { id: true, username: true, isActive: true, avatarUrl: true } },
+        user2: { select: { id: true, username: true, isActive: true, avatarUrl: true } }
       }
     });
     const formattedList = connections.map((conn) => {
@@ -354,10 +374,18 @@ export const getConnectionsList = async (req: Request, res: Response, next: Next
         id: otherUser.id,
         username: otherUser.username,
         isActive: otherUser.isActive,
-        avatarUrl: otherUser.avatar.avatarUrl || null,
+        avatarUrl: otherUser.avatarUrl,
         connectionId: conn.id
       };
     });
+
+    const connectionIds = formattedList.map(user => user.id);
+    const redisListType = status === "FRIEND" 
+      ? ConnectionListType.FRIEND 
+      : ConnectionListType.ARCHIVED;
+    redisManager.userDetail.cacheConnectionList(userProfileId, connectionIds, redisListType)
+      .catch(err => console.error("Failed to warm connection cache:", err));
+
     res.json({
       success: true,
       status: status,
@@ -372,26 +400,30 @@ export const getConnectionsList = async (req: Request, res: Response, next: Next
 export const deleteConnection = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const {connectionId}:connectionIdType = req.validatedData.params;
-    const myProfileId = req.user!.profile!.id;
+    const profileId = req.user!.profile!.id;
     const now = new Date();
-    const [res1, res2] = await Promise.all([
-      prisma.connection.updateMany({
-        where: { id: connectionId, user1Id: myProfileId },
-        data: { user1DeletedAt: now }
-      }),
-      prisma.connection.updateMany({
-        where: { id: connectionId, user2Id: myProfileId },
-        data: { user2DeletedAt: now }
-      })
-    ]);
-
-    if (res1.count === 0 && res2.count === 0) {
-      res.status(404).json({
+    const connection = await prisma.connection.findFirst({
+      where: {
+        id: connectionId,
+        OR: [{ user1Id: profileId }, { user2Id: profileId }]
+      },
+      select: { user1Id: true, user2Id: true }
+    });
+    if (!connection) {
+      return res.status(404).json({
         success: false,
         message: "Chat not found or access denied."
       });
-      return;
     }
+    const isUser1 = connection.user1Id === profileId;
+    await prisma.connection.update({
+      where: { id: connectionId },
+      data: isUser1 ? { user1DeletedAt: now } : { user2DeletedAt: now }
+    });
+    await Promise.all([
+      redisManager.userDetail.cacheConnectionList(profileId, [], ConnectionListType.FRIEND),
+      redisManager.userDetail.cacheConnectionList(profileId, [], ConnectionListType.ARCHIVED)
+    ]);
     res.json({
       success:true
     })
@@ -416,13 +448,13 @@ export const getFriendRequests = async (req: Request, res: Response, next: NextF
       select: {
         id: true,
         origin: true,
-        matchId:true,
+        connectionId:true,
         [isIncoming ? "sender" : "receiver"]: {
           select: { 
             id: true, 
             username: true,
             isActive:true,
-            avatar: { select: { avatarUrl: true } },
+            avatarUrl:true
           }
         }
       }
@@ -430,11 +462,11 @@ export const getFriendRequests = async (req: Request, res: Response, next: NextF
     const formattedData = requestList.map((request) => ({
       requestId: request.id,
       origin: request.origin,
-      matchId:request.matchId,
+      connectionId:request.connectionId,
       type: type.toUpperCase(),
       user: isIncoming ? request.sender : request.receiver
     }));
-    //TODO- avatarURl flattening
+
     res.json({
       success: true,
       data: formattedData,
@@ -455,26 +487,23 @@ export const searchUser = async (req: Request, res: Response, next: NextFunction
         isActive:true
       },
       select:{
+        id: true,
         username:true,
-        avatar:{
-          select:{
-            avatarUrl:true
-          }
-        }
+        avatarUrl:true
       }
     })
     if (!requestedUser) {
-      res.status(404).json({
+      return res.status(404).json({
         success: false,
         message: "User not found or private"
       });
-      return;
     };
     res.json({
       success:true,
       data:{
+        id: requestedUser.id,
         username:requestedUser.username,
-        avatar: requestedUser.avatar.avatarUrl
+        avatar: requestedUser.avatarUrl
       }
     })
   } catch (err) {
@@ -496,8 +525,8 @@ export const getUserProfile = async (req:Request,res:Response,next:NextFunction)
         id: true,
         username: true,
         aboutMe: true,
-        interest: { select: { interest: true } },
-        avatar: { select: { avatarUrl: true } },
+        interest: true,
+        avatarUrl:true,
         matchAsUser1: {
           where: { user2Id: myUserProfileId },
           select: { id: true, status: true }
@@ -533,8 +562,8 @@ export const getUserProfile = async (req:Request,res:Response,next:NextFunction)
         id: requestedUserProfile.id,
         username: requestedUserProfile.username,
         aboutMe: requestedUserProfile.aboutMe,
-        interest: requestedUserProfile.interest.map(i=>i.interest),
-        avatar: requestedUserProfile.avatar,
+        interest: requestedUserProfile.interest,
+        avatarUrl: requestedUserProfile.avatarUrl,
         relationship: {
           connectionId: connection?.id || null,
           status: connection?.status || "NONE",
@@ -551,30 +580,27 @@ export const getUserProfile = async (req:Request,res:Response,next:NextFunction)
 export const sendRequest = async (req:Request,res:Response,next:NextFunction) => {
   try {
     const {userId:targetUserId}: userIdType = req.validatedData.params;
-    const {origin,matchId}: sendRequestType = req.validatedData.body;
+    const {origin,connectionId}: sendRequestType = req.validatedData.body;
     const myProfileId = req.user!.profile!.id;
     if (myProfileId === targetUserId) {
-      res.status(400).json({
+      return res.status(400).json({
         success: false,
         message: "Self-requests are not allowed"
       });
-      return;
     }
     const target = await prisma.userProfile.findFirst({
       where:{
         id:targetUserId,
         isActive:true,
         allowDiscovery:true
-      },select:{
-        id:true
-      }
+      },
+      select:{ id:true }
     });
     if(!target){
-      res.status(404).json({
+      return res.status(404).json({
         success:false,
         message:"User not found"
       })
-      return;
     }
     const requestData = await prisma.$transaction(async (tx) => {
       const existingConnection = await tx.connection.findFirst({
@@ -583,12 +609,13 @@ export const sendRequest = async (req:Request,res:Response,next:NextFunction) =>
             { user1Id: myProfileId, user2Id: targetUserId },
             { user1Id: targetUserId, user2Id: myProfileId }
           ]
-        },select:{
+        },
+        select:{
           id:true,
           status:true
         }
       });
-      if (existingConnection?.status === "FRIEND") throw new Error("Already_connected");
+      if (existingConnection?.status === "FRIEND") return { status: "ALREADY_CONNECTED" };
       const pendingRequest = await tx.friendRequest.findFirst({
         where: {
           OR: [
@@ -601,26 +628,33 @@ export const sendRequest = async (req:Request,res:Response,next:NextFunction) =>
       });
 
       if (pendingRequest) {
-        return { error: "PENDING", senderId: pendingRequest.senderId };
+        return { status: "PENDING", senderId: pendingRequest.senderId };
       }
       let finalOrigin = origin;
-      let finalMatchId = matchId;
+      let finalconnectionId = connectionId;
 
       if (existingConnection) {
         finalOrigin = "ARCHIVE";
-        finalMatchId = existingConnection.id;
+        finalconnectionId = existingConnection.id;
       }
       await tx.friendRequest.create({
         data: {
           origin: finalOrigin,
-          matchId: finalMatchId,
+          connectionId: finalconnectionId,
           senderId: myProfileId,
           receiverId:targetUserId
         }
       });
-      return { success: true };
+      return { status: "SUCCESS" };
     });
-    if (requestData.error === "PENDING") {
+    if (requestData.status === "ALREADY_CONNECTED") {
+      return res.status(400).json({
+        success: false,
+        message: "You are already friends with this user"
+      });
+    }
+
+    if (requestData.status === "PENDING") {
       return res.status(400).json({
         success: false,
         message: requestData.senderId === myProfileId 
@@ -628,18 +662,13 @@ export const sendRequest = async (req:Request,res:Response,next:NextFunction) =>
           : "This user has already sent you a request! Check your inbox." 
       });
     }
+
+    //TODO - notification of friend request
     res.status(201).json({
       success: true,
       message: "Friend Request sent successfully"
     });
-  } catch (err:any) {
-    if (err.message === "Already_connected") {
-      res.status(400).json({
-        success: false,
-        message: "You are already friends with this user"
-      })
-      return;
-    }
+  } catch (err) {
     next(err)
   }
 }
@@ -690,20 +719,18 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
       select: {
         senderId: true,
         origin: true,
-        matchId: true
+        connectionId: true
       }
     });
     if (!friendRequest) {
-      res.status(404).json({ message: "Request not found or already processed." })
-      return;
+      return res.status(404).json({ message: "Request not found or already processed." });
     }
     if (action === "REJECT") {
       await prisma.friendRequest.delete({ where: { id: requestId } });
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
         message: "Request rejected."
       });
-      return;
     }
     if (action === "ACCEPT") {
       await prisma.$transaction(async (tx) => {
@@ -711,7 +738,7 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
           where: { id: requestId },
           data: { status: 'ACCEPTED' }
         });
-        if (friendRequest.origin === 'SEARCH') {
+        if (friendRequest.origin === 'SEARCH' || !friendRequest.connectionId) {
           await tx.connection.create({
             data: { 
               status: 'FRIEND',
@@ -720,11 +747,9 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
             }
           });
         } else if (friendRequest.origin === 'ARCHIVE') {
-          
           const updateResult = await tx.connection.updateMany({
-            where: { 
-              //@ts-ignore
-              id: friendRequest.matchId,
+            where: {
+              id: friendRequest.connectionId,
               OR: [
                 { user1Id: userId, user2Id: friendRequest.senderId },
                 { user1Id: friendRequest.senderId, user2Id: userId }
@@ -748,11 +773,14 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
           }
         }
       });
-      res.status(200).json({
+      await Promise.all([
+        redisManager.userDetail.cacheConnectionList(userId, [friendRequest.senderId], ConnectionListType.FRIEND),
+        redisManager.userDetail.cacheConnectionList(friendRequest.senderId, [userId], ConnectionListType.FRIEND)
+      ])
+      return res.status(200).json({
         success: true,
         message: "Friend Request accepted."
       });
-      return;
     }
   } catch (err) {
     next(err);
@@ -761,43 +789,40 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
 
 export const handleUnfriendRequest = async (req:Request,res:Response,next:NextFunction) => {
   try{
-    const { userId: receiverId }: userIdType = req.validatedData.params;
+    const { userId: targetUserId }: userIdType = req.validatedData.params;
     const myProfileId = req.user!.profile!.id;
     const now = new Date();
     const THIRTY_DAYS = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-    const [res1,res2] = await Promise.all([
-      prisma.connection.updateMany({
-        where: { 
-          user1Id: myProfileId, 
-          user2Id: receiverId, 
-          status: 'FRIEND' 
-        },
-        data: {
-          status: 'UNFRIENDED',
-          user1DeletedAt: now,
-          finalDeleteAt: THIRTY_DAYS
-        }
-      }),
-      prisma.connection.updateMany({
-        where: { 
-          user1Id: receiverId, 
-          user2Id: myProfileId, 
-          status: 'FRIEND' 
-        },
-        data: {
-          status: 'UNFRIENDED',
-          user2DeletedAt: now,
-          finalDeleteAt: THIRTY_DAYS
-        }
-      })
-    ])
-    if (res1.count === 0 && res2.count === 0) {
-      res.status(404).json({
+    const connection = await prisma.connection.findFirst({
+      where: {
+        status: 'FRIEND',
+        OR: [
+          { user1Id: myProfileId, user2Id: targetUserId },
+          { user1Id: targetUserId, user2Id: myProfileId }
+        ]
+      },
+      select: { id: true, user1Id: true }
+    });
+    if (!connection) {
+      return res.status(404).json({
         success: false,
         message: "No active friendship found" 
       });
-      return;
     }
+    const isUser1 = connection.user1Id === myProfileId;
+    await prisma.connection.update({
+      where: { id: connection.id },
+      data: {
+        status: 'UNFRIENDED',
+        finalDeleteAt: THIRTY_DAYS,
+        [isUser1 ? 'user1DeletedAt' : 'user2DeletedAt']: now
+      }
+    });
+    Promise.all([
+      redisManager.userDetail.cacheConnectionList(myProfileId, [], ConnectionListType.FRIEND),
+      redisManager.userDetail.cacheConnectionList(targetUserId, [], ConnectionListType.FRIEND)
+    ]).catch(err => console.error("Failed to invalidate friend cache on unfriend:", err));
+
     res.json({
       success: true,
       status: 'UNFRIENDED',
@@ -812,51 +837,50 @@ export const deactivateProfile = async (req:Request,res:Response,next:NextFuncti
   try {
     const {password}:deactivatePasswordType = req.validatedData.body;
     const userId = req.user!.id;
+    const profileId = req.user!.profile!.id;
     const now = new Date();
     const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
     const userDetails = await prisma.user.findUnique({
-      where:{
-        id:userId
-      },
+      where:{ id:userId },
       select:{
         password:true,
         reactivatedAt:true
       }
     });
     if (userDetails!.reactivatedAt && (now.getTime() - userDetails!.reactivatedAt.getTime() < SEVEN_DAYS)) {
-      res.status(400).json({
+      return res.status(400).json({
         success:false,
         message:"You can only deactivate your account once every 7 days"
       })
-      return;
     }
     const isMatch = await bcrypt.compare(password,userDetails!.password);
     if(!isMatch){
-      res.status(401).json({
+      return res.status(401).json({
         success:false,
         message:'Invalid password'
       })
-      return;
     }
     await prisma.user.update({
-      where:{
-        id:userId
-      },
+      where:{ id:userId },
       data:{
         deletedAt: now,
+        tokenVersion:{increment:1},
         profile:{ 
-          update:{
-            isActive: false
-          }
+          update:{ isActive: false }
         }
       }
     })
+    await Promise.all([
+      redisManager.match.leaveQueue(profileId),
+      redisManager.userDetail.cacheConnectionList(profileId, [], ConnectionListType.FRIEND),
+      redisManager.auth.invalidateSession(userId)
+    ])
     res.clearCookie("token",{...COOKIE_OPTIONS,maxAge:0});
     res.json({
       success:true,
       messgage:"Account deactivated"
     })
   } catch (err) {
-    next(err)
+    next(err)   
   }
 }

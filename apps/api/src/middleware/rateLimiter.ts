@@ -1,12 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import { redisManager } from '../services/redis';
 
-type RateLimitKey = 'ip' | 'device' | 'email';
+type RateLimitKey = 'ip' | 'device' | 'email' | 'user';
 export const rateLimiter = (action:string, type: RateLimitKey, limit: number, windowSeconds: number) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       let identifier = '';
-      if (type === 'ip') {
+      if (type === 'user') {
+        identifier = req.user?.id || 'unauthenticated';
+      } else if (type === 'ip') {
         identifier = req.ip || 'unknown_ip';
       } else if (type === 'device') {
         identifier = req.headers['x-device-id'] as string;
@@ -15,7 +17,7 @@ export const rateLimiter = (action:string, type: RateLimitKey, limit: number, wi
           return;
         }
       } else if (type === 'email') {
-        identifier = req.validatedData.body.email || 'unknown_email';
+        identifier = req.validatedData?.body?.email || 'unknown_email';
       }
       const redisKey = `${action}:${type}:${identifier}`;
       const isRateLimited = await redisManager.auth.checkRateLimit(redisKey, limit, windowSeconds);

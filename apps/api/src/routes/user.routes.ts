@@ -1,10 +1,12 @@
-import { connectionIdSchema, deactivatePasswordSchema, getConnectionsListSchema, getFriendRequestsSchema, initiateProfileSchema, requestHandleSchema, requestIdSchema, sendRequestSchema, updateAvatarSchema, updateDiscoverySchema, updatePasswordSchema, updateProfileSchema, userIdSchema, usernameCheckSchema } from "@matcha/zod";
+import { connectionIdSchema, deactivatePasswordSchema, getConnectionsListSchema, getFriendRequestsSchema, initiateProfileSchema, requestHandleSchema, requestIdSchema, sendRequestSchema, updatePasswordSchema, updateProfileSchema, userIdSchema, usernameCheckSchema, vibeCheck } from "@matcha/zod";
 import { Router } from "express";
 import passport from "passport";
-import { cancelRequest, checkUsername, deactivateProfile, deleteConnection, generateUsername, getConnectionsList, getFriendRequests, getMetadata, getProfile, getUserProfile, handleRequest, handleUnfriendRequest, initiateProfile, searchUser, seedDB, sendRequest, updateAvatar, updateDiscovery, updatePassword, updateProfile } from "../controllers/user.controller";
+import { cancelRequest, checkUsername, deactivateProfile, deleteConnection, generateUsername, getConnectionsList, getFriendRequests, getMetadata, getProfile, getUserProfile, handleRequest, handleUnfriendRequest, initiateProfile, searchUser, seedDB, sendRequest, updatePassword, updateProfile } from "../controllers/user.controller";
 import { authGuard } from "../middleware/authGuard";
 import { profileGuard } from "../middleware/profileGuard";
 import { validate } from "../middleware/validate";
+import { rateLimiter } from "../middleware/rateLimiter";
+import { idempotencyGuard } from "../middleware/idempotency";
 const userRouter: Router = Router();
 
 const auth = passport.authenticate("jwt", {session:false});
@@ -18,6 +20,7 @@ userRouter.get(
   "/check-username",
   auth,
   authGuard,
+  rateLimiter('check-username', 'user', 15, 60),
   validate(usernameCheckSchema,"query"),
   checkUsername
 );
@@ -25,12 +28,15 @@ userRouter.get(
   "/generate-username",
   auth,
   authGuard,
+  rateLimiter('generate-username', 'user', 10, 60),
+  validate(vibeCheck,"query"),
   generateUsername
 );
 userRouter.post(
-  "/onboarding/username",
+  "/onboarding",
   auth,
   authGuard,
+  idempotencyGuard('onboarding', 60),
   validate(initiateProfileSchema),
   initiateProfile
 );
@@ -40,36 +46,12 @@ userRouter.get(
   authGuard,
   getMetadata
 );
-userRouter.patch(
-  "/onboarding/details",
-  auth,
-  authGuard,
-  profileGuard,
-  validate(updateProfileSchema),
-  updateProfile
-);
 userRouter.get(
   "/me",
   auth,
   authGuard,
   profileGuard,
   getProfile
-);
-userRouter.patch(
-  "/me/avatar",
-  auth,
-  authGuard,
-  profileGuard,
-  validate(updateAvatarSchema),
-  updateAvatar
-);
-userRouter.patch(
-  "/me/discovery",
-  auth,
-  authGuard,
-  profileGuard,
-  validate(updateDiscoverySchema),
-  updateDiscovery
 );
 userRouter.patch(
   "/me/profile",
@@ -84,6 +66,8 @@ userRouter.patch(
   auth,
   authGuard,
   profileGuard,
+  rateLimiter('update-password', 'user', 5, 60 * 15),
+  idempotencyGuard('update-password', 15),
   validate(updatePasswordSchema),
   updatePassword
 );
@@ -92,6 +76,8 @@ userRouter.delete(
   auth,
   authGuard,
   profileGuard,
+  rateLimiter('deactivate-profile', 'user', 3, 15 * 60),
+  idempotencyGuard('deactivate-profile', 15),
   validate(deactivatePasswordSchema),
   deactivateProfile
 );
@@ -108,6 +94,8 @@ userRouter.patch(
   auth,
   authGuard,
   profileGuard,
+  rateLimiter('delete-connection', 'user', 20, 60),
+  idempotencyGuard('delete-connection', 5),
   validate(connectionIdSchema,"params"),
   deleteConnection
 );
@@ -124,6 +112,7 @@ userRouter.get(
   auth,
   authGuard,
   profileGuard,
+  rateLimiter('search', 'user', 40, 60),
   validate(usernameCheckSchema,"query"),
   searchUser
 );
@@ -132,6 +121,7 @@ userRouter.get(
   auth,
   authGuard,
   profileGuard,
+  rateLimiter('get-user', 'user', 60, 60),
   validate(usernameCheckSchema,"params"),
   getUserProfile
 );
@@ -140,6 +130,8 @@ userRouter.post(
   auth,
   authGuard,
   profileGuard,
+  rateLimiter('send-request', 'user', 20, 60),
+  idempotencyGuard('send-request', 30),
   validate(userIdSchema,"params"),
   validate(sendRequestSchema),
   sendRequest
@@ -149,6 +141,8 @@ userRouter.delete(
   auth,
   authGuard,
   profileGuard,
+  rateLimiter('cancel-request', 'user', 20, 60),
+  idempotencyGuard('cancel-request', 30),
   validate(requestIdSchema,"params"),
   cancelRequest
 );
@@ -157,6 +151,8 @@ userRouter.post(
   auth,
   authGuard, 
   profileGuard,
+  rateLimiter('handle-request', 'user', 30, 60),
+  idempotencyGuard('handle-request', 30), 
   validate(requestIdSchema,"params"),
   validate(requestHandleSchema),
   handleRequest
@@ -166,11 +162,9 @@ userRouter.patch(
   auth,
   authGuard,
   profileGuard,
+  rateLimiter('unfriend', 'user', 20, 60),
+  idempotencyGuard('unfriend', 5),
   validate(userIdSchema,"params"),
   handleUnfriendRequest
 );
 export default userRouter;
-//TODO - block
-//TODO - get avatar
-//TODO - final delete of chats based on timing -> cron job
-//TODO - unfriend check when loading chats

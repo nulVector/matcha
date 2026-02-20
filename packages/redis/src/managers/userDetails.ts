@@ -1,5 +1,5 @@
 import Redis from "ioredis";
-import { ConnectionListType, RequestListType, UserProfile } from "../common";
+import { ConnectionListType, UserProfile } from "../common";
 
 export class UserDetailManager {
   constructor (private redis:Redis) {}
@@ -103,27 +103,5 @@ export class UserDetailManager {
   async checkConnection(userId:string,target:string,type:ConnectionListType){
     const isMember = await this.redis.sismember(`user:${type}:${userId}`,target);
     return isMember === 1;
-  }
-  async cacheRequestList(userId:string,ids:string[],type:RequestListType){
-    const pipeline = this.redis.pipeline();
-    const key = `user:req:${type}:${userId}`;
-    pipeline.del(key)
-    if (ids.length > 0) {
-      pipeline.sadd(key, ...ids);
-      pipeline.expire(key, 60 * 5);
-    }
-    await pipeline.exec()
-  }
-  async getRequestList(userId:string,type:RequestListType){
-    return await this.redis.smembers(`user:req:${type}:${userId}`)
-  }
-  async getRequestsWithDetails(userId: string, type: RequestListType) {
-    const ids = await this.getRequestList(userId, type);
-    const profiles = await this.getManyProfiles(ids);
-    return profiles.map(p => ({
-      ...p,
-      requestStatus: type,
-      connectionStatus: "NONE"
-    }));
   }
 }

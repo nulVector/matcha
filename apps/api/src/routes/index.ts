@@ -5,7 +5,7 @@ import messageRouter from "./message.routes";
 import userRouter from "./user.routes";
 import { globalErrorHandler } from "../middleware/errorHandler";
 const mainRouter: Router = Router();
-//TODO-rate limiters
+
 mainRouter.use("/auth", authRouter);
 mainRouter.use("/users", userRouter);
 mainRouter.use("/connections", connectionRouter);
