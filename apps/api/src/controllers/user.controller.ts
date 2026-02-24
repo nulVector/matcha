@@ -1,5 +1,5 @@
 import prisma from '@matcha/prisma';
-import { ConnectionListType } from '@matcha/redis';
+import { ConnectionListType, NotificationCategory } from '@matcha/redis';
 import { connectionIdType, deactivatePasswordType, getConnectionsListType, getFriendRequestsType, initiateProfileType, requestHandleType, requestIdType, sendRequestType, updatePasswordType, updateProfileType, userIdType, usernameCheckType, vibeCheckType } from '@matcha/zod';
 import bcrypt from "bcrypt";
 import { NextFunction, Request, Response } from "express";
@@ -663,7 +663,10 @@ export const sendRequest = async (req:Request,res:Response,next:NextFunction) =>
       });
     }
 
-    //TODO - notification of friend request
+    await redisManager.notification.setNotificationFlag(
+      targetUserId, 
+      NotificationCategory.NEW_FRIEND_REQUEST
+    );
     res.status(201).json({
       success: true,
       message: "Friend Request sent successfully"

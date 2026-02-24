@@ -15,8 +15,7 @@ export enum MessageType {
   SYSTEM = "SYSTEM"
 }
 export enum NotificationCategory {
-  FRIEND_REQUEST = 'friend_requests', 
-  ALERT = 'alerts'
+  NEW_FRIEND_REQUEST = 'new_friend_request'
 }
 
 export interface UserProfile {

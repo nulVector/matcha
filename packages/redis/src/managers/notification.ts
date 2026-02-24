@@ -4,10 +4,10 @@ import { NotificationCategory } from '../common';
 export class NotificationManager {
   constructor(private redis: Redis) {}
 
-  async incrNotification(userId: string, category: NotificationCategory, amount: number = 1) {
+  async setNotificationFlag(userId: string, category: NotificationCategory) {
     const key = `user:notifications:${userId}`;
     const tx = this.redis.multi();
-    tx.hincrby(key, category, amount);
+    tx.hset(key, category, "1"); 
     const publishPayload = JSON.stringify({
       receiverId: userId,
       eventType: 'NOTIFICATION_UPDATE',
@@ -16,13 +16,11 @@ export class NotificationManager {
     tx.publish('chat_router', publishPayload);
     await tx.exec();
   }
-
-  async resetNotification(userId: string, category: NotificationCategory) {
+  async clearNotificationFlag(userId: string, category: NotificationCategory) {
     const key = `user:notifications:${userId}`;
-    await this.redis.hset(key, category, 0);
+    await this.redis.hdel(key, category);
   }
-
-  async getAllNotifications(userId: string): Promise<Record<string, string>> {
+  async getNotificationFlags(userId: string): Promise<Record<string, string>> {
     const key = `user:notifications:${userId}`;
     return await this.redis.hgetall(key); 
   }
