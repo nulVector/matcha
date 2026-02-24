@@ -1,37 +1,36 @@
 import { Router } from "express";
-import passport from "passport";
 import { authGuard } from "../middleware/authGuard";
 import { profileGuard } from "../middleware/profileGuard";
+import { requireAuth } from "../middleware/requireAuth";
 const connectionRouter: Router = Router();
-const auth = passport.authenticate("jwt",{session:false});
 
 connectionRouter.post(
     "/queue/join",
-    auth,
+    requireAuth,
     authGuard,
     profileGuard,
 );
 connectionRouter.post(
     "/queue/leave",
-    auth,
+    requireAuth,
     authGuard,
     profileGuard,
 );
 connectionRouter.patch(
     "/:connectionId/extend",
-    auth,
+    requireAuth,
     authGuard,
     profileGuard,
 );
 connectionRouter.patch(
     "/:connectionId/convert", 
-    auth, 
+    requireAuth, 
     authGuard, 
     profileGuard,
 );
 connectionRouter.delete(
     "/:connectionId", 
-    auth, 
+    requireAuth, 
     authGuard, 
     profileGuard,
 );

@@ -1,11 +1,11 @@
 import { NextFunction, Request, Response } from "express";
 
-export const profileGuard = async (req:Request,res:Response,next:NextFunction) => {
-  if (!req.user?.profile || !req.user.profile.id || !req.user.profile.username) {
+export const profileGuard = (req:Request,res:Response,next:NextFunction) => {
+  if (!req.user?.profile || !req.user.profile.id) {
     res.status(403).json({ 
       success: false,
       message: "Onboarding incomplete",
-      code: "USERNAME_REQUIRED" 
+      code: "PROFILE_INCOMPLETE"
     });
     return;
   }

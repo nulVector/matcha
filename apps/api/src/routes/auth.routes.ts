@@ -1,12 +1,12 @@
 import { loginSchema, requestPasswordResetSchema, resetPasswordSchema, signupSchema } from "@matcha/zod";
 import { Router } from "express";
-import passport from "passport";
 import { confirmResetPassword, login, logout, requestResetPassword, signup } from "../controllers/auth.controller";
 import { idempotencyGuard } from "../middleware/idempotency";
 import { rateLimiter } from "../middleware/rateLimiter";
+import { requireAuth } from "../middleware/requireAuth";
 import { validate } from "../middleware/validate";
 const authRouter: Router = Router();
-const auth = passport.authenticate("jwt", {session:false});
+
 authRouter.post(
     "/signup",
     rateLimiter('signup', 'ip', 100, 60*15),
@@ -36,7 +36,7 @@ authRouter.post(
 );
 authRouter.post(
     "/logout",
-    auth,
+    requireAuth,
     logout
 );
 

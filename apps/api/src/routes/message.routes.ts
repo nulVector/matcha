@@ -1,20 +1,19 @@
 import { Router } from "express";
-import passport from "passport";
 import { authGuard } from "../middleware/authGuard";
 import { profileGuard } from "../middleware/profileGuard";
+import { requireAuth } from "../middleware/requireAuth";
 
 const messageRouter: Router = Router();
-const auth = passport.authenticate("jwt",{session:false});
 
 messageRouter.get(
   "/unread",
-  auth,
+  requireAuth,
   authGuard,
   profileGuard,
 );
 messageRouter.get(
   "/:connectionId",
-  auth,
+  requireAuth,
   authGuard,
   profileGuard,
 )

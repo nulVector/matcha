@@ -1,15 +1,14 @@
 import { connectionIdSchema, deactivatePasswordSchema, getConnectionsListSchema, getFriendRequestsSchema, initiateProfileSchema, requestHandleSchema, requestIdSchema, sendRequestSchema, updatePasswordSchema, updateProfileSchema, userIdSchema, usernameCheckSchema, vibeCheck } from "@matcha/zod";
 import { Router } from "express";
-import passport from "passport";
 import { cancelRequest, checkUsername, deactivateProfile, deleteConnection, generateUsername, getConnectionsList, getFriendRequests, getMetadata, getProfile, getUserProfile, handleRequest, handleUnfriendRequest, initiateProfile, searchUser, seedDB, sendRequest, updatePassword, updateProfile } from "../controllers/user.controller";
 import { authGuard } from "../middleware/authGuard";
-import { profileGuard } from "../middleware/profileGuard";
-import { validate } from "../middleware/validate";
-import { rateLimiter } from "../middleware/rateLimiter";
 import { idempotencyGuard } from "../middleware/idempotency";
+import { profileGuard } from "../middleware/profileGuard";
+import { rateLimiter } from "../middleware/rateLimiter";
+import { requireAuth } from "../middleware/requireAuth";
+import { validate } from "../middleware/validate";
 const userRouter: Router = Router();
 
-const auth = passport.authenticate("jwt", {session:false});
 //TODO - remove this before deploy
 userRouter.post(
   "/seed",
@@ -18,7 +17,7 @@ userRouter.post(
 
 userRouter.get(
   "/check-username",
-  auth,
+  requireAuth,
   authGuard,
   rateLimiter('check-username', 'user', 15, 60),
   validate(usernameCheckSchema,"query"),
@@ -26,7 +25,7 @@ userRouter.get(
 );
 userRouter.get(
   "/generate-username",
-  auth,
+  requireAuth,
   authGuard,
   rateLimiter('generate-username', 'user', 10, 60),
   validate(vibeCheck,"query"),
@@ -34,7 +33,7 @@ userRouter.get(
 );
 userRouter.post(
   "/onboarding",
-  auth,
+  requireAuth,
   authGuard,
   idempotencyGuard('onboarding', 60),
   validate(initiateProfileSchema),
@@ -42,20 +41,20 @@ userRouter.post(
 );
 userRouter.get(
   "/get-metadata",
-  auth,
+  requireAuth,
   authGuard,
   getMetadata
 );
 userRouter.get(
   "/me",
-  auth,
+  requireAuth,
   authGuard,
   profileGuard,
   getProfile
 );
 userRouter.patch(
   "/me/profile",
-  auth,
+  requireAuth,
   authGuard,
   profileGuard,
   validate(updateProfileSchema),
@@ -63,7 +62,7 @@ userRouter.patch(
 );
 userRouter.patch(
   "/me/update-password",
-  auth,
+  requireAuth,
   authGuard,
   profileGuard,
   rateLimiter('update-password', 'user', 5, 60 * 15),
@@ -73,7 +72,7 @@ userRouter.patch(
 );
 userRouter.delete(
   "/me/deactivate-profile",
-  auth,
+  requireAuth,
   authGuard,
   profileGuard,
   rateLimiter('deactivate-profile', 'user', 3, 15 * 60),
@@ -83,7 +82,7 @@ userRouter.delete(
 );
 userRouter.get(
   "/me/connections",
-  auth,
+  requireAuth,
   authGuard,
   profileGuard,
   validate(getConnectionsListSchema,"query"),
@@ -91,7 +90,7 @@ userRouter.get(
 );
 userRouter.patch(
   "/me/connections/:connectionId",
-  auth,
+  requireAuth,
   authGuard,
   profileGuard,
   rateLimiter('delete-connection', 'user', 20, 60),
@@ -101,7 +100,7 @@ userRouter.patch(
 );
 userRouter.get(
   "/me/requests",
-  auth,
+  requireAuth,
   authGuard,
   profileGuard,
   validate(getFriendRequestsSchema,"query"),
@@ -109,7 +108,7 @@ userRouter.get(
 );
 userRouter.get(
   "/search",
-  auth,
+  requireAuth,
   authGuard,
   profileGuard,
   rateLimiter('search', 'user', 40, 60),
@@ -118,7 +117,7 @@ userRouter.get(
 );
 userRouter.get(
   "/:username",
-  auth,
+  requireAuth,
   authGuard,
   profileGuard,
   rateLimiter('get-user', 'user', 60, 60),
@@ -127,7 +126,7 @@ userRouter.get(
 );
 userRouter.post(
   "/:userId/request",
-  auth,
+  requireAuth,
   authGuard,
   profileGuard,
   rateLimiter('send-request', 'user', 20, 60),
@@ -138,7 +137,7 @@ userRouter.post(
 );
 userRouter.delete(
   "/:requestId/cancel",
-  auth,
+  requireAuth,
   authGuard,
   profileGuard,
   rateLimiter('cancel-request', 'user', 20, 60),
@@ -148,7 +147,7 @@ userRouter.delete(
 );
 userRouter.post(
   "/:requestId/handle-request",
-  auth,
+  requireAuth,
   authGuard, 
   profileGuard,
   rateLimiter('handle-request', 'user', 30, 60),
@@ -159,7 +158,7 @@ userRouter.post(
 );
 userRouter.patch(
   "/:userId/unfriend",
-  auth,
+  requireAuth,
   authGuard,
   profileGuard,
   rateLimiter('unfriend', 'user', 20, 60),

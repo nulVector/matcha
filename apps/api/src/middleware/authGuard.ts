@@ -1,12 +1,13 @@
 import { NextFunction, Request, Response } from "express";
 
-export const authGuard = async (req:Request,res:Response,next:NextFunction) => {
+export const authGuard = (req:Request,res:Response,next:NextFunction) => {
   if (req.user) {
     next();
     return;
   }
 
-  res.status(401).json({ 
+  res.status(401).json({
+    success: false,
     message: "Unauthorized: You must be logged in." 
   });
   return;
