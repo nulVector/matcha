@@ -5,11 +5,11 @@ export class UserConnectionManager {
   constructor (private redis:Redis) {}
 
   async mapSocket(userId:string,socketId:string){
-    const pipeline = this.redis.pipeline();
-    pipeline.sadd(`user:sockets:${userId}`,socketId);
-    pipeline.set(`socket:${socketId}`,userId, "EX", 60 * 60 * 24);
-    pipeline.set(`user:status:${userId}`,UserStatus.ONLINE, "EX", 60);
-    await pipeline.exec();
+    const tx = this.redis.multi();
+    tx.sadd(`user:sockets:${userId}`,socketId);
+    tx.set(`socket:${socketId}`,userId, "EX", 60 * 60 * 24);
+    tx.set(`user:status:${userId}`,UserStatus.ONLINE, "EX", 60);
+    await tx.exec();
   }
   async getUserSockets(userId:string){
     return await this.redis.smembers(`user:sockets:${userId}`);
@@ -28,10 +28,10 @@ export class UserConnectionManager {
     return await this.redis.scard(`user:sockets:${userId}`);
   }
   async setUserStatus(userId:string,status:UserStatus) {
-    const pipeline = this.redis.pipeline()
-    pipeline.hset(`user:profile:${userId}`, "status", status);
-    pipeline.expire(`user:profile:${userId}`, 300);
-    await pipeline.exec();
+    const tx = this.redis.multi()
+    tx.hset(`user:profile:${userId}`, "status", status);
+    tx.expire(`user:profile:${userId}`, 300);
+    await tx.exec();
   }
   async getUserStatus(userId:string): Promise<UserStatus | null> {
     return await this.redis.hget(`user:profile:${userId}`,"status") as UserStatus;

@@ -11,6 +11,15 @@
     "clean": "rimraf dist .turbo"
   },
   "devDependencies": {
-    "@matcha/typescript-config":"workspace:*"
+    "@matcha/typescript-config": "workspace:*",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^25.3.0",
+    "@types/ws": "^8.18.1"
+  },
+  "dependencies": {
+    "@matcha/redis": "workspace:*",
+    "dotenv": "^17.2.3",
+    "jsonwebtoken": "^9.0.3",
+    "ws": "^8.19.0"
   }
 }

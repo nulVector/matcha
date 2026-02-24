@@ -67,20 +67,20 @@ export class MatchManager {
     const vector = this.generateVector(interests);
     const geoString = `${long},${lat}`;
     const vectorBuffer = Buffer.from(vector.buffer, vector.byteOffset, vector.byteLength);
-    const pipeline = this.redis.pipeline();
-    pipeline.hset(key,{
+    const tx = this.redis.multi();
+    tx.hset(key,{
       geo:geoString,
       embedding:vectorBuffer,
     })
-    pipeline.expire(key,60*60*24);
-    await pipeline.exec();
+    tx.expire(key,60*60*24);
+    await tx.exec();
   }
   async addToQueue(userId:string){
-    const pipeline = this.redis.pipeline();
-    pipeline.hset(`user:profile:${userId}`, "status", UserStatus.QUEUE);
-    pipeline.lrem(`match:queue`, 0, userId);
-    pipeline.lpush(`match:queue`,userId);
-    await pipeline.exec();
+    const tx = this.redis.multi();
+    tx.hset(`user:profile:${userId}`, "status", UserStatus.QUEUE);
+    tx.lrem(`match:queue`, 0, userId);
+    tx.lpush(`match:queue`,userId);
+    await tx.exec();
   }
   async popFromQueue(){
     const result = await this.redis.brpop(`match:queue`,0);
@@ -89,11 +89,11 @@ export class MatchManager {
     }
     return null;
   }
-  async leaveQueue(userId:string){
-    const pipeline = this.redis.pipeline();
-    pipeline.lrem(`match:queue`,0,userId);
-    pipeline.hset(`user:profile:${userId}`,"status",UserStatus.ONLINE);
-    await pipeline.exec();
+  async leaveQueue(userId: string, targetStatus: UserStatus = UserStatus.ONLINE) {
+    const tx = this.redis.multi();
+    tx.lrem(`match:queue`, 0, userId);
+    tx.hset(`user:profile:${userId}`, "status", targetStatus);
+    await tx.exec();
   }
   async findMatchesInRadius(
     userVector: Float32Array,
@@ -152,11 +152,11 @@ export class MatchManager {
     }
   }
   async cleanupMatch(userA: string, userB: string) {
-    const pipeline = this.redis.pipeline();
-    pipeline.hset(`user:profile:${userA}`, "status", UserStatus.QUEUE);
-    pipeline.hset(`user:profile:${userB}`, "status", UserStatus.QUEUE);
-    pipeline.lpush("match:queue", userA); 
-    pipeline.lpush("match:queue", userB);
-    await pipeline.exec();
+    const tx = this.redis.multi();
+    tx.hset(`user:profile:${userA}`, "status", UserStatus.QUEUE);
+    tx.hset(`user:profile:${userB}`, "status", UserStatus.QUEUE);
+    tx.lpush("match:queue", userA); 
+    tx.lpush("match:queue", userB);
+    await tx.exec();
   }
 }

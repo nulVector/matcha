@@ -14,6 +14,10 @@ export enum MessageType {
   TEXT = "TEXT",
   SYSTEM = "SYSTEM"
 }
+export enum NotificationCategory {
+  FRIEND_REQUEST = 'friend_requests', 
+  ALERT = 'alerts'
+}
 
 export interface UserProfile {
   id: string;

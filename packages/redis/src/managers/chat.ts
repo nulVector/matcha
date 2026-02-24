@@ -4,20 +4,31 @@ import { CachedMessage } from "../common";
 export class ChatManager {
   constructor (private redis:Redis, private subRedis:Redis) {}
 
-  async addMessage(connectionId:string,msg:CachedMessage){
-    const pipeline = this.redis.pipeline();
-    const key = `chat:${connectionId}`;
-    pipeline.rpush(key,JSON.stringify(msg));
-    pipeline.ltrim(key,-50,-1);
-    pipeline.expire(key,60*60*24);
-    await pipeline.exec();
+  async processNewMessage(
+    connectionId: string, 
+    receiverId: string, 
+    message: CachedMessage, 
+    eventType: string
+  ) {
+    const tx = this.redis.multi(); 
+    const chatKey = `chat:${connectionId}`;
+    const unreadKey = `user:unread:${receiverId}`;
+
+    tx.rpush(chatKey, JSON.stringify(message));
+    tx.ltrim(chatKey, -50, -1);
+    tx.expire(chatKey, 60 * 60 * 24);
+    tx.hincrby(unreadKey, connectionId, 1);
+    const publishPayload = JSON.stringify({
+      receiverId,
+      eventType,
+      eventData: message
+    });
+    tx.publish('chat_router', publishPayload);
+    await tx.exec();
   }
   async getMessages(connectionId:string){
     const rawMessages = await this.redis.lrange(`chat:${connectionId}`, 0, -1);
     return rawMessages.map((msg) => JSON.parse(msg) as CachedMessage);
-  }
-  async incrUnread(userId:string,connectionId:string,amt:number){
-    await this.redis.hincrby(`user:unread:${userId}`,connectionId,amt);
   }
   async getUnread(userId:string){
     const rawMap = await this.redis.hgetall(`user:unread:${userId}`);

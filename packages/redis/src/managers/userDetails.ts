@@ -16,7 +16,6 @@ export class UserDetailManager {
     return result;
   }
   async cacheProfile(userId:string,profile:Partial<UserProfile>){
-    const pipeline = this.redis.pipeline();
     const key = `user:profile:${userId}`;
     const dataToStore: Record<string, string> = {};
     for (const [k, v] of Object.entries(profile)) {
@@ -28,9 +27,10 @@ export class UserDetailManager {
       }
     }
     if (Object.keys(dataToStore).length > 0) {
-      pipeline.hset(key, dataToStore);
-      pipeline.expire(key, 60 * 60 * 24); 
-      await pipeline.exec();
+      const tx = this.redis.multi();
+      tx.hset(key, dataToStore);
+      tx.expire(key, 60 * 60 * 24); 
+      await tx.exec();
     }
   }
   async getProfile(userId:string): Promise<Partial<UserProfile>|  null> {
@@ -56,15 +56,15 @@ export class UserDetailManager {
     await this.redis.del(`user:profile:${userId}`)
   }
   async cacheConnectionList(userId:string,ids:string[],type:ConnectionListType){
-    const pipeline = this.redis.pipeline();
+    const tx = this.redis.multi();
     const key = `user:${type}:${userId}`;
     const ttl = type === ConnectionListType.FRIEND ? 60 * 60 * 24 : 60 * 60;
-      pipeline.del(key);
+      tx.del(key);
       if (ids.length > 0) {
-        pipeline.sadd(key, ...ids);
-        pipeline.expire(key, ttl);
+        tx.sadd(key, ...ids);
+        tx.expire(key, ttl);
       }
-      await pipeline.exec();
+      await tx.exec();
   }
   async getConnectionList(userId:string,type:ConnectionListType){
     return await this.redis.smembers(`user:${type}:${userId}`)

@@ -1,12 +1,38 @@
 import { Router } from "express";
 import passport from "passport";
+import { authGuard } from "../middleware/authGuard";
+import { profileGuard } from "../middleware/profileGuard";
 const connectionRouter: Router = Router();
 const auth = passport.authenticate("jwt",{session:false});
 
-//TODO - only online users should participate in the match making
-connectionRouter.post("/find",auth);
-connectionRouter.patch("/:connectionId/extend",auth);
-connectionRouter.patch("/:connectionId/convert",auth);
-connectionRouter.delete("/:connectionId",auth);
-
+connectionRouter.post(
+    "/queue/join",
+    auth,
+    authGuard,
+    profileGuard,
+);
+connectionRouter.post(
+    "/queue/leave",
+    auth,
+    authGuard,
+    profileGuard,
+);
+connectionRouter.patch(
+    "/:connectionId/extend",
+    auth,
+    authGuard,
+    profileGuard,
+);
+connectionRouter.patch(
+    "/:connectionId/convert", 
+    auth, 
+    authGuard, 
+    profileGuard,
+);
+connectionRouter.delete(
+    "/:connectionId", 
+    auth, 
+    authGuard, 
+    profileGuard,
+);
 export default connectionRouter;

@@ -6,6 +6,7 @@ import { MatchManager } from "./managers/match";
 import { MetadataManager } from "./managers/metadata";
 import { UserConnectionManager } from "./managers/userConnection";
 import { UserDetailManager } from "./managers/userDetails";
+import { NotificationManager } from "./managers/notification";
 
 export class RedisManager {
   private redis:Redis;
@@ -19,6 +20,7 @@ export class RedisManager {
   public chat:ChatManager;
   public match:MatchManager;
   public bloom:BloomFilterManager;
+  public notification:NotificationManager;
 
   constructor (connectionString:string) {
     this.redis = new Redis(connectionString);
@@ -31,6 +33,7 @@ export class RedisManager {
     this.chat = new ChatManager(this.redis,this.subRedis);
     this.match = new MatchManager(this.redis);
     this.bloom = new BloomFilterManager(this.redis);
+    this.notification = new NotificationManager(this.redis)
   }
   async quit() {
     await Promise.all([
