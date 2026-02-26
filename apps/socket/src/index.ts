@@ -1,9 +1,9 @@
 import { CachedMessage, MessageType, UserStatus } from '@matcha/redis';
-import crypto from 'crypto';
 import { createServer, IncomingMessage } from 'http';
 import jwt from 'jsonwebtoken';
 import { WebSocket, WebSocketServer } from 'ws';
 import { redisManager } from './services/redis';
+import { createId } from '@paralleldrive/cuid2';
 interface JwtPayload {
   id:string,
   tokenVersion:number
@@ -72,7 +72,7 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
     (ws as any).isAlive = true;
   });
   const userId = userSession.userId;
-  const socketId = crypto.randomUUID(); 
+  const socketId = createId(); 
   try {
     await redisManager.userConnection.mapSocket(userId,socketId);
     if (!localSockets.has(userId)) localSockets.set(userId, new Set());
@@ -90,7 +90,7 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
           case 'CHAT_MESSAGE': {
             const { connectionId, receiverId, content } = parsedData.payload;
             const message: CachedMessage = {
-              id: crypto.randomUUID(),
+              id: createId(),
               content,
               senderId: userId,
               createdAt: new Date().toISOString(),

@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@matcha/redis": "workspace:*",
+    "@paralleldrive/cuid2": "^3.3.0",
     "dotenv": "^17.2.3",
     "jsonwebtoken": "^9.0.3",
     "ws": "^8.19.0"
