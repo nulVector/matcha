@@ -47,3 +47,8 @@ export interface CachedMessage {
   createdAt: string;     
   type: MessageType; 
 }
+
+export interface UnreadCountData {
+  connectionId: string;
+  count: number
+}

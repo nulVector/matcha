@@ -69,6 +69,10 @@ export class UserDetailManager {
   async getConnectionList(userId:string,type:ConnectionListType){
     return await this.redis.smembers(`user:${type}:${userId}`)
   }
+  async inConnectionList(userId:string,connectionId:string,type:ConnectionListType) {
+    const exists = await this.redis.sismember(`user:${type}:${userId}`,connectionId);
+    return exists === 1;
+  }
   async getManyProfiles(
     ids: string[], 
     fields: string[] = ["id", "username", "avatarUrl"]

@@ -16,6 +16,7 @@ interface UserSession {
 enum EventType {
   CHAT_MESSAGE = "Chat_Message",
   USER_TYPING = "User_Typing",
+  STOPPED_TYPING = "Stopped_Typing",
   MESSAGE_READ = "Message_Read"
 }
 const server = createServer((req, res) => {
@@ -66,6 +67,10 @@ server.on('upgrade',async (request,socket,head)=>{
   }
 })
 wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:UserSession)=>{
+  (ws as any).isAlive = true;
+  ws.on('pong', () => {
+    (ws as any).isAlive = true;
+  });
   const userId = userSession.userId;
   const socketId = crypto.randomUUID(); 
   try {
@@ -101,7 +106,6 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
           }
           case 'TYPING_INDICATOR': {
             const { connectionId, receiverId} = parsedData.payload;
-            await redisManager.chat.setTyping(connectionId,userId);
             await redisManager.chat.publish(
               'chat_router',
               JSON.stringify({
@@ -115,9 +119,27 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
             )
             break;
           }
-          case 'MARK_READ': {
+          case 'STOPPED_TYPING': {
+            const { connectionId, receiverId } = parsedData.payload;
+            await redisManager.chat.publish(
+              'chat_router',
+              JSON.stringify({
+                receiverId,
+                eventType: EventType.STOPPED_TYPING,
+                eventData: {
+                  senderId: userId,
+                  connectionId
+                }
+              })
+            );
+            break;
+          }
+          case 'VIEWING_CHAT': {
             const { connectionId, receiverId} = parsedData.payload;
-            await redisManager.chat.resetUnread(userId,connectionId);
+            await Promise.all([
+              redisManager.chat.setActiveChat(userId,connectionId),
+              redisManager.chat.resetUnread(userId,connectionId)
+            ])
             await redisManager.chat.publish(
               'chat_router',
               JSON.stringify({
@@ -128,16 +150,27 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
             )
             break;
           }
+          case 'LEAVING_CHAT': {
+            const { connectionId } = parsedData.payload;
+            await redisManager.chat.removeActiveChat(userId);
+            //TODO - push in queue
+            break;
+          }
           default:
             break;
         }
       } catch (err) {
-        console.error(`Error processing message from ${userId}:`);
+        console.error(`Error processing message from ${userId}:`, err);
       }
     });
 
     ws.on('close', async () => {
       try {
+        const activeChat = await redisManager.chat.getActiveChat(userId);
+        if (activeChat) {
+          await redisManager.chat.removeActiveChat(userId);
+          //TODO - add to queue
+        }
         const userTabs = localSockets.get(userId);
         if (userTabs) {
           userTabs.delete(ws);
@@ -182,4 +215,18 @@ async function bootstrap(){
     console.log(`Websocket running on port ${PORT}`);
   })
 }
+
+const heartbeatInterval = setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if ((ws as any).isAlive === false) {
+      return ws.terminate(); 
+    }
+    (ws as any).isAlive = false;
+    ws.ping();
+  });
+}, 30000);
+wss.on('close', () => {
+  clearInterval(heartbeatInterval);
+});
+
 bootstrap();
