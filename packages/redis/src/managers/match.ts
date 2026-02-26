@@ -1,5 +1,5 @@
 import Redis from "ioredis";
-import { MASTER_INTERESTS, UserStatus } from "../common";
+import { MASTER_INTERESTS, UserState } from "../common";
 
 export class MatchManager {
   constructor (private redis:Redis) {}
@@ -49,7 +49,7 @@ export class MatchManager {
           'ON', 'HASH',
           'PREFIX', '1', 'user:profile:',
           'SCHEMA',
-          'status', 'TAG',
+          'queueStatus', 'TAG',
           'geo', 'GEO',
           'embedding', 'VECTOR', 'HNSW', 
             '6',
@@ -62,7 +62,7 @@ export class MatchManager {
       }
     }
   }
-  async updateUserStatus(userId:string,lat:number,long:number,interests:string[]){
+  async updateMatchProfile(userId:string,lat:number,long:number,interests:string[]){
     const key = `user:profile:${userId}`;
     const vector = this.generateVector(interests);
     const geoString = `${long},${lat}`;
@@ -77,7 +77,7 @@ export class MatchManager {
   }
   async addToQueue(userId:string){
     const tx = this.redis.multi();
-    tx.hset(`user:profile:${userId}`, "status", UserStatus.QUEUE);
+    tx.hset(`user:profile:${userId}`,'queueStatus',UserState.QUEUED);
     tx.lrem(`match:queue`, 0, userId);
     tx.lpush(`match:queue`,userId);
     await tx.exec();
@@ -89,10 +89,10 @@ export class MatchManager {
     }
     return null;
   }
-  async leaveQueue(userId: string, targetStatus: UserStatus = UserStatus.ONLINE) {
+  async leaveQueue(userId: string, targetStatus: UserState = UserState.IDLE) {
     const tx = this.redis.multi();
     tx.lrem(`match:queue`, 0, userId);
-    tx.hset(`user:profile:${userId}`, "status", targetStatus);
+    tx.hset(`user:profile:${userId}`,'queueStatus',targetStatus);
     await tx.exec();
   }
   async findMatchesInRadius(
@@ -103,7 +103,7 @@ export class MatchManager {
   ) {
     const indexName = `idx:users`;
     const vectorBuffer = Buffer.from(userVector.buffer, userVector.byteOffset, userVector.byteLength);
-    const query = `@status:{${UserStatus.QUEUE}} @geo:[${long} ${lat} ${radiusKm} km]=>[KNN 10 @embedding $vec AS score]`;
+    const query = `@queueStatus:{${UserState.QUEUED}} @geo:[${long} ${lat} ${radiusKm} km]=>[KNN 10 @embedding $vec AS score]`;
     try {
       const results = await this.redis.call(
         "FT.SEARCH", indexName, query,
@@ -121,26 +121,46 @@ export class MatchManager {
   async lockMatch(userA:string,userB:string){
     const keyA = `user:profile:${userA}`;
     const keyB = `user:profile:${userB}`;
+    const presAKey = `user:status:${userA}`;
+    const presBKey = `user:status:${userB}`;
     const queueKey = `match:queue`;
     try {
       await this.redis.watch(keyA,keyB);
       const pipeline = this.redis.pipeline();
-      pipeline.hget(keyA,"status");
-      pipeline.hget(keyB,"status");
+      pipeline.hget(keyA,"queueStatus");
+      pipeline.hget(keyB,"queueStatus");
+      pipeline.get(presAKey);
+      pipeline.get(presBKey);
       const results = await pipeline.exec();
-      if (!results || !results[0] || !results[1]) {
+      if (!results || !results[0] || !results[1] || !results[2] || !results[3]) {
         await this.redis.unwatch();
         return false;
       }
       const statusA = results[0][1] as string;
       const statusB = results[1][1] as string;
-      if (statusA !== UserStatus.QUEUE || statusB !== UserStatus.QUEUE){
+      const isOnlineA = results[2][1] === "1";
+      const isOnlineB = results[3][1] === "1";
+      if (!isOnlineA || !isOnlineB) {
+        await this.redis.unwatch();
+        const tx = this.redis.multi();
+        if (!isOnlineA) {
+          tx.lrem(queueKey, 0, userA);
+          tx.hset(keyA, "queueStatus", UserState.IDLE);
+        }
+        if (!isOnlineB) {
+          tx.lrem(queueKey, 0, userB);
+          tx.hset(keyB, "queueStatus", UserState.IDLE);
+        }
+        await tx.exec();
+        return false;
+      }
+      if (statusA !== UserState.QUEUED || statusB !== UserState.QUEUED){
         await this.redis.unwatch();
         return false;
       }
       const tx = this.redis.multi();
-      tx.hset(keyA,"status",UserStatus.MATCHED);
-      tx.hset(keyB,"status",UserStatus.MATCHED);
+      tx.hset(keyA,"queueStatus",UserState.MATCHED);
+      tx.hset(keyB,"queueStatus",UserState.MATCHED);
       tx.lrem(queueKey,0,userA);
       tx.lrem(queueKey,0,userB);
       const execResult = await tx.exec();
@@ -153,8 +173,8 @@ export class MatchManager {
   }
   async cleanupMatch(userA: string, userB: string) {
     const tx = this.redis.multi();
-    tx.hset(`user:profile:${userA}`, "status", UserStatus.QUEUE);
-    tx.hset(`user:profile:${userB}`, "status", UserStatus.QUEUE);
+    tx.hset(`user:profile:${userA}`, "queueStatus", UserState.QUEUED);
+    tx.hset(`user:profile:${userB}`, "queueStatus", UserState.QUEUED);
     tx.lpush("match:queue", userA); 
     tx.lpush("match:queue", userB);
     await tx.exec();

@@ -1,5 +1,5 @@
 import Redis from "ioredis";
-import { REMOVE_SOCKET_SCRIPT, UserStatus } from "../common";
+import { REMOVE_SOCKET_SCRIPT } from "../common";
 
 export class UserConnectionManager {
   constructor (private redis:Redis) {}
@@ -8,7 +8,7 @@ export class UserConnectionManager {
     const tx = this.redis.multi();
     tx.sadd(`user:sockets:${userId}`,socketId);
     tx.set(`socket:${socketId}`,userId, "EX", 60 * 60 * 24);
-    tx.set(`user:status:${userId}`,UserStatus.ONLINE, "EX", 60);
+    tx.set(`user:status:${userId}`,"1", "EX", 60);
     await tx.exec();
   }
   async getUserSockets(userId:string){
@@ -27,13 +27,11 @@ export class UserConnectionManager {
   async countSockets(userId:string){
     return await this.redis.scard(`user:sockets:${userId}`);
   }
-  async setUserStatus(userId:string,status:UserStatus) {
-    const tx = this.redis.multi()
-    tx.hset(`user:profile:${userId}`, "status", status);
-    tx.expire(`user:profile:${userId}`, 300);
-    await tx.exec();
+  async setUserStatus(userId:string) {
+    await this.redis.set(`user:status:${userId}`, "1", "EX", 60);
   }
-  async getUserStatus(userId:string): Promise<UserStatus | null> {
-    return await this.redis.hget(`user:profile:${userId}`,"status") as UserStatus;
+  async checkUserStatus(userId: string): Promise<boolean> {
+    const exists = await this.redis.exists(`user:status:${userId}`);
+    return exists === 1;
   }
 }

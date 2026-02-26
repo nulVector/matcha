@@ -6,10 +6,11 @@ export class UserDetailManager {
 
   private deserializeProfile(data: Record<string, string>): Partial<UserProfile> {
     const result: any = { ...data };
-    if (data.isActive) result.isActive = data.isActive === "true";
-    if (data.allowDiscovery) result.allowDiscovery = data.allowDiscovery === "true";
-    if (data.locationLatitude) result.locationLatitude = parseFloat(data.locationLatitude);
-    if (data.locationLongitude) result.locationLongitude = parseFloat(data.locationLongitude);
+    delete result.embedding;
+    if (data.isActive !== undefined) result.isActive = data.isActive === "true";
+    if (data.allowDiscovery !== undefined) result.allowDiscovery = data.allowDiscovery === "true";
+    if (data.locationLatitude !== undefined) result.locationLatitude = parseFloat(data.locationLatitude);
+    if (data.locationLongitude !== undefined) result.locationLongitude = parseFloat(data.locationLongitude);
     if (data.interest !== undefined) {
       result.interest = data.interest === "" ? [] : data.interest.split(",");
     }
@@ -103,9 +104,5 @@ export class UserDetailManager {
       ...p,
       connectionStatus: type
     }));
-  }
-  async checkConnection(userId:string,target:string,type:ConnectionListType){
-    const isMember = await this.redis.sismember(`user:${type}:${userId}`,target);
-    return isMember === 1;
   }
 }

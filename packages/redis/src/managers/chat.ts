@@ -19,14 +19,13 @@ export class ChatManager {
     message: CachedMessage, 
     eventType: string
   ) {
+    const activeChat = await this.getActiveChat(receiverId);
     const tx = this.redis.multi(); 
     const chatKey = `chat:${connectionId}`;
     const unreadKey = `user:unread:${receiverId}`;
-
     tx.rpush(chatKey, JSON.stringify(message));
     tx.ltrim(chatKey, -50, -1);
     tx.expire(chatKey, 60 * 60 * 24);
-    const activeChat = await this.getActiveChat(receiverId);
     if (activeChat !== connectionId) {
       tx.hincrby(unreadKey, connectionId, 1);
     }

@@ -10,7 +10,6 @@ import { NotificationManager } from "./managers/notification";
 
 export class RedisManager {
   private redis:Redis;
-  private pubRedis:Redis;
   private subRedis:Redis;
 
   public auth:AuthManager;
@@ -24,8 +23,8 @@ export class RedisManager {
 
   constructor (connectionString:string) {
     this.redis = new Redis(connectionString);
-    this.pubRedis = new Redis(connectionString);
     this.subRedis = new Redis(connectionString);
+    
     this.auth = new AuthManager(this.redis);
     this.userDetail = new UserDetailManager(this.redis);
     this.userConnection = new UserConnectionManager(this.redis);
@@ -38,7 +37,6 @@ export class RedisManager {
   async quit() {
     await Promise.all([
       this.redis.quit(),
-      this.pubRedis.quit(),
       this.subRedis.quit()
     ])
   }

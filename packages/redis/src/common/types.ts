@@ -1,7 +1,6 @@
-export enum UserStatus {
-  ONLINE = "ONLINE",
-  OFFLINE = "OFFLINE",
-  QUEUE = "QUEUE",
+export enum UserState {
+  IDLE = "IDLE",
+  QUEUED = "QUEUED",
   MATCHED = "MATCHED"
 }
 
