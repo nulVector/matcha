@@ -4,34 +4,20 @@ import { profileGuard } from "../middleware/profileGuard";
 import { requireAuth } from "../middleware/requireAuth";
 const connectionRouter: Router = Router();
 
+connectionRouter.use(requireAuth,authGuard,profileGuard);
 connectionRouter.post(
     "/queue/join",
-    requireAuth,
-    authGuard,
-    profileGuard,
 );
 connectionRouter.post(
     "/queue/leave",
-    requireAuth,
-    authGuard,
-    profileGuard,
 );
 connectionRouter.patch(
     "/:connectionId/extend",
-    requireAuth,
-    authGuard,
-    profileGuard,
 );
 connectionRouter.patch(
-    "/:connectionId/convert", 
-    requireAuth, 
-    authGuard, 
-    profileGuard,
+    "/:connectionId/convert",
 );
 connectionRouter.delete(
-    "/:connectionId", 
-    requireAuth, 
-    authGuard, 
-    profileGuard,
+    "/:connectionId",
 );
 export default connectionRouter;

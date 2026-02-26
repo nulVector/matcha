@@ -7,20 +7,14 @@ import { validate } from "../middleware/validate";
 import { requireAuth } from '../middleware/requireAuth';
 
 const notificationRouter: Router = Router();
-
+notificationRouter.use(requireAuth,authGuard,profileGuard);
 notificationRouter.get(
     "/",
-    requireAuth,
-    authGuard,
-    profileGuard,
     getNotification
 )
 notificationRouter.patch(
     "/:category/read",
-    requireAuth,
-    authGuard,
-    profileGuard,
-    validate(CategorySchema),
+    validate(CategorySchema,"params"),
     markNotificationRead
 )
 
