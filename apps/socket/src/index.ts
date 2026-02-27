@@ -1,4 +1,4 @@
-import { CachedMessage, MessageType, UserStatus } from '@matcha/redis';
+import { CachedMessage, MessageType, UserState } from '@matcha/redis';
 import { createServer, IncomingMessage } from 'http';
 import jwt from 'jsonwebtoken';
 import { WebSocket, WebSocketServer } from 'ws';
@@ -67,22 +67,31 @@ server.on('upgrade',async (request,socket,head)=>{
   }
 })
 wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:UserSession)=>{
-  (ws as any).isAlive = true;
-  ws.on('pong', () => {
-    (ws as any).isAlive = true;
-  });
-  const userId = userSession.userId;
+  const profileId = userSession.userProfileId;
+  if (!profileId) {
+    ws.close(1008, "Profile required to connect");
+    return;
+  }
   const socketId = createId(); 
+  (ws as any).isAlive = true;
+  ws.on('pong', async () => {
+    (ws as any).isAlive = true;
+    try {
+      await redisManager.userConnection.setUserStatus(profileId);
+    } catch (err) {
+      console.error(`Heartbeat update failed for ${profileId}:`, err);
+    }
+  });
   try {
-    await redisManager.userConnection.mapSocket(userId,socketId);
-    if (!localSockets.has(userId)) localSockets.set(userId, new Set());
-    localSockets.get(userId)!.add(ws);
+    await redisManager.userConnection.mapSocket(profileId,socketId);
+    if (!localSockets.has(profileId)) localSockets.set(profileId, new Set());
+    localSockets.get(profileId)!.add(ws);
     ws.on('message', async (rawMessage: Buffer) => {
       let parsedData;
       try {
         parsedData = JSON.parse(rawMessage.toString());
       } catch (err) {
-        console.error(`Malformed JSON from ${userId}`);
+        console.error(`Malformed JSON from ${profileId}`);
         return;
       }
       try {
@@ -92,7 +101,7 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
             const message: CachedMessage = {
               id: createId(),
               content,
-              senderId: userId,
+              senderId: profileId,
               createdAt: new Date().toISOString(),
               type: MessageType.TEXT
             };
@@ -111,7 +120,7 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
               JSON.stringify({
                 receiverId,
                 eventData:{
-                  senderId:userId,
+                  senderId:profileId,
                   connectionId
                 },
                 eventType:EventType.USER_TYPING
@@ -127,7 +136,7 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
                 receiverId,
                 eventType: EventType.STOPPED_TYPING,
                 eventData: {
-                  senderId: userId,
+                  senderId: profileId,
                   connectionId
                 }
               })
@@ -137,8 +146,8 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
           case 'VIEWING_CHAT': {
             const { connectionId, receiverId} = parsedData.payload;
             await Promise.all([
-              redisManager.chat.setActiveChat(userId,connectionId),
-              redisManager.chat.resetUnread(userId,connectionId)
+              redisManager.chat.setActiveChat(profileId,connectionId),
+              redisManager.chat.resetUnread(profileId,connectionId)
             ])
             await redisManager.chat.publish(
               'chat_router',
@@ -152,7 +161,7 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
           }
           case 'LEAVING_CHAT': {
             const { connectionId } = parsedData.payload;
-            await redisManager.chat.removeActiveChat(userId);
+            await redisManager.chat.removeActiveChat(profileId);
             //TODO - push in queue
             break;
           }
@@ -160,36 +169,34 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
             break;
         }
       } catch (err) {
-        console.error(`Error processing message from ${userId}:`, err);
+        console.error(`Error processing message from ${profileId}:`, err);
       }
     });
 
     ws.on('close', async () => {
       try {
-        const activeChat = await redisManager.chat.getActiveChat(userId);
+        const activeChat = await redisManager.chat.getActiveChat(profileId);
         if (activeChat) {
-          await redisManager.chat.removeActiveChat(userId);
+          await redisManager.chat.removeActiveChat(profileId);
           //TODO - add to queue
         }
-        const userTabs = localSockets.get(userId);
+        const userTabs = localSockets.get(profileId);
         if (userTabs) {
           userTabs.delete(ws);
-          if (userTabs.size === 0) localSockets.delete(userId);
+          if (userTabs.size === 0) localSockets.delete(profileId);
         }
         const count = await redisManager.userConnection.removeSocket(socketId);
         if (count === 0) {
-          await redisManager.match.leaveQueue(userId, UserStatus.OFFLINE);
+          await redisManager.match.leaveQueue(profileId, UserState.IDLE);
         }
       } catch (err) {
-        console.error(`Error cleaning up socket for ${userId}:`, err);
+        console.error(`Error cleaning up socket for ${profileId}:`, err);
       }
     });
   } catch (err) {
-    console.error(`Failed to initialize connection for ${userSession.userId}:`, err);
+    console.error(`Failed to initialize connection for ${profileId}:`, err);
     ws.close();
   }
-  
-  
 });
 
 async function bootstrap(){
