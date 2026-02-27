@@ -13,8 +13,14 @@ export enum MessageType {
   TEXT = "TEXT",
   SYSTEM = "SYSTEM"
 }
+
 export enum NotificationCategory {
   NEW_FRIEND_REQUEST = 'new_friend_request'
+}
+
+export enum MatchAction {
+  EXTEND = 'EXTEND',
+  CONVERT = 'CONVERT'
 }
 
 export interface UserProfile {
@@ -31,6 +37,9 @@ export interface UserProfile {
   locationLatitude: number;
   locationLongitude: number;
   interest: string[];
+  queueStatus?: UserState;
+  geo?: string;
+  embedding?: Buffer;
 }
 
 export interface UserSession {

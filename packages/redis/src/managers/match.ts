@@ -1,5 +1,5 @@
 import Redis from "ioredis";
-import { MASTER_INTERESTS, UserState } from "../common";
+import { MASTER_INTERESTS, MatchAction, UserState } from "../common";
 
 export class MatchManager {
   constructor (private redis:Redis) {}
@@ -178,5 +178,45 @@ export class MatchManager {
     tx.lpush("match:queue", userA); 
     tx.lpush("match:queue", userB);
     await tx.exec();
+  }
+  async setMatchTimer(connectionId:string, timer:number) {
+    await this.redis.set(`match:timer:${connectionId}`,"1","EX",timer)
+  }
+  async clearMatchTimer(connectionId:string) {
+    await this.redis.del(`match:timer:${connectionId}`)
+  }
+  async recordMatchVotes(connectionId:string,userId:string,action:MatchAction) {
+    const key = `match:votes:${connectionId}:${action}`;
+    const tx = this.redis.multi();
+    tx.hset(key,userId,"1");
+    tx.expire(key, 60 * 30);
+    tx.hlen(key);
+    const result = await tx.exec();
+    if (!result || !result[2]) return 0;
+    return result[2][1] as number;
+  }
+  async clearMatchVotes(connectionId: string) {
+    const tx = this.redis.multi();
+    tx.del(`match:votes:${connectionId}:EXTEND`);
+    tx.del(`match:votes:${connectionId}:CONVERT`);
+    await tx.exec();
+  }
+  async setMatchInfo(connectionId:string,user1Id:string,user2Id:string){
+    const key = `match:info:${connectionId}`;
+    const tx = this.redis.multi();
+    tx.hset(key,{
+      user1Id,
+      user2Id
+    })
+    tx.expire(key, 60 * 40 )
+    await tx.exec()
+  }
+  async getMatchInfo(connectionId:string){
+    const info = await this.redis.hgetall(`match:info:${connectionId}`);
+    if (Object.keys(info).length === 0) return null;
+    return info as { user1Id: string; user2Id: string };
+  }
+  async clearMatchInfo(connectionId:string){
+    await this.redis.del(`match:info:${connectionId}`);
   }
 }
