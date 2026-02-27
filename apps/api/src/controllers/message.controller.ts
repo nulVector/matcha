@@ -1,8 +1,8 @@
 import prisma from "@matcha/prisma";
+import { CachedMessage, ConnectionListType } from "@matcha/redis";
 import { connectionIdType } from "@matcha/zod";
 import { NextFunction, Request, Response } from "express";
 import { redisManager } from "../services/redis";
-import { CachedMessage, ConnectionListType } from "@matcha/redis";
 
 export const getUnreadCounts = async (req:Request,res:Response,next:NextFunction) => {
   try {
@@ -46,7 +46,7 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
       redisManager.userDetail.inConnectionList(profileId,connectionId,ConnectionListType.FRIEND),
       redisManager.userDetail.inConnectionList(profileId,connectionId,ConnectionListType.ARCHIVED),
     ])
-      
+    if(!isFriend && !isArchived){
       const connection = await prisma.connection.findFirst({
         where:{
           id:connectionId,
