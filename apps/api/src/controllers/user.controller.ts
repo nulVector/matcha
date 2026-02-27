@@ -142,7 +142,7 @@ export const initiateProfile = async (req:Request, res:Response,next:NextFunctio
       isActive: true,
       allowDiscovery: false
     });
-    await redisManager.match.updateUserStatus(
+    await redisManager.match.updateMatchProfile(
       userProfile.id, 
       locationLatitude, 
       locationLongitude, 
@@ -241,7 +241,7 @@ export const updateProfile = async (req:Request,res:Response,next:NextFunction) 
     });
     await redisManager.userDetail.updateProfileFields(profileId, updateData);
     if (interest || (locationLatitude && locationLongitude)) {
-      await redisManager.match.updateUserStatus(
+      await redisManager.match.updateMatchProfile(
         profileId, 
         updatedProfile.locationLatitude, 
         updatedProfile.locationLongitude, 
@@ -777,8 +777,8 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
         }
       });
       await Promise.all([
-        redisManager.userDetail.cacheConnectionList(userId, [friendRequest.senderId], ConnectionListType.FRIEND),
-        redisManager.userDetail.cacheConnectionList(friendRequest.senderId, [userId], ConnectionListType.FRIEND)
+        redisManager.userDetail.cacheConnectionList(userId, [], ConnectionListType.FRIEND),
+        redisManager.userDetail.cacheConnectionList(friendRequest.senderId, [], ConnectionListType.FRIEND)
       ])
       return res.status(200).json({
         success: true,
