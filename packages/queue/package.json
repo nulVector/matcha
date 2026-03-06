@@ -1,0 +1,29 @@
+{
+  "name": "@matcha/queue",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc -w",
+    "clean": "rimraf dist .turbo"
+  },
+  "devDependencies": {
+    "@matcha/typescript-config": "workspace:*"
+  },
+  "dependencies": {
+    "bullmq": "^5.70.1",
+    "ioredis": "^5.9.2"
+  }
+}
