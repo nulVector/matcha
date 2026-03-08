@@ -100,6 +100,7 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
             const { connectionId, receiverId, content } = parsedData.payload;
             const message: CachedMessage = {
               id: createId(),
+              connectionId,
               content,
               senderId: profileId,
               createdAt: new Date().toISOString(),
@@ -144,11 +145,14 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
             break;
           }
           case 'VIEWING_CHAT': {
-            const { connectionId, receiverId} = parsedData.payload;
+            const { connectionId, receiverId, lastMessageId } = parsedData.payload;
             await Promise.all([
               redisManager.chat.setActiveChat(profileId,connectionId),
               redisManager.chat.resetUnread(profileId,connectionId)
             ])
+            if (lastMessageId) {
+              await redisManager.chat.bufferReadReceipt(connectionId, profileId, lastMessageId);
+            }
             await redisManager.chat.publish(
               'chat_router',
               JSON.stringify({
@@ -162,7 +166,6 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
           case 'LEAVING_CHAT': {
             const { connectionId } = parsedData.payload;
             await redisManager.chat.removeActiveChat(profileId);
-            //TODO - push in queue
             break;
           }
           default:
@@ -178,7 +181,6 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
         const activeChat = await redisManager.chat.getActiveChat(profileId);
         if (activeChat) {
           await redisManager.chat.removeActiveChat(profileId);
-          //TODO - add to queue
         }
         const userTabs = localSockets.get(profileId);
         if (userTabs) {

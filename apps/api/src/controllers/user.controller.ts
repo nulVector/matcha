@@ -1,6 +1,7 @@
 import prisma from '@matcha/prisma';
 import { ConnectionListType, NotificationCategory } from '@matcha/redis';
 import { connectionIdType, deactivatePasswordType, getConnectionsListType, getFriendRequestsType, initiateProfileType, requestHandleType, requestIdType, sendRequestType, updatePasswordType, updateProfileType, userIdType, usernameCheckType, vibeCheckType } from '@matcha/zod';
+import { TaskProducer } from '@matcha/queue'
 import bcrypt from "bcrypt";
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
@@ -126,11 +127,9 @@ export const initiateProfile = async (req:Request, res:Response,next:NextFunctio
         avatarUrl: true
       }
     });
-    //TODO - push to a queue(bullmq)
-    await redisManager.bloom.add('bf:usernames', userProfile.username);
     await redisManager.auth.cacheSession(userId, tokenVersion, userProfile.id);
-    await redisManager.userDetail.cacheProfile(userProfile.id, {
-      id: userProfile.id,
+    await TaskProducer.dispatchProfileInit({
+      userId: userProfile.id,
       username: userProfile.username,
       avatarUrl: userProfile.avatarUrl,
       aboutMe,
@@ -138,16 +137,8 @@ export const initiateProfile = async (req:Request, res:Response,next:NextFunctio
       location,
       locationLatitude,
       locationLongitude,
-      interest,
-      isActive: true,
-      allowDiscovery: false
-    });
-    await redisManager.match.updateMatchProfile(
-      userProfile.id, 
-      locationLatitude, 
-      locationLongitude, 
       interest
-    );
+    });
     res.status(201).json({
       success:true,
       message: "Profile created successfully",
@@ -876,6 +867,7 @@ export const deactivateProfile = async (req:Request,res:Response,next:NextFuncti
     await Promise.all([
       redisManager.match.leaveQueue(profileId),
       redisManager.userDetail.cacheConnectionList(profileId, [], ConnectionListType.FRIEND),
+      redisManager.userDetail.cacheConnectionList(profileId, [], ConnectionListType.ARCHIVED),
       redisManager.auth.invalidateSession(userId)
     ])
     res.clearCookie("token",{...COOKIE_OPTIONS,maxAge:0});

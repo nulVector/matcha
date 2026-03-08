@@ -78,6 +78,7 @@ export class MatchManager {
   async addToQueue(userId:string){
     const tx = this.redis.multi();
     tx.hset(`user:profile:${userId}`,'queueStatus',UserState.QUEUED);
+    tx.hset(`user:profile:${userId}`,'queuedAt', Date.now().toString());
     tx.lrem(`match:queue`, 0, userId);
     tx.lpush(`match:queue`,userId);
     await tx.exec();
@@ -94,6 +95,34 @@ export class MatchManager {
     tx.lrem(`match:queue`, 0, userId);
     tx.hset(`user:profile:${userId}`,'queueStatus',targetStatus);
     await tx.exec();
+  }
+  async getUsersInQueue() {
+    return await this.redis.lrange(`match:queue`, 0, -1);
+  }
+  async getSearcherProfile(userId: string) {
+    const key = `user:profile:${userId}`;
+    const [queueStatus, queuedAtStr, latStr, longStr] = await this.redis.hmget(
+      key, 
+      'queueStatus', 
+      'queuedAt', 
+      'locationLatitude', 
+      'locationLongitude'
+    );
+    if (queueStatus !== UserState.QUEUED) return null;
+    const vectorBuffer = await this.redis.hgetBuffer(key, 'embedding');
+    if (!vectorBuffer) return null;
+    const searcherVector = new Float32Array(
+      vectorBuffer.buffer, 
+      vectorBuffer.byteOffset, 
+      vectorBuffer.length / Float32Array.BYTES_PER_ELEMENT
+    );
+    return {
+      queueStatus,
+      queuedAt: queuedAtStr ? parseInt(queuedAtStr, 10) : Date.now(),
+      lat: parseFloat(latStr || "0"),
+      long: parseFloat(longStr || "0"),
+      searcherVector
+    };
   }
   async findMatchesInRadius(
     userVector: Float32Array,

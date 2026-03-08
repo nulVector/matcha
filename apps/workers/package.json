@@ -1,0 +1,24 @@
+{
+  "name": "workers",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node ./dist/index.js",
+    "dev": "tsc -w & nodemon ./dist/index.js",
+    "clean": "rimraf dist .turbo"
+  },
+  "dependencies": {
+    "@matcha/prisma": "workspace:*",
+    "@matcha/redis": "workspace:*",
+    "@matcha/queue": "workspace:*",
+    "bullmq": "^5.70.1",
+    "dotenv": "^17.2.3",
+    "ioredis": "^5.9.2"
+  },
+  "devDependencies": {
+    "@matcha/typescript-config": "workspace:*"
+  }
+}

@@ -26,6 +26,7 @@ export class ChatManager {
     tx.rpush(chatKey, JSON.stringify(message));
     tx.ltrim(chatKey, -50, -1);
     tx.expire(chatKey, 60 * 60 * 24);
+    tx.rpush("buffer:messages", JSON.stringify(message));
     if (activeChat !== connectionId) {
       tx.hincrby(unreadKey, connectionId, 1);
     }
@@ -79,6 +80,34 @@ export class ChatManager {
   }
   async resetUnread(userId:string,connectionId:string){
     await this.redis.hdel(`user:unread:${userId}`,connectionId);
+  }
+  async getMessageBufferBatch(batchSize: number): Promise<CachedMessage[]> {
+    const rawMessages = await this.redis.lrange("buffer:messages", 0, batchSize - 1);
+    return rawMessages.map(msg => JSON.parse(msg) as CachedMessage);
+  }
+  async trimMessageBufferBatch(batchSize: number) {
+    await this.redis.ltrim("buffer:messages", batchSize, -1);
+  }
+  async bufferReadReceipt(connectionId: string, userId: string, messageId: string) {
+    const payload = JSON.stringify({
+      messageId,
+      readAt: new Date().toISOString()
+    });
+    await this.redis.hset("buffer:reads", `${connectionId}:${userId}`, payload);
+  }
+  async extractReadReceiptBuffer(): Promise<Record<string, string> | null> {
+    const tempKey = `buffer:reads:processing:${Date.now()}`;
+    try {
+      await this.redis.rename("buffer:reads", tempKey);
+      const data = await this.redis.hgetall(tempKey);
+      await this.redis.del(tempKey);
+      return data;
+    } catch (error: any) {
+      if (error.message.includes("no such key")) {
+        return null; 
+      }
+      throw error;
+    }
   }
   async publish(channel:string,msg:string){
     return await this.redis.publish(channel,msg);

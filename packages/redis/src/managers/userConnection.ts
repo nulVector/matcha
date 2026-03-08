@@ -27,8 +27,8 @@ export class UserConnectionManager {
   async countSockets(userId:string){
     return await this.redis.scard(`user:sockets:${userId}`);
   }
-  async setUserStatus(userId:string) {
-    await this.redis.set(`user:status:${userId}`, "1", "EX", 60);
+  async setUserStatus(userId: string) {
+    await this.redis.set(`user:status:${userId}`, Date.now().toString(), "EX", 60 * 2);
   }
   async checkUserStatus(userId: string): Promise<boolean> {
     const exists = await this.redis.exists(`user:status:${userId}`);

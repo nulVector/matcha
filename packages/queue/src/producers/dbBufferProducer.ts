@@ -16,7 +16,7 @@ export const DbBufferProducer = {
     );
     await dbBufferQueue.add(
       JobName.PROCESS_READ_BATCH,
-      { batchSize: 1000 } as ProcessReadBatchPayload,
+      {},
       {
         repeat: {
           every: 10000,

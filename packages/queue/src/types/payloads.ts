@@ -24,13 +24,15 @@ export interface ProcessMessageBatchPayload {
   batchSize?: number;
 }
 export interface ProcessReadBatchPayload {
-  batchSize?: number;
 }
 
 // CRON QUEUE PAYLOADS
 export interface CleanupArchiveChatsPayload {
 }
 export interface SweepMatchQueuePayload {
+}
+export interface ArchiveExpiredMatchesPayload {
+
 }
  
 export type TaskQueueJob = 
@@ -43,4 +45,5 @@ export type DbBufferQueueJob =
 
 export type CronQueueJob = 
   | { name: JobName.CLEANUP_ARCHIVE_CHATS; data: CleanupArchiveChatsPayload }
-  | { name: JobName.SWEEP_MATCH_QUEUE; data: SweepMatchQueuePayload };
+  | { name: JobName.SWEEP_MATCH_QUEUE; data: SweepMatchQueuePayload }
+  | { name: JobName.ARCHIVE_EXPIRED_MATCHES; data: ArchiveExpiredMatchesPayload };

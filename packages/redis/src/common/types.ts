@@ -38,6 +38,7 @@ export interface UserProfile {
   locationLongitude: number;
   interest: string[];
   queueStatus?: UserState;
+  queuedAt?:string;
   geo?: string;
   embedding?: Buffer;
 }
@@ -50,6 +51,7 @@ export interface UserSession {
 
 export interface CachedMessage {
   id: string;
+  connectionId: string;
   content: string;
   senderId: string;
   createdAt: string;     

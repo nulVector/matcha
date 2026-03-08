@@ -12,5 +12,6 @@ export enum JobName {
   PROCESS_READ_BATCH = "process_read_batch",
 
   CLEANUP_ARCHIVE_CHATS = "cleanup_archive_chats",
-  SWEEP_MATCH_QUEUE = "sweep_match_queue"
+  SWEEP_MATCH_QUEUE = "sweep_match_queue",
+  ARCHIVE_EXPIRED_MATCHES = "archive_expired_matches"
 }
