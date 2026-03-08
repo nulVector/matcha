@@ -67,6 +67,9 @@ export class UserDetailManager {
       }
       await tx.exec();
   }
+  async invalidateConnectionList(userId: string, type: ConnectionListType) {
+    await this.redis.del(`user:${type}:${userId}`);
+  }
   async getConnectionList(userId:string,type:ConnectionListType){
     return await this.redis.smembers(`user:${type}:${userId}`)
   }

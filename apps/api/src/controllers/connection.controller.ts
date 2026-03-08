@@ -142,8 +142,8 @@ export const convertConnection = async (req:Request,res:Response,next:NextFuncti
         redisManager.match.clearMatchVotes(connectionId),
         redisManager.match.clearMatchTimer(connectionId),
         redisManager.match.clearMatchInfo(connectionId),
-        redisManager.userDetail.cacheConnectionList(profileId, [], ConnectionListType.FRIEND),
-        redisManager.userDetail.cacheConnectionList(receiverId, [], ConnectionListType.FRIEND)
+        redisManager.userDetail.invalidateConnectionList(profileId, ConnectionListType.FRIEND),
+        redisManager.userDetail.invalidateConnectionList(receiverId, ConnectionListType.FRIEND)
       ]);
       const successEvent = {
         eventType: "SYSTEM_EVENT",

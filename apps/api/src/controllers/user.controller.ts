@@ -412,8 +412,8 @@ export const deleteConnection = async (req: Request, res: Response, next: NextFu
       data: isUser1 ? { user1DeletedAt: now } : { user2DeletedAt: now }
     });
     await Promise.all([
-      redisManager.userDetail.cacheConnectionList(profileId, [], ConnectionListType.FRIEND),
-      redisManager.userDetail.cacheConnectionList(profileId, [], ConnectionListType.ARCHIVED)
+      redisManager.userDetail.invalidateConnectionList(profileId, ConnectionListType.FRIEND),
+      redisManager.userDetail.invalidateConnectionList(profileId, ConnectionListType.ARCHIVED)
     ]);
     res.json({
       success:true
@@ -768,8 +768,8 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
         }
       });
       await Promise.all([
-        redisManager.userDetail.cacheConnectionList(userId, [], ConnectionListType.FRIEND),
-        redisManager.userDetail.cacheConnectionList(friendRequest.senderId, [], ConnectionListType.FRIEND)
+        redisManager.userDetail.invalidateConnectionList(userId, ConnectionListType.FRIEND),
+        redisManager.userDetail.invalidateConnectionList(friendRequest.senderId, ConnectionListType.FRIEND)
       ])
       return res.status(200).json({
         success: true,
@@ -813,8 +813,8 @@ export const handleUnfriendRequest = async (req:Request,res:Response,next:NextFu
       }
     });
     Promise.all([
-      redisManager.userDetail.cacheConnectionList(myProfileId, [], ConnectionListType.FRIEND),
-      redisManager.userDetail.cacheConnectionList(targetUserId, [], ConnectionListType.FRIEND)
+      redisManager.userDetail.invalidateConnectionList(myProfileId, ConnectionListType.FRIEND),
+      redisManager.userDetail.invalidateConnectionList(targetUserId, ConnectionListType.FRIEND)
     ]).catch(err => console.error("Failed to invalidate friend cache on unfriend:", err));
 
     res.json({
@@ -866,8 +866,8 @@ export const deactivateProfile = async (req:Request,res:Response,next:NextFuncti
     })
     await Promise.all([
       redisManager.match.leaveQueue(profileId),
-      redisManager.userDetail.cacheConnectionList(profileId, [], ConnectionListType.FRIEND),
-      redisManager.userDetail.cacheConnectionList(profileId, [], ConnectionListType.ARCHIVED),
+      redisManager.userDetail.invalidateConnectionList(profileId, ConnectionListType.FRIEND),
+      redisManager.userDetail.invalidateConnectionList(profileId, ConnectionListType.ARCHIVED),
       redisManager.auth.invalidateSession(userId)
     ])
     res.clearCookie("token",{...COOKIE_OPTIONS,maxAge:0});
