@@ -128,13 +128,22 @@ export const initiateProfile = async (req:Request, res:Response,next:NextFunctio
       }
     });
     await redisManager.auth.cacheSession(userId, tokenVersion, userProfile.id);
+    await redisManager.userDetail.cacheProfile(userProfile.id, {
+      id: userProfile.id,
+      username: userProfile.username,
+      avatarUrl: userProfile.avatarUrl,
+      aboutMe: aboutMe || null,
+      openingQues: openingQues || null,
+      location,
+      locationLatitude,
+      locationLongitude,
+      interest,
+      isActive: true,
+      allowDiscovery: false
+    });
     await TaskProducer.dispatchProfileInit({
       userId: userProfile.id,
       username: userProfile.username,
-      avatarUrl: userProfile.avatarUrl,
-      aboutMe,
-      openingQues,
-      location,
       locationLatitude,
       locationLongitude,
       interest

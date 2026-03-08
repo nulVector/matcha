@@ -4,10 +4,6 @@ import { JobName } from "../constant/keys";
 export interface ProfileInitPayload {
   userId: string;
   username: string;
-  avatarUrl: string;
-  aboutMe?: string | null;
-  openingQues?: string | null;
-  location: string;
   locationLatitude: number;
   locationLongitude: number;
   interest: string[];

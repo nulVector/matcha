@@ -11,28 +11,11 @@ export const taskWorker = new Worker(
         const {
           userId,
           username,
-          avatarUrl,
-          aboutMe,
-          openingQues,
-          location,
           locationLatitude,
           locationLongitude,
           interest,
         } = task.data;
         await redisManager.bloom.add('bf:usernames', username);
-        await redisManager.userDetail.cacheProfile(userId, {
-          id: userId,
-          username,
-          avatarUrl,
-          aboutMe: aboutMe || null,
-          openingQues: openingQues || null,
-          location,
-          locationLatitude,
-          locationLongitude,
-          interest,
-          isActive: true,
-          allowDiscovery: false
-        });
         await redisManager.match.updateMatchProfile(
           userId, 
           locationLatitude, 
