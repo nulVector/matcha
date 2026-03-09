@@ -88,7 +88,7 @@ model Connection {
   id              String           @id @default(cuid(2))
   createdAt       DateTime         @default(now())
   status          ConnectionStatus @default(MATCHED)
-  updatedAt       DateTime         @updatedAt
+  updatedAt       DateTime         @default(now())
   expiresAt       DateTime?
   user1Id         String
   user1           UserProfile      @relation("MatchUser1", fields: [user1Id], references: [id])

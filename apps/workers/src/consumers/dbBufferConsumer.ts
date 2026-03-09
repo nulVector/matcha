@@ -26,6 +26,13 @@ export const dbBufferWorker = new Worker(
           data: messagesToInsert,
           skipDuplicates: true,
         });
+        const uniqueConnectionIds = [...new Set(messages.map(msg => msg.connectionId))];
+        if (uniqueConnectionIds.length > 0) {
+          await prisma.connection.updateMany({
+            where: { id: { in: uniqueConnectionIds } },
+            data: { updatedAt: new Date() }
+          });
+        }
         await redisManager.chat.trimMessageBufferBatch(messages.length);
         break;
       }
