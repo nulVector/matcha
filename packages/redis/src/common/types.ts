@@ -46,7 +46,8 @@ export interface UserProfile {
 export interface UserSession {
   userId: string;
   tokenVersion: number;
-  userProfileId: string | null
+  userProfileId: string | null;
+  hasPassword: boolean
 }
 
 export interface ConnectionListItem { 

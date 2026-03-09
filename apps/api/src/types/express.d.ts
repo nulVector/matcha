@@ -8,6 +8,7 @@ declare global {
       profile: {
         id:string;
       } | null;
+      hasPassword:boolean;
     }
     interface Request {
       validatedData: {

@@ -4,8 +4,8 @@ import { RATE_LIMIT_SCRIPT, UserSession } from "../common";
 export class AuthManager {
   constructor (private redis:Redis) {}
 
-  async cacheSession(userId:string, tokenVersion: number, userProfileId:string | null){
-    const data:UserSession = {userId,tokenVersion,userProfileId};
+  async cacheSession(userId:string, tokenVersion: number, userProfileId:string | null, hasPassword: boolean){
+    const data:UserSession = {userId,tokenVersion,userProfileId, hasPassword};
     await this.redis.set(`session:${userId}`,JSON.stringify(data),"EX",60 * 60 * 24 * 7);
   } 
   async getSession(userId:string): Promise<UserSession | null>{

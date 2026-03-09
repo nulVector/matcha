@@ -40,6 +40,7 @@ export const configurePassport = (passport:PassportStatic) =>{
         select: {
           id: true,
           googleId: true,
+          password: true,
           tokenVersion: true,
           deletedAt: true,
           profile: {
@@ -54,6 +55,7 @@ export const configurePassport = (passport:PassportStatic) =>{
           select: {
             id: true,
             googleId: true,
+            password: true,
             tokenVersion: true,
             deletedAt: true,
             profile: { select: { id: true } }
@@ -69,6 +71,7 @@ export const configurePassport = (passport:PassportStatic) =>{
           select: {
             id: true,
             googleId: true,
+            password: true,  
             tokenVersion: true,
             deletedAt: true,
             profile: { select: { id: true } }
@@ -91,7 +94,8 @@ export const configurePassport = (passport:PassportStatic) =>{
       return done(null, {
         id: user.id,
         tokenVersion: user.tokenVersion,
-        profile: hasProfile ? { id: user.profile!.id } : null 
+        profile: hasProfile ? { id: user.profile!.id } : null,
+        hasPassword: !!user.password
       });
     } catch (err) {
       return done(err);
@@ -144,7 +148,8 @@ export const configurePassport = (passport:PassportStatic) =>{
         return done(null, {
           id:user.id,
           tokenVersion:user.tokenVersion,
-          profile: hasProfile ? {id:user.profile!.id} : null 
+          profile:hasProfile ? {id:user.profile!.id} : null,
+          hasPassword:true
         });                  
       }catch(err){
         return done(err)
@@ -173,7 +178,8 @@ export const configurePassport = (passport:PassportStatic) =>{
         const user: Express.User = {
           id: session.userId,
           tokenVersion: session.tokenVersion,
-          profile: session.userProfileId ? { id: session.userProfileId } : null
+          profile: session.userProfileId ? { id: session.userProfileId } : null,
+          hasPassword: session.hasPassword
         };
         return done(null, user);
       }catch(err){

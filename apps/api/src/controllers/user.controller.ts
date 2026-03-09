@@ -109,6 +109,7 @@ export const initiateProfile = async (req:Request, res:Response,next:NextFunctio
     }:initiateProfileType = req.validatedData.body;
     const userId = req.user!.id;
     const tokenVersion = req.user!.tokenVersion;
+    const hasPassword = req.user!.hasPassword;
     const userProfile = await prisma.userProfile.create({
       data: {
         userId,
@@ -127,7 +128,7 @@ export const initiateProfile = async (req:Request, res:Response,next:NextFunctio
         avatarUrl: true
       }
     });
-    await redisManager.auth.cacheSession(userId, tokenVersion, userProfile.id);
+    await redisManager.auth.cacheSession(userId, tokenVersion, userProfile.id, hasPassword);
     await redisManager.userDetail.cacheProfile(userProfile.id, {
       id: userProfile.id,
       username: userProfile.username,
@@ -341,7 +342,7 @@ export const updatePassword = async (req:Request,res:Response, next:NextFunction
       },
       select: { tokenVersion: true }
     })
-    await redisManager.auth.cacheSession(userId, updatedUser.tokenVersion, profileId);
+    await redisManager.auth.cacheSession(userId, updatedUser.tokenVersion, profileId, true);
     const token = jwt.sign({ 
         id: userId, 
         tokenVersion: updatedUser.tokenVersion 

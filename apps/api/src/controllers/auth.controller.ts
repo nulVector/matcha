@@ -26,7 +26,7 @@ export const signup = async (req:Request, res:Response,next:NextFunction) =>{
         tokenVersion:true
       }
     });
-    await redisManager.auth.cacheSession(newUser.id,newUser.tokenVersion,null);
+    await redisManager.auth.cacheSession(newUser.id,newUser.tokenVersion,null, true);
     const token = jwt.sign({
       id:newUser.id,
       tokenVersion:newUser.tokenVersion
@@ -50,7 +50,7 @@ export const login = async (req:Request,res:Response,next:NextFunction)=>{
       });
       return;
     }
-    await redisManager.auth.cacheSession(user.id,user.tokenVersion,user.profile ? user.profile.id : null);
+    await redisManager.auth.cacheSession(user.id,user.tokenVersion,user.profile ? user.profile.id : null, true);
     const token = jwt.sign({
       id:user.id,
       tokenVersion:user.tokenVersion
@@ -63,7 +63,7 @@ export const login = async (req:Request,res:Response,next:NextFunction)=>{
 export const googleAuthCallback = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = req.user!;
-    await redisManager.auth.cacheSession(user.id,user.tokenVersion,user.profile ? user.profile.id : null);
+    await redisManager.auth.cacheSession(user.id,user.tokenVersion,user.profile ? user.profile.id : null,user.hasPassword);
     const token = jwt.sign({
       id: user.id,
       tokenVersion: user.tokenVersion
