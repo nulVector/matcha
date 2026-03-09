@@ -12,8 +12,8 @@
   },
   "dependencies": {
     "@matcha/prisma": "workspace:*",
-    "@matcha/zod": "workspace:*",
     "@matcha/redis": "workspace:*",
+    "@matcha/zod": "workspace:*",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -21,19 +21,21 @@
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
     "zod": "^4.2.1"
   },
   "devDependencies": {
-    "@matcha/typescript-config": "workspace:*",
     "@matcha/queue": "workspace:*",
+    "@matcha/typescript-config": "workspace:*",
     "@types/bcrypt": "^6.0.0",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/passport": "^1.0.17",
+    "@types/passport-google-oauth20": "^2.0.17",
     "@types/passport-jwt": "^4.0.1",
     "@types/passport-local": "^1.0.38"
   }

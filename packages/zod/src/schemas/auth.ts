@@ -52,16 +52,21 @@ export type loginType = z.infer<typeof loginSchema>;
 
 export const updatePasswordSchema = z
   .object({
-    currentPassword:z.string().trim(),
+    currentPassword:z.string().trim().optional(),
     newPassword:passwordSchema
   })
-  .refine((data)=>data.currentPassword !== data.newPassword,{
-    error:"New password must be different from current password",
-    path:["newPassword"]
-  })
+  .refine((data) => {
+    if (data.currentPassword) {
+      return data.currentPassword !== data.newPassword;
+    }
+    return true; 
+  }, {
+    error: "New password must be different from current password",
+    path: ["newPassword"]
+  });
 export type updatePasswordType = z.infer<typeof updatePasswordSchema>;
 
 export const deactivatePasswordSchema = z.object({
-  password:passwordSchema
+  password:z.string().trim().optional()
 })
 export type deactivatePasswordType = z.infer<typeof deactivatePasswordSchema>;

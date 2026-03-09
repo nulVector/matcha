@@ -1,7 +1,7 @@
 import prisma from '@matcha/prisma';
+import { TaskProducer } from '@matcha/queue';
 import { ConnectionListType, NotificationCategory } from '@matcha/redis';
 import { connectionIdType, deactivatePasswordType, getConnectionsListType, getFriendRequestsType, initiateProfileType, requestHandleType, requestIdType, sendRequestType, updatePasswordType, updateProfileType, userIdType, usernameCheckType, vibeCheckType } from '@matcha/zod';
-import { TaskProducer } from '@matcha/queue'
 import bcrypt from "bcrypt";
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
@@ -317,11 +317,20 @@ export const updatePassword = async (req:Request,res:Response, next:NextFunction
         message: "User not found"
       });
     }
-    const isMatch = await bcrypt.compare(currentPassword,existingUser.password);
-    if(!isMatch){
-      return res.status(400).json({
-        messgage:"Password is invalid"
-      })
+    if (existingUser.password) {
+      if (!currentPassword) {
+        return res.status(400).json({
+          success: false,
+          message: "Current password is required to update your password."
+        });
+      }
+      const isMatch = await bcrypt.compare(currentPassword, existingUser.password);
+      if (!isMatch) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid current password."
+        });
+      }
     }
     const hashedPassword = await bcrypt.hash(newPassword,10);
     const updatedUser = await prisma.user.update({
@@ -337,7 +346,6 @@ export const updatePassword = async (req:Request,res:Response, next:NextFunction
         id: userId, 
         tokenVersion: updatedUser.tokenVersion 
       },jwtSecret,{ expiresIn: '7d' });
-
     res.cookie("token", token, COOKIE_OPTIONS);
     return res.json({
       success:true,
@@ -890,18 +898,32 @@ export const deactivateProfile = async (req:Request,res:Response,next:NextFuncti
         reactivatedAt:true
       }
     });
-    if (userDetails!.reactivatedAt && (now.getTime() - userDetails!.reactivatedAt.getTime() < SEVEN_DAYS)) {
+    if (!userDetails) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+    if (userDetails.reactivatedAt && (now.getTime() - userDetails!.reactivatedAt.getTime() < SEVEN_DAYS)) {
       return res.status(400).json({
         success:false,
         message:"You can only deactivate your account once every 7 days"
       })
     }
-    const isMatch = await bcrypt.compare(password,userDetails!.password);
-    if(!isMatch){
-      return res.status(401).json({
-        success:false,
-        message:'Invalid password'
-      })
+    if (userDetails.password) {
+      if (!password) {
+        return res.status(400).json({
+          success: false,
+          message: "Password is required to deactivate your account."
+        });
+      }
+      const isMatch = await bcrypt.compare(password, userDetails.password);
+      if (!isMatch) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid password'
+        });
+      }
     }
     await prisma.user.update({
       where:{ id:userId },
@@ -922,7 +944,7 @@ export const deactivateProfile = async (req:Request,res:Response,next:NextFuncti
     res.clearCookie("token",{...COOKIE_OPTIONS,maxAge:0});
     res.json({
       success:true,
-      messgage:"Account deactivated"
+      message:"Account deactivated"
     })
   } catch (err) {
     next(err)   

@@ -1,10 +1,11 @@
 import { loginSchema, requestPasswordResetSchema, resetPasswordSchema, signupSchema } from "@matcha/zod";
 import { Router } from "express";
-import { confirmResetPassword, login, logout, requestResetPassword, signup } from "../controllers/auth.controller";
+import { confirmResetPassword, googleAuthCallback, login, logout, requestResetPassword, signup } from "../controllers/auth.controller";
 import { idempotencyGuard } from "../middleware/idempotency";
 import { rateLimiter } from "../middleware/rateLimiter";
 import { requireAuth } from "../middleware/requireAuth";
 import { validate } from "../middleware/validate";
+import passport from "passport";
 const authRouter: Router = Router();
 
 authRouter.post(
@@ -20,6 +21,21 @@ authRouter.post(
     validate(loginSchema),
     rateLimiter('login', 'email', 10, 60*15),
     login
+);
+authRouter.get(
+  "/google",
+  passport.authenticate("google", { 
+    scope: ["profile", "email"], 
+    session: false 
+  })
+);
+authRouter.get(
+  "/google/callback",
+  passport.authenticate("google", { 
+    session: false, 
+    failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:5173'}/login?error=GoogleAuthFailed` 
+  }),
+  googleAuthCallback
 );
 authRouter.post(
     "/request-password-reset",

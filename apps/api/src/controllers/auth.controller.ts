@@ -60,6 +60,23 @@ export const login = async (req:Request,res:Response,next:NextFunction)=>{
   })(req,res,next);
 }
 
+export const googleAuthCallback = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user!;
+    await redisManager.auth.cacheSession(user.id,user.tokenVersion,user.profile ? user.profile.id : null);
+    const token = jwt.sign({
+      id: user.id,
+      tokenVersion: user.tokenVersion
+    }, jwtSecret, { expiresIn: '7d' });
+    res.cookie("token", token, COOKIE_OPTIONS);
+    const frontendUrl = process.env.CLIENT_URL || "http://localhost:5173";
+    const redirectUrl = user.profile ? `${frontendUrl}/home` : `${frontendUrl}/onboarding`;
+    res.redirect(redirectUrl);
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const requestResetPassword = async (req:Request,res:Response,next:NextFunction) => {
   try {
     const {email}:requestPasswordResetType = req.validatedData.body;
@@ -70,7 +87,7 @@ export const requestResetPassword = async (req:Request,res:Response,next:NextFun
     if (user) {
       const resetToken = crypto.randomBytes(32).toString('hex');
       await redisManager.auth.setResetToken(resetToken, user.id);
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const frontendUrl = process.env.CLIENT_URL || 'http://localhost:5173';
       const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
       // TODO - send email to user via Nodemailer/Resend/SendGrid
     }

@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import { PassportStatic } from "passport";
 import { ExtractJwt, Strategy as JwtStrategy } from "passport-jwt";
 import { Strategy as LocalStrategy } from "passport-local";
+import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { redisManager } from "../services/redis";
 
 interface JwtPayload {
@@ -10,11 +11,92 @@ interface JwtPayload {
   tokenVersion:number
 }
 const jwtSecret = process.env.JWT_SECRET;
-if(!jwtSecret){
+const clientID = process.env.GOOGLE_CLIENT_ID;
+const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+if(!jwtSecret || !clientID || !clientSecret){
   throw new Error("Environment variables not availble");
 }
 
 export const configurePassport = (passport:PassportStatic) =>{
+  passport.use(new GoogleStrategy({
+    clientID,
+    clientSecret,
+    callbackURL: '/api/auth/google/callback',
+    scope: ['profile', 'email']
+  }, async (accessToken, refreshToken, profile, done) => {
+    try {
+      const email = profile.emails?.[0]?.value;
+      const googleId = profile.id;
+      if (!email) {
+        return done(new Error("No email provided from Google"), false);
+      }
+      let user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { googleId: googleId },
+            { email: email }
+          ]
+        },
+        select: {
+          id: true,
+          googleId: true,
+          tokenVersion: true,
+          deletedAt: true,
+          profile: {
+            select: { id: true }
+          }
+        }
+      });
+      if (user && !user.googleId) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { googleId: googleId },
+          select: {
+            id: true,
+            googleId: true,
+            tokenVersion: true,
+            deletedAt: true,
+            profile: { select: { id: true } }
+          }
+        });
+      }
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            email: email,
+            googleId: googleId,
+          },
+          select: {
+            id: true,
+            googleId: true,
+            tokenVersion: true,
+            deletedAt: true,
+            profile: { select: { id: true } }
+          }
+        });
+      }
+      const hasProfile = user.profile !== null;
+      if (user.deletedAt) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            deletedAt: null,
+            reactivatedAt: new Date(),
+            profile: hasProfile ? {
+              update: { isActive: true }
+            } : undefined
+          }
+        });
+      }
+      return done(null, {
+        id: user.id,
+        tokenVersion: user.tokenVersion,
+        profile: hasProfile ? { id: user.profile!.id } : null 
+      });
+    } catch (err) {
+      return done(err);
+    }
+  }));
   passport.use(new LocalStrategy(
     {usernameField:"email"},
     async (email,password,done) => {
