@@ -49,6 +49,11 @@ export interface UserSession {
   userProfileId: string | null
 }
 
+export interface ConnectionListItem { 
+  otherUserId: string, 
+  timestamp: number 
+}
+
 export interface CachedMessage {
   id: string;
   connectionId: string;

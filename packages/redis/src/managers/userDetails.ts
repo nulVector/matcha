@@ -1,5 +1,5 @@
 import Redis from "ioredis";
-import { ConnectionListType, UserProfile, UserState } from "../common";
+import { ConnectionListItem, ConnectionListType, UserProfile, UserState } from "../common";
 
 export class UserDetailManager {
   constructor (private redis:Redis) {}
@@ -56,25 +56,43 @@ export class UserDetailManager {
   async invalidateProfile(userId:string){
     await this.redis.del(`user:profile:${userId}`)
   }
-  async cacheConnectionList(userId:string,ids:string[],type:ConnectionListType){
+  async cachePaginatedUIConnections(userId:string, connections:ConnectionListItem[], type:ConnectionListType){
+    if (connections.length === 0 ) return;
+    const key = `user:connection:ui:${type}:${userId}`;
     const tx = this.redis.multi();
-    const key = `user:${type}:${userId}`;
-    const ttl = type === ConnectionListType.FRIEND ? 60 * 60 * 24 : 60 * 60;
-      tx.del(key);
-      if (ids.length > 0) {
-        tx.sadd(key, ...ids);
-        tx.expire(key, ttl);
-      }
-      await tx.exec();
+    connections.forEach(conn => {
+      tx.zadd(key,conn.timestamp,conn.otherUserId);
+    })
+    tx.expire(key, 60 * 60 * 24);
+    await tx.exec();
+  }
+  async cacheAuthConnectionIds(userId:string, connectionIds: string[], type: ConnectionListType){
+    if (connectionIds.length === 0 ) return;
+    const key = `user:connection:auth:${type}:${userId}`;
+    const tx = this.redis.multi();
+    tx.sadd(key, ...connectionIds);
+    tx.expire(key, 60 * 60 * 24);
+    await tx.exec();
   }
   async invalidateConnectionList(userId: string, type: ConnectionListType) {
-    await this.redis.del(`user:${type}:${userId}`);
+    const tx = this.redis.multi();
+    tx.del(`user:connection:ui:${type}:${userId}`);
+    tx.del(`user:connection:auth:${type}:${userId}`);
+    await tx.exec();
   }
   async getConnectionList(userId:string,type:ConnectionListType){
-    return await this.redis.smembers(`user:${type}:${userId}`)
+    return await this.redis.zrevrange(`user:connection:ui:${type}:${userId}`, 0, -1);
   }
-  async inConnectionList(userId:string,connectionId:string,type:ConnectionListType) {
-    const exists = await this.redis.sismember(`user:${type}:${userId}`,connectionId);
+  async isAuthConnectionHydrated(userId: string, type: ConnectionListType) {
+    const exists = await this.redis.exists(`user:connection:auth:${type}:${userId}`);
+    return exists === 1;
+  }
+  async addSingleAuthConnection(userId: string, connectionId: string, type: ConnectionListType) {
+    const key = `user:connection:auth:${type}:${userId}`;
+    await this.redis.sadd(key, connectionId);
+  }
+  async inAuthConnectionList(userId: string, connectionId: string, type: ConnectionListType) {
+    const exists = await this.redis.sismember(`user:connection:auth:${type}:${userId}`, connectionId);
     return exists === 1;
   }
   async getManyProfiles(

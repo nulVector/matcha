@@ -83,14 +83,18 @@ export type updateProfileType = z.infer<typeof updateProfileSchema>
 export const getConnectionsListSchema = z.object({
   status: z.enum(["FRIEND" , "ARCHIVED"],{
     error:"Must be either 'FRIEND' or 'ARCHIVED'"
-  })
+  }),
+  cursor: cuidId.optional(),
+  limit: z.coerce.number().min(1).max(50).default(20)
 })
 export type getConnectionsListType = z.infer<typeof getConnectionsListSchema>
 
 export const getFriendRequestsSchema = z.object({
   type: z.enum(["incoming","outgoing"],{
     error:"Must be either 'incoming' or 'outgoing'"
-  })
+  }),
+  cursor: cuidId.optional(),
+  limit: z.coerce.number().min(1).max(50).default(20)
 })
 export type getFriendRequestsType = z.infer<typeof getFriendRequestsSchema>
 

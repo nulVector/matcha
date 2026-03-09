@@ -43,8 +43,8 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
     const profileId = req.user!.profile!.id;
     const {connectionId}:connectionIdType = req.validatedData.params;
     let [isFriend,isArchived] = await Promise.all([
-      redisManager.userDetail.inConnectionList(profileId,connectionId,ConnectionListType.FRIEND),
-      redisManager.userDetail.inConnectionList(profileId,connectionId,ConnectionListType.ARCHIVED),
+      redisManager.userDetail.inAuthConnectionList(profileId,connectionId,ConnectionListType.FRIEND),
+      redisManager.userDetail.inAuthConnectionList(profileId,connectionId,ConnectionListType.ARCHIVED),
     ])
     if(!isFriend && !isArchived){
       const connection = await prisma.connection.findFirst({
@@ -65,6 +65,8 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
           message:"Forbidden: You can not access this chat."
         })
       }
+      const listType = connection.status === "FRIEND" ? ConnectionListType.FRIEND : ConnectionListType.ARCHIVED;
+      await redisManager.userDetail.addSingleAuthConnection(profileId, connectionId, listType);
     }
     let messages = await redisManager.chat.getMessages(connectionId);
     if (!messages || messages.length === 0) {

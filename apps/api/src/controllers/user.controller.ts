@@ -349,12 +349,14 @@ export const updatePassword = async (req:Request,res:Response, next:NextFunction
 }
 
 export const getConnectionsList = async (req: Request, res: Response, next: NextFunction) => {
-  //TODO- ADD pagination, either OFFSET based(static list) or ID based(Like insta)
   try {
     const userProfileId = req.user!.profile!.id;
-    const {status}:getConnectionsListType = req.validatedData.query;
+    const {status, cursor, limit}:getConnectionsListType = req.validatedData.query;
 
     const connections = await prisma.connection.findMany({
+      take: limit + 1,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      orderBy: { updatedAt: 'desc' },
       where: {
         status,
         OR: [
@@ -364,10 +366,16 @@ export const getConnectionsList = async (req: Request, res: Response, next: Next
       },
       select: {
         id: true,
+        updatedAt: true,
         user1: { select: { id: true, username: true, isActive: true, avatarUrl: true } },
         user2: { select: { id: true, username: true, isActive: true, avatarUrl: true } }
       }
     });
+    let nextCursor: string | undefined = undefined;
+    if(connections.length > limit){
+      const nextItem = connections.pop();
+      nextCursor = nextItem!.id;
+    }
     const formattedList = connections.map((conn) => {
       const otherUser = conn.user1.id === userProfileId ? conn.user2 : conn.user1;
       return {
@@ -375,22 +383,44 @@ export const getConnectionsList = async (req: Request, res: Response, next: Next
         username: otherUser.username,
         isActive: otherUser.isActive,
         avatarUrl: otherUser.avatarUrl,
-        connectionId: conn.id
+        connectionId: conn.id,
+        timestamp: conn.updatedAt.getTime()
       };
     });
 
-    const connectionIds = formattedList.map(user => user.id);
     const redisListType = status === "FRIEND" 
       ? ConnectionListType.FRIEND 
       : ConnectionListType.ARCHIVED;
-    redisManager.userDetail.cacheConnectionList(userProfileId, connectionIds, redisListType)
-      .catch(err => console.error("Failed to warm connection cache:", err));
-
+    const cacheData = formattedList.map(item => ({ 
+      otherUserId: item.id, 
+      timestamp: item.timestamp 
+    }));
+    redisManager.userDetail.cachePaginatedUIConnections(userProfileId, cacheData, redisListType)
+      .catch(err => console.error("Failed to warm UI connection cache:", err));
+    
+    redisManager.userDetail.isAuthConnectionHydrated(userProfileId, redisListType).then(isHydrated => {
+      if (!isHydrated) {
+        prisma.connection.findMany({
+          where: {
+            status,
+            OR: [
+              { AND: [{ user1Id: userProfileId }, { user1DeletedAt: null }] },
+              { AND: [{ user2Id: userProfileId }, { user2DeletedAt: null }] }
+            ]
+          },
+          select: { id: true }
+        }).then(allConnections => {
+          const allAuthIds = allConnections.map(c => c.id);
+          return redisManager.userDetail.cacheAuthConnectionIds(userProfileId, allAuthIds, redisListType);
+        }).catch(err => console.error("Failed to warm complete Auth cache:", err));
+      }
+    }).catch(err => console.error("Redis error checking hydration:", err));
     res.json({
       success: true,
       status: status,
       count: formattedList.length,
-      data: formattedList
+      data: formattedList,
+      nextCursor
     });
   } catch (err) {
     next(err);
@@ -435,34 +465,43 @@ export const deleteConnection = async (req: Request, res: Response, next: NextFu
 export const getFriendRequests = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const myProfileId = req.user!.profile!.id;
-    const {type}:getFriendRequestsType = req.validatedData.query;
+    const { type, cursor, limit } = req.validatedData.query as getFriendRequestsType;
     const isIncoming = type === "incoming";
+    
     const requestList = await prisma.friendRequest.findMany({
+      take: limit + 1,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      orderBy: { createdAt: 'desc' },
       where: {
         status: "PENDING",
         [isIncoming ? "receiverId" : "senderId"]: myProfileId,
-        [isIncoming ? "sender" : "receiver"]:{
+        [isIncoming ? "sender" : "receiver"]: {
           isActive: true
         }
       },
       select: {
         id: true,
         origin: true,
-        connectionId:true,
+        connectionId: true,
         [isIncoming ? "sender" : "receiver"]: {
           select: { 
             id: true, 
             username: true,
-            isActive:true,
-            avatarUrl:true
+            isActive: true,
+            avatarUrl: true
           }
         }
       }
     });
-    const formattedData = requestList.map((request) => ({
+    let nextCursor: string | undefined = undefined;
+    if (requestList.length > limit) {
+      const nextItem = requestList.pop();
+      nextCursor = nextItem!.id;
+    }
+    const formattedData = requestList.map((request: any) => ({
       requestId: request.id,
       origin: request.origin,
-      connectionId:request.connectionId,
+      connectionId: request.connectionId,
       type: type.toUpperCase(),
       user: isIncoming ? request.sender : request.receiver
     }));
@@ -471,6 +510,7 @@ export const getFriendRequests = async (req: Request, res: Response, next: NextF
       success: true,
       data: formattedData,
       count: formattedData.length,
+      nextCursor
     });
   } catch (err) {
     next(err);
