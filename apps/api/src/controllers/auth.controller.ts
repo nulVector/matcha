@@ -33,7 +33,8 @@ export const signup = async (req:Request, res:Response,next:NextFunction) =>{
     },jwtSecret,{expiresIn:'7d'});
     res.cookie("token",token,COOKIE_OPTIONS);
     return res.status(201).json({message:"User created successfully"});
-  }catch(err){
+  }catch (err: any){
+    err.context = { location: "authController.signup", emailAttempted: req.validatedData.body.email };
     next(err)
   }
 }
@@ -50,13 +51,18 @@ export const login = async (req:Request,res:Response,next:NextFunction)=>{
       });
       return;
     }
-    await redisManager.auth.cacheSession(user.id,user.tokenVersion,user.profile ? user.profile.id : null, true);
-    const token = jwt.sign({
-      id:user.id,
-      tokenVersion:user.tokenVersion
-    },jwtSecret,{expiresIn:'7d'});
-    res.cookie("token",token,COOKIE_OPTIONS);
-    return res.json({message:"Logged in successfully"});
+    try {
+      await redisManager.auth.cacheSession(user.id,user.tokenVersion,user.profile ? user.profile.id : null, true);
+      const token = jwt.sign({
+        id:user.id,
+        tokenVersion:user.tokenVersion
+      },jwtSecret,{expiresIn:'7d'});
+      res.cookie("token",token,COOKIE_OPTIONS);
+      return res.json({message:"Logged in successfully"});
+    } catch (innerErr: any) {
+      innerErr.context = { location: "authController.login_token_generation", userId: user.id };
+      next(innerErr);
+    }
   })(req,res,next);
 }
 
@@ -72,7 +78,8 @@ export const googleAuthCallback = async (req: Request, res: Response, next: Next
     const frontendUrl = process.env.CLIENT_URL || "http://localhost:5173";
     const redirectUrl = user.profile ? `${frontendUrl}/home` : `${frontendUrl}/onboarding`;
     res.redirect(redirectUrl);
-  } catch (err) {
+  } catch (err: any) {
+    err.context = { location: "authController.googleAuthCallback", userId: req.user!.id };
     next(err);
   }
 };
@@ -92,7 +99,8 @@ export const requestResetPassword = async (req:Request,res:Response,next:NextFun
       // TODO - send email to user via Nodemailer/Resend/SendGrid
     }
     return res.json({ message: "If an account exists, a reset code has been sent." });
-  } catch (err) {
+  } catch (err: any) {
+    err.context = { location: "authController.requestResetPassword", emailAttempted: req.validatedData.body.email };
     next(err)
   }
 }
@@ -115,7 +123,8 @@ export const confirmResetPassword = async (req: Request, res: Response,next:Next
     await redisManager.auth.consumeResetToken(token);
     await redisManager.auth.invalidateSession(userId);
     return res.json({ message: "Password has been successfully reset. Please log in." });
-  } catch (err) {
+  } catch (err: any) {
+    err.context = { location: "authController.confirmResetPassword" };
     next(err)
   }
 };
@@ -126,7 +135,8 @@ export const logout = async (req:Request,res:Response,next:NextFunction)=>{
     await redisManager.auth.invalidateSession(userId);
     res.clearCookie("token", COOKIE_OPTIONS);
     return res.json({ message: "Logged out successfully" });
-  } catch (err) {
+  } catch (err: any) {
+    err.context = { location: "authController.logout", userId: req.user!.id };
     next(err);
   }
 }

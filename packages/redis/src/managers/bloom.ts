@@ -11,7 +11,7 @@ export class BloomFilterManager {
       if (err.message && err.message.includes('item exists')) {
         return; 
       }
-      console.error(`Failed to reserve Bloom Filter ${key}:`, err);
+      throw err;
     }
   }
   async add(key:string,item:string) {

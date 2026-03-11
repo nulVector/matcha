@@ -1,6 +1,7 @@
 import { JobName, QueueName, TaskQueueJob } from "@matcha/queue";
 import { Job, Worker } from "bullmq";
 import { redisManager, workerConnection } from "../config/redis";
+import { logger } from "@matcha/logger";
 
 export const taskWorker = new Worker(
   QueueName.TASK, 
@@ -40,6 +41,9 @@ export const taskWorker = new Worker(
   }
 )
 taskWorker.on("failed", (job, err) => {
-  console.error(`Job ${job?.id} failed:`, err.message);
+  logger.error({ err, jobId: job?.id, jobName: job?.name }, "Task job failed");
 });
-taskWorker.on("error", (err) => console.error("Worker Error:", err));
+
+taskWorker.on("error", (err) => {
+  logger.error({ err }, "Task Worker Error");
+});

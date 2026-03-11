@@ -1,6 +1,7 @@
 import { redisManager } from "../config/redis";
 import prisma, { ConnectionStatus } from "@matcha/prisma";
 import { UserState } from "@matcha/redis";
+import { logger } from "@matcha/logger";
 
 interface MatchConstraints {
   radiusKm: number;
@@ -72,8 +73,8 @@ export async function startMatchmakingLoop() {
         }
       }
       await sleep(1000);
-    } catch (error) {
-      console.error("Matchmaking Loop Error:", error);
+    } catch (error: any) {
+      logger.error({ err: error }, "Matchmaking Loop Error");
       await sleep(5000);
     }
   }

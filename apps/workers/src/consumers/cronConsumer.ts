@@ -3,6 +3,7 @@ import { Job, Worker } from "bullmq";
 import { redisManager, workerConnection } from "../config/redis";
 import prisma, { ConnectionStatus } from "@matcha/prisma";
 import { ConnectionListType, UserState } from "@matcha/redis";
+import { logger } from "@matcha/logger";
 
 export const cronWorker = new Worker(
   QueueName.CRON,
@@ -74,6 +75,9 @@ export const cronWorker = new Worker(
   }
 );
 cronWorker.on("failed", (job, err) => {
-  console.error(`Job ${job?.id} failed:`, err.message);
+  logger.error({ err, jobId: job?.id, jobName: job?.name }, "Cron job failed");
 });
-cronWorker.on("error", (err) => console.error("Worker Error:", err));
+
+cronWorker.on("error", (err) => {
+  logger.error({ err }, "Cron Worker Error");
+});

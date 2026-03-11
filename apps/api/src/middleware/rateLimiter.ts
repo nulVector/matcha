@@ -26,7 +26,12 @@ export const rateLimiter = (action:string, type: RateLimitKey, limit: number, wi
         return;
       }
       next();
-    } catch (err) {
+    } catch (err: any) {
+      err.context = { 
+        location: "middleware.rateLimiter", 
+        action, 
+        limitType: type 
+      };
       next(err);
     }
   };

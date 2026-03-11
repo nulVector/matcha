@@ -4,19 +4,22 @@ import { cronWorker } from "./consumers/cronConsumer";
 import { startMatchmakingLoop, stopMatchmakingLoop } from "./consumers/matchConsumer";
 import { workerConnection, redisManager } from "./config/redis";
 import prisma from "@matcha/prisma";
+import { logger } from "@matcha/logger";
 
 async function bootstrap() {
-  console.log("Starting Matcha Worker Node.");
-  console.log(`Task Worker listening on ${taskWorker.name}`);
-  console.log(`DB Buffer Worker listening on ${dbBufferWorker.name}`);
-  console.log(`Cron Worker listening on ${cronWorker.name}`);
-  console.log(`Initializing Matchmaking Consumer...`);
-  startMatchmakingLoop().catch((err) => {
-    console.error("Native Matchmaking Loop crashed:", err);
+  logger.info("Starting Matcha Worker Node.");
+  logger.info(`Task Worker listening on ${taskWorker.name}`);
+  logger.info(`DB Buffer Worker listening on ${dbBufferWorker.name}`);
+  logger.info(`Cron Worker listening on ${cronWorker.name}`);
+  logger.info(`Initializing Matchmaking Consumer...`);
+  
+  startMatchmakingLoop().catch((err: any) => {
+    logger.error({ err }, "Native Matchmaking Loop crashed:");
   });
-  console.log("All background services are up and running!");
+  logger.info("All background services are up and running!");
 }
-bootstrap().catch((err) => {
-  console.error("Failed to bootstrap worker node:", err);
+
+bootstrap().catch((err: any) => {
+  logger.error({ err }, "Failed to bootstrap worker node:");
   process.exit(1);
 });

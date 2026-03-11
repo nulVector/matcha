@@ -2,6 +2,7 @@ import { Job, Worker } from "bullmq";
 import { QueueName, JobName, DbBufferQueueJob } from "@matcha/queue";
 import { redisManager, workerConnection } from "../config/redis";
 import prisma from "@matcha/prisma";
+import { logger } from "@matcha/logger";
 
 export const dbBufferWorker = new Worker(
   QueueName.DB_BUFFER,
@@ -92,6 +93,9 @@ export const dbBufferWorker = new Worker(
   }
 );
 dbBufferWorker.on("failed", (job, err) => {
-  console.error(`Job ${job?.id} failed:`, err.message);
+  logger.error({ err, jobId: job?.id, jobName: job?.name }, "DbBuffer job failed");
 });
-dbBufferWorker.on("error", (err) => console.error("Worker Error:", err));
+
+dbBufferWorker.on("error", (err) => {
+  logger.error({ err }, "DbBuffer Worker Error");
+});

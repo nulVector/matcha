@@ -18,7 +18,11 @@ export const validate =(schema:ZodObject,source:RequestSource = "body") => {
       }
       req.validatedData[source] = parsedData.data;
       next();
-    } catch (err) {
+    } catch (err: any) {
+      err.context = { 
+        location: "middleware.validate", 
+        requestSource: source 
+      };
       next(err)
     }
   }

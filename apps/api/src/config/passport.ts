@@ -97,7 +97,8 @@ export const configurePassport = (passport:PassportStatic) =>{
         profile: hasProfile ? { id: user.profile!.id } : null,
         hasPassword: !!user.password
       });
-    } catch (err) {
+    } catch (err: any) {
+      err.context = { location: "GoogleStrategy", emailAttempted: profile.emails?.[0]?.value };
       return done(err);
     }
   }));
@@ -151,7 +152,8 @@ export const configurePassport = (passport:PassportStatic) =>{
           profile:hasProfile ? {id:user.profile!.id} : null,
           hasPassword:true
         });                  
-      }catch(err){
+      }catch(err: any){
+        err.context = { location: "LocalStrategy", emailAttempted: email };
         return done(err)
       }
     }
@@ -182,7 +184,8 @@ export const configurePassport = (passport:PassportStatic) =>{
           hasPassword: session.hasPassword
         };
         return done(null, user);
-      }catch(err){
+      }catch(err: any){
+        err.context = { location: "JwtStrategy", targetUserId: jwt_payload.id };
         return done(err)
       }
     }

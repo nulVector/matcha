@@ -33,7 +33,8 @@ export const getUnreadCounts = async (req:Request,res:Response,next:NextFunction
       success:true,
       data: unreadCount
     })
-  } catch (err) {
+  } catch (err: any) {
+    err.context = { location: "messageController.getUnreadCounts", profileId: req.user!.profile!.id };
     next(err)
   }
 }
@@ -96,7 +97,8 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
       success: true,
       data: messages
     });
-  } catch (err) {
+  } catch (err: any) {
+    err.context = { location: "messageController.getChatHistory", profileId: req.user!.profile!.id, connectionId: req.validatedData.params.connectionId };
     next(err)
   }
 }

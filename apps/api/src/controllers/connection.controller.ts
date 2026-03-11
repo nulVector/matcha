@@ -19,7 +19,8 @@ export const joinQueue = async (req:Request,res:Response,next:NextFunction) => {
       success:true,
       message:"Successfully joined the matchmaking queue."
     })
-  } catch (err) {
+  } catch (err: any) {
+    err.context = { location: "connectionController.joinQueue", profileId: req.user!.profile!.id };
     next(err);
   }
 }
@@ -31,7 +32,8 @@ export const leaveQueue = async (req:Request,res:Response,next:NextFunction) => 
       success:true,
       message:"Successfully left the matchmaking queue."
     })
-  } catch (err) {
+  } catch (err: any) {
+    err.context = { location: "connectionController.leaveQueue", profileId: req.user!.profile!.id };
     next(err)
   }
 }
@@ -98,7 +100,8 @@ export const extendTimer = async (req:Request,res:Response,next:NextFunction) =>
       success: false,
       message: "Invalid vote state."
     });
-  } catch (err) {
+  } catch (err: any) {
+    err.context = { location: "connectionController.extendTimer", profileId: req.user!.profile!.id, connectionId: req.validatedData.params.connectionId };
     next(err)
   }
 }
@@ -162,7 +165,8 @@ export const convertConnection = async (req:Request,res:Response,next:NextFuncti
       success: false,
       message: "Invalid vote state."
     })
-  } catch (err) {
+  } catch (err: any) {
+    err.context = { location: "connectionController.convertConnection", profileId: req.user!.profile!.id, connectionId: req.validatedData.params.connectionId };
     next(err)
   }
 }
@@ -210,7 +214,8 @@ export const skipConnection = async (req:Request,res:Response,next:NextFunction)
       success: true,
       message: "Chat skipped. Re-entering matchmaking."
     });
-  } catch (err) {
+  } catch (err: any) {
+    err.context = { location: "connectionController.skipConnection", profileId: req.user!.profile!.id, connectionId: req.validatedData.params.connectionId };
     next(err)
   }
 }

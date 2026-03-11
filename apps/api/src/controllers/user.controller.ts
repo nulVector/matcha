@@ -8,6 +8,7 @@ import jwt from "jsonwebtoken";
 import { COOKIE_OPTIONS } from '../constant/cookie';
 import { USERNAME_VIBES } from '../constant/usernameList';
 import { redisManager } from '../services/redis';
+import { logger } from '@matcha/logger';
 
 type LocationMetadata = { id: string; name: string; latitude: number; longitude: number };
 type InterestMetadata = { id: string; name: string };
@@ -66,7 +67,8 @@ export const checkUsername = async (req:Request,res:Response,next:NextFunction) 
       return res.status(200).json({available: false,message:"Username already taken."});
     }
     res.status(200).json({available: true,message:"Username available."})
-  }catch(err) {
+  }catch(err: any) {
+    err.context = { location: "userController.checkUsername", usernameAttempted: req.validatedData.query.username };
     next(err)
   }
 }
@@ -90,7 +92,8 @@ export const generateUsername = async (req:Request,res:Response,next:NextFunctio
     res.json({
       usernames: generatedList
     })
-  }catch(err){
+  }catch(err: any){
+    err.context = { location: "userController.generateUsername" };
     next(err)
   }
 }
@@ -158,7 +161,8 @@ export const initiateProfile = async (req:Request, res:Response,next:NextFunctio
       }
     });
     return;
-  } catch (err) {
+  } catch (err: any) {
+    err.context = { location: "userController.initiateProfile", userId: req.user!.id };
     next(err);
   }
 }
@@ -189,7 +193,7 @@ export const getMetadata = async (req:Request,res:Response,next:NextFunction) =>
     if (!cachedLocations) cachePromises.push(redisManager.metaData.cacheMetadata('locations', locations));
     if (!cachedInterests) cachePromises.push(redisManager.metaData.cacheMetadata('interests', interests));
     if (!cachedAvatars) cachePromises.push(redisManager.metaData.cacheMetadata('avatars', avatars));
-    Promise.all(cachePromises).catch(err => console.error("Failed to cache metadata:", err));
+    Promise.all(cachePromises).catch(err => logger.error({ err }, "Failed to cache metadata"));
     res.json({
       success: true,
       data: {
@@ -198,7 +202,8 @@ export const getMetadata = async (req:Request,res:Response,next:NextFunction) =>
         avatars
       }
     })
-  }catch(err){
+  }catch(err: any){
+    err.context = { location: "userController.getMetadata" };
     next(err);
   }
 }
@@ -255,7 +260,8 @@ export const updateProfile = async (req:Request,res:Response,next:NextFunction) 
       allowDiscovery: updatedProfile.allowDiscovery
     });
     return;
-  }catch(err){
+  }catch(err: any){
+    err.context = { location: "userController.updateProfile", profileId: req.user!.profile!.id };
     next(err)
   }
 }
@@ -292,13 +298,14 @@ export const getProfile = async (req:Request,res:Response, next:NextFunction) =>
       });
     }
     redisManager.userDetail.cacheProfile(profileId, userProfile).catch(err => {
-      console.error("Failed to cache profile", err);
+      logger.error({ err, profileId }, "Failed to cache profile");
     });
     res.json({
       success: true,
       data: userProfile
     });
-  } catch (err) {
+  } catch (err: any) {
+    err.context = { location: "userController.getProfile", profileId: req.user!.profile!.id };
     next(err)
   }
 }
@@ -352,7 +359,8 @@ export const updatePassword = async (req:Request,res:Response, next:NextFunction
       success:true,
       message:"Password changed successfully."
     })
-  }catch(err){
+  }catch(err: any){
+    err.context = { location: "userController.updatePassword", userId: req.user!.id };
     next(err)
   }
 }
@@ -405,7 +413,7 @@ export const getConnectionsList = async (req: Request, res: Response, next: Next
       timestamp: item.timestamp 
     }));
     redisManager.userDetail.cachePaginatedUIConnections(userProfileId, cacheData, redisListType)
-      .catch(err => console.error("Failed to warm UI connection cache:", err));
+      .catch(err => logger.error({ err, profileId: userProfileId }, "Failed to warm UI connection cache"));
     
     redisManager.userDetail.isAuthConnectionHydrated(userProfileId, redisListType).then(isHydrated => {
       if (!isHydrated) {
@@ -421,9 +429,9 @@ export const getConnectionsList = async (req: Request, res: Response, next: Next
         }).then(allConnections => {
           const allAuthIds = allConnections.map(c => c.id);
           return redisManager.userDetail.cacheAuthConnectionIds(userProfileId, allAuthIds, redisListType);
-        }).catch(err => console.error("Failed to warm complete Auth cache:", err));
+        }).catch(err => logger.error({ err, profileId: userProfileId }, "Failed to warm complete Auth cache"));
       }
-    }).catch(err => console.error("Redis error checking hydration:", err));
+    }).catch(err => logger.error({ err, profileId: userProfileId }, "Redis error checking hydration"));
     res.json({
       success: true,
       status: status,
@@ -431,7 +439,8 @@ export const getConnectionsList = async (req: Request, res: Response, next: Next
       data: formattedList,
       nextCursor
     });
-  } catch (err) {
+  } catch (err: any) {
+    err.context = { location: "userController.getConnectionsList", profileId: req.user!.profile!.id };
     next(err);
   }
 };
@@ -466,7 +475,8 @@ export const deleteConnection = async (req: Request, res: Response, next: NextFu
     res.json({
       success:true
     })
-  } catch (err) {
+  } catch (err: any) {
+    err.context = { location: "userController.deleteConnection", profileId: req.user!.profile!.id, connectionId: req.validatedData.params.connectionId };
     next(err)
   }
 }
@@ -521,7 +531,8 @@ export const getFriendRequests = async (req: Request, res: Response, next: NextF
       count: formattedData.length,
       nextCursor
     });
-  } catch (err) {
+  } catch (err: any) {
+    err.context = { location: "userController.getFriendRequests", profileId: req.user!.profile!.id };
     next(err);
   }
 }
@@ -555,7 +566,8 @@ export const searchUser = async (req: Request, res: Response, next: NextFunction
         avatar: requestedUser.avatarUrl
       }
     })
-  } catch (err) {
+  } catch (err: any) {
+    err.context = { location: "userController.searchUser", requestedUsername: req.validatedData.query.username };
     next(err)
   }
 }
@@ -621,7 +633,8 @@ export const getUserProfile = async (req:Request,res:Response,next:NextFunction)
         }
       }
     });
-  } catch (err) {
+  } catch (err: any) {
+    err.context = { location: "userController.getUserProfile", profileId: req.user!.profile!.id, requestedUsername: req.validatedData.params.username };
     next(err)
   }
 }
@@ -720,7 +733,8 @@ export const sendRequest = async (req:Request,res:Response,next:NextFunction) =>
       success: true,
       message: "Friend Request sent successfully"
     });
-  } catch (err) {
+  } catch (err: any) {
+    err.context = { location: "userController.sendRequest", profileId: req.user!.profile!.id, targetUserId: req.validatedData.params.userId };
     next(err)
   }
 }
@@ -748,7 +762,8 @@ export const cancelRequest = async (req:Request,res:Response,next:NextFunction) 
       message: "Friend Request canceled successfully."
     });
     return;
-  } catch (err) {
+  } catch (err: any) {
+    err.context = { location: "userController.cancelRequest", profileId: req.user!.profile!.id, requestId: req.validatedData.params.requestId };
     next(err);
   }
 }
@@ -834,7 +849,8 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
         message: "Friend Request accepted."
       });
     }
-  } catch (err) {
+  } catch (err: any) {
+    err.context = { location: "userController.handleRequest", profileId: req.user!.profile!.id, requestId: req.validatedData.params.requestId };
     next(err);
   }
 }
@@ -873,14 +889,15 @@ export const handleUnfriendRequest = async (req:Request,res:Response,next:NextFu
     Promise.all([
       redisManager.userDetail.invalidateConnectionList(myProfileId, ConnectionListType.FRIEND),
       redisManager.userDetail.invalidateConnectionList(targetUserId, ConnectionListType.FRIEND)
-    ]).catch(err => console.error("Failed to invalidate friend cache on unfriend:", err));
+    ]).catch(err => logger.error({ err, myProfileId, targetUserId }, "Failed to invalidate friend cache on unfriend"));
 
     res.json({
       success: true,
       status: 'UNFRIENDED',
       finalDeleteAt: THIRTY_DAYS
     });
-  }catch(err){
+  }catch(err: any){
+    err.context = { location: "userController.handleUnfriendRequest", profileId: req.user!.profile!.id, targetUserId: req.validatedData.params.userId };
     next(err)
   }
 }
@@ -947,7 +964,8 @@ export const deactivateProfile = async (req:Request,res:Response,next:NextFuncti
       success:true,
       message:"Account deactivated"
     })
-  } catch (err) {
-    next(err)   
+  } catch (err: any) {
+    err.context = { location: "userController.deactivateProfile", userId: req.user!.id, profileId: req.user!.profile!.id };
+    next(err)  
   }
 }

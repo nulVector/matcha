@@ -4,6 +4,8 @@ import jwt from 'jsonwebtoken';
 import { WebSocket, WebSocketServer } from 'ws';
 import { redisManager } from './services/redis';
 import { createId } from '@paralleldrive/cuid2';
+import { logger } from '@matcha/logger';
+
 interface JwtPayload {
   id:string,
   tokenVersion:number
@@ -78,8 +80,8 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
     (ws as any).isAlive = true;
     try {
       await redisManager.userConnection.setUserStatus(profileId);
-    } catch (err) {
-      console.error(`Heartbeat update failed for ${profileId}:`, err);
+    } catch (err: any) {
+      logger.error({ err, profileId }, "Heartbeat update failed");
     }
   });
   try {
@@ -90,8 +92,8 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
       let parsedData;
       try {
         parsedData = JSON.parse(rawMessage.toString());
-      } catch (err) {
-        console.error(`Malformed JSON from ${profileId}`);
+      } catch (err: any) {
+        logger.warn({ err, profileId }, "Malformed JSON received");
         return;
       }
       try {
@@ -171,8 +173,8 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
           default:
             break;
         }
-      } catch (err) {
-        console.error(`Error processing message from ${profileId}:`, err);
+      } catch (err: any) {
+        logger.error({ err, profileId }, "Error processing message");
       }
     });
 
@@ -191,12 +193,12 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
         if (count === 0) {
           await redisManager.match.leaveQueue(profileId, UserState.IDLE);
         }
-      } catch (err) {
-        console.error(`Error cleaning up socket for ${profileId}:`, err);
+      } catch (err: any) {
+        logger.error({ err, profileId }, "Error cleaning up socket");
       }
     });
-  } catch (err) {
-    console.error(`Failed to initialize connection for ${profileId}:`, err);
+  } catch (err: any) {
+    logger.error({ err, profileId }, "Failed to initialize connection");
     ws.close();
   }
 });
@@ -215,13 +217,13 @@ async function bootstrap(){
           });
           receiverSockets.forEach(ws => ws.send(outGoingPayload));
         }
-      } catch (err) {
-        console.error("Failed to parse Redis router message", err);
+      } catch (err: any) {
+        logger.error({ err }, "Failed to parse Redis router message");
       }
     }
   });
   server.listen(PORT,()=>{
-    console.log(`Websocket running on port ${PORT}`);
+    logger.info(`WebSocket running on port ${PORT}`);
   })
 }
 

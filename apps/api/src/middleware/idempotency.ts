@@ -22,7 +22,12 @@ export const idempotencyGuard = (action: string, expireTimeSeconds: number) => {
         }
       });
       next();
-    } catch (error) {
+    } catch (error: any) {
+      error.context = { 
+        location: "middleware.idempotencyGuard", 
+        action, 
+        idempotencyKey: req.headers['x-idempotency-key'] 
+      };
       next(error);
     }
   };

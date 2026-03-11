@@ -1,5 +1,6 @@
 import Redis from "ioredis";
 import { MASTER_INTERESTS, MatchAction, UserState } from "../common";
+import { logger } from "@matcha/logger";
 
 export class MatchManager {
   constructor (private redis:Redis) {}
@@ -58,7 +59,7 @@ export class MatchManager {
             'DISTANCE_METRIC', 'COSINE' 
         );
       } else {
-        console.error("Redis Index Error:", err);
+        throw err;
       }
     }
   }
@@ -142,8 +143,8 @@ export class MatchManager {
         "DIALECT", "2"
       ) as any[];
       return this.parseRedisSearchResults(results);
-    } catch (error) {
-      console.error("Search Error:", error);
+    } catch (error: any) {
+      logger.error({ err: error, lat, long, radiusKm }, "Matchmaking FT.SEARCH failed");
       return [];
     }
   }
@@ -194,9 +195,9 @@ export class MatchManager {
       tx.lrem(queueKey,0,userB);
       const execResult = await tx.exec();
       return execResult !== null;
-    } catch (err) {
-      console.error("LockMatch Error:",err);
+    } catch (err: any) {
       await this.redis.unwatch();
+      logger.error({ err, userA, userB }, "LockMatch transaction failed");
       return false;
     }
   }

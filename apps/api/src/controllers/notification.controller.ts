@@ -12,7 +12,8 @@ export const getNotification = async (req:Request,res:Response,next:NextFunction
         has_new_requests: flags[NotificationCategory.NEW_FRIEND_REQUEST] === "1"
       }
     })
-  } catch (err) {
+  } catch (err: any) {
+    err.context = { location: "notificationController.getNotification", userId: req.user!.profile!.id };
     next(err)
   }
 }
@@ -25,7 +26,8 @@ export const markNotificationRead = async (req:Request,res:Response,next:NextFun
       success:true,
       message:"Notification cleared"
     })
-  } catch (err) {
+  } catch (err: any) {
+    err.context = { location: "notificationController.markNotificationRead", userId: req.user!.profile!.id, category: req.validatedData.params.category };
     next(err)
   }
 }
