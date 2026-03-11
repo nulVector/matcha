@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 import cookieParser from "cookie-parser";
 import cors from "cors";
+import helmet from "helmet";
 import express from "express";
 import passport from "passport";
 import pinoHttp from "pino-http";
@@ -11,6 +12,7 @@ import mainRouter from "./routes/index";
 import { redisManager } from "./services/redis";
 const app = express();
 const PORT = process.env.PORT || 3001;
+app.use(helmet());
 app.use(cookieParser());
 app.use(express.json());
 app.use(cors({
