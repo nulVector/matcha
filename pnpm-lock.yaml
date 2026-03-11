@@ -41,6 +41,9 @@ importers:
       '@matcha/zod':
         specifier: workspace:*
         version: link:../../packages/zod
+      '@paralleldrive/cuid2':
+        specifier: ^3.3.0
+        version: 3.3.0
       bcrypt:
         specifier: ^6.0.0
         version: 6.0.0

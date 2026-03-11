@@ -7,6 +7,7 @@ import jwt from "jsonwebtoken";
 import passport from 'passport';
 import { COOKIE_OPTIONS } from "../constant/cookie";
 import { redisManager } from "../services/redis";
+import { createId } from '@paralleldrive/cuid2';
 
 const jwtSecret = process.env.JWT_SECRET;
 if (!jwtSecret){
@@ -26,9 +27,11 @@ export const signup = async (req:Request, res:Response,next:NextFunction) =>{
         tokenVersion:true
       }
     });
-    await redisManager.auth.cacheSession(newUser.id,newUser.tokenVersion,null, true);
+    const sessionId = createId();
+    await redisManager.auth.cacheSession(newUser.id, sessionId, newUser.tokenVersion, null, true);
     const token = jwt.sign({
       id:newUser.id,
+      sessionId,
       tokenVersion:newUser.tokenVersion
     },jwtSecret,{expiresIn:'7d'});
     res.cookie("token",token,COOKIE_OPTIONS);
@@ -52,9 +55,11 @@ export const login = async (req:Request,res:Response,next:NextFunction)=>{
       return;
     }
     try {
-      await redisManager.auth.cacheSession(user.id,user.tokenVersion,user.profile ? user.profile.id : null, true);
+      const sessionId = createId();
+      await redisManager.auth.cacheSession(user.id, sessionId, user.tokenVersion, user.profile ? user.profile.id : null, true);
       const token = jwt.sign({
         id:user.id,
+        sessionId,
         tokenVersion:user.tokenVersion
       },jwtSecret,{expiresIn:'7d'});
       res.cookie("token",token,COOKIE_OPTIONS);
@@ -69,9 +74,11 @@ export const login = async (req:Request,res:Response,next:NextFunction)=>{
 export const googleAuthCallback = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = req.user!;
-    await redisManager.auth.cacheSession(user.id,user.tokenVersion,user.profile ? user.profile.id : null,user.hasPassword);
+    const sessionId = createId();
+    await redisManager.auth.cacheSession(user.id, sessionId, user.tokenVersion, user.profile ? user.profile.id : null, user.hasPassword);
     const token = jwt.sign({
       id: user.id,
+      sessionId: sessionId,
       tokenVersion: user.tokenVersion
     }, jwtSecret, { expiresIn: '7d' });
     res.cookie("token", token, COOKIE_OPTIONS);
@@ -121,7 +128,7 @@ export const confirmResetPassword = async (req: Request, res: Response,next:Next
       }
     });
     await redisManager.auth.consumeResetToken(token);
-    await redisManager.auth.invalidateSession(userId);
+    await redisManager.auth.invalidateAllUserSessions(userId);
     return res.json({ message: "Password has been successfully reset. Please log in." });
   } catch (err: any) {
     err.context = { location: "authController.confirmResetPassword" };
@@ -132,7 +139,10 @@ export const confirmResetPassword = async (req: Request, res: Response,next:Next
 export const logout = async (req:Request,res:Response,next:NextFunction)=>{
   try {
     const userId = req.user!.id;
-    await redisManager.auth.invalidateSession(userId);
+    //TODO - extract this out 
+    const token = req.cookies['token'];
+    const decoded = jwt.decode(token) as any; 
+    await redisManager.auth.invalidateSession(userId, decoded.sessionId);
     res.clearCookie("token", COOKIE_OPTIONS);
     return res.json({ message: "Logged out successfully" });
   } catch (err: any) {

@@ -4,16 +4,26 @@ import { RATE_LIMIT_SCRIPT, UserSession } from "../common";
 export class AuthManager {
   constructor (private redis:Redis) {}
 
-  async cacheSession(userId:string, tokenVersion: number, userProfileId:string | null, hasPassword: boolean){
+  async cacheSession(userId:string, sessionId: string, tokenVersion: number, userProfileId:string | null, hasPassword: boolean){
     const data:UserSession = {userId,tokenVersion,userProfileId, hasPassword};
-    await this.redis.set(`session:${userId}`,JSON.stringify(data),"EX",60 * 60 * 24 * 7);
+    await this.redis.set(`session:${userId}:${sessionId}`,JSON.stringify(data),"EX",60 * 60 * 24 * 7);
   } 
-  async getSession(userId:string): Promise<UserSession | null>{
-    const data = await this.redis.get(`session:${userId}`);
+  async getSession(userId:string, sessionId: string): Promise<UserSession | null>{
+    const data = await this.redis.get(`session:${userId}:${sessionId}`);
     return data ? JSON.parse(data) : null;
   }
-  async invalidateSession(userId:string){
-    await this.redis.del(`session:${userId}`);
+  async invalidateSession(userId:string, sessionId: string){
+    await this.redis.del(`session:${userId}:${sessionId}`);
+  }
+  async invalidateAllUserSessions(userId: string) {
+    let cursor = "0";
+    do {
+      const [nextCursor, keys] = await this.redis.scan(cursor, "MATCH", `session:${userId}:*`, "COUNT", "100");
+      cursor = nextCursor;
+      if (keys.length > 0) {
+        await this.redis.del(...keys);
+      }
+    } while (cursor !== "0");
   }
   async setResetToken(token:string,userId:string){
     await this.redis.set(`reset:${token}`,userId,"EX",60 * 10)

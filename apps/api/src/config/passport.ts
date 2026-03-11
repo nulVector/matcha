@@ -8,6 +8,7 @@ import { redisManager } from "../services/redis";
 
 interface JwtPayload {
   id:string,
+  sessionId: string,
   tokenVersion:number
 }
 const jwtSecret = process.env.JWT_SECRET;
@@ -173,7 +174,7 @@ export const configurePassport = (passport:PassportStatic) =>{
     },
     async (jwt_payload:JwtPayload,done) => {
       try {
-        const session = await redisManager.auth.getSession(jwt_payload.id);
+        const session = await redisManager.auth.getSession(jwt_payload.id, jwt_payload.sessionId);
         if (!session || session.tokenVersion !== jwt_payload.tokenVersion) {
           return done(null, false);
         }

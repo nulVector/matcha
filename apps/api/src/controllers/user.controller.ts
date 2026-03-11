@@ -113,6 +113,9 @@ export const initiateProfile = async (req:Request, res:Response,next:NextFunctio
     const userId = req.user!.id;
     const tokenVersion = req.user!.tokenVersion;
     const hasPassword = req.user!.hasPassword;
+    const token = req.cookies['token'];
+    const decoded = jwt.decode(token) as any; 
+    const sessionId = decoded.sessionId;
     const userProfile = await prisma.userProfile.create({
       data: {
         userId,
@@ -131,7 +134,7 @@ export const initiateProfile = async (req:Request, res:Response,next:NextFunctio
         avatarUrl: true
       }
     });
-    await redisManager.auth.cacheSession(userId, tokenVersion, userProfile.id, hasPassword);
+    await redisManager.auth.cacheSession(userId, sessionId, tokenVersion, userProfile.id, hasPassword);
     await redisManager.userDetail.cacheProfile(userProfile.id, {
       id: userProfile.id,
       username: userProfile.username,
@@ -315,6 +318,9 @@ export const updatePassword = async (req:Request,res:Response, next:NextFunction
     const {currentPassword,newPassword}:updatePasswordType = req.validatedData.body;
     const userId = req.user!.id;
     const profileId = req.user!.profile!.id;
+    const currentToken = req.cookies['token'];
+    const decoded = jwt.decode(currentToken) as any;
+    const sessionId = decoded.sessionId;
     const existingUser = await prisma.user.findUnique({
       where:{ id:userId },
       select:{ password:true }
@@ -349,7 +355,8 @@ export const updatePassword = async (req:Request,res:Response, next:NextFunction
       },
       select: { tokenVersion: true }
     })
-    await redisManager.auth.cacheSession(userId, updatedUser.tokenVersion, profileId, true);
+    await redisManager.auth.invalidateAllUserSessions(userId);
+    await redisManager.auth.cacheSession(userId, sessionId, updatedUser.tokenVersion, profileId, true);
     const token = jwt.sign({ 
         id: userId, 
         tokenVersion: updatedUser.tokenVersion 
@@ -957,7 +964,7 @@ export const deactivateProfile = async (req:Request,res:Response,next:NextFuncti
       redisManager.match.leaveQueue(profileId),
       redisManager.userDetail.invalidateConnectionList(profileId, ConnectionListType.FRIEND),
       redisManager.userDetail.invalidateConnectionList(profileId, ConnectionListType.ARCHIVED),
-      redisManager.auth.invalidateSession(userId)
+      redisManager.auth.invalidateAllUserSessions(userId)
     ])
     res.clearCookie("token",{...COOKIE_OPTIONS,maxAge:0});
     res.json({
