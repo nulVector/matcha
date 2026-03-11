@@ -10,14 +10,24 @@ import { logger } from "@matcha/logger";
 import { configurePassport } from "./config/passport";
 import mainRouter from "./routes/index";
 import { redisManager } from "./services/redis";
+import { serverAdapter, adminAuth } from "./config/bullboard";
 const app = express();
 const PORT = process.env.PORT || 3001;
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      "script-src": ["'self'", "'unsafe-inline'"],
+      "style-src": ["'self'", "'unsafe-inline'"],
+      "img-src": ["'self'", "data:"], 
+    },
+  },
+}));
 app.use(cookieParser());
 app.use(express.json());
 app.use(cors({
     credentials:true,
-    origin:process.env.CLIENT_URL || "http://localhost:5173"
+    origin:process.env.CLIENT_URL || "http://localhost:5173" 
 }))
 app.use(pinoHttp({
   logger,
@@ -28,7 +38,7 @@ app.use(pinoHttp({
 }));
 app.use(passport.initialize());
 configurePassport(passport);
-
+app.use('/admin/queues/dashboard', adminAuth, serverAdapter.getRouter());
 app.use("/api/v1",mainRouter);
 
 async function bootstrap() {

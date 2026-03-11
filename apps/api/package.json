@@ -11,6 +11,8 @@
     "clean": "rimraf dist .turbo"
   },
   "dependencies": {
+    "@bull-board/api": "^6.20.3",
+    "@bull-board/express": "^6.20.3",
     "@matcha/logger": "workspace:*",
     "@matcha/prisma": "workspace:*",
     "@matcha/redis": "workspace:*",
@@ -20,6 +22,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "express-basic-auth": "^1.2.1",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
     "passport": "^0.7.0",
