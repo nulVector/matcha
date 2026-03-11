@@ -1,4 +1,4 @@
-import { connectionIdSchema } from "@matcha/zod";
+import { connectionIdSchema, getChatHistorySchema } from "@matcha/zod";
 import { Router } from "express";
 import { getChatHistory, getUnreadCounts } from "../controllers/message.controller";
 import { authGuard } from "../middleware/authGuard";
@@ -16,6 +16,7 @@ messageRouter.get(
 messageRouter.get(
   "/:connectionId",
   validate(connectionIdSchema,"params"),
+  validate(getChatHistorySchema,"query"),
   getChatHistory
 )
 

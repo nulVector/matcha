@@ -1,6 +1,6 @@
 import prisma from "@matcha/prisma";
 import { CachedMessage, ConnectionListType } from "@matcha/redis";
-import { connectionIdType } from "@matcha/zod";
+import { connectionIdType, getChatHistoryType } from "@matcha/zod";
 import { NextFunction, Request, Response } from "express";
 import { redisManager } from "../services/redis";
 
@@ -43,6 +43,7 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
   try {
     const profileId = req.user!.profile!.id;
     const {connectionId}:connectionIdType = req.validatedData.params;
+    const { cursor, limit = 50 }: getChatHistoryType = req.validatedData.query;
     let [isFriend,isArchived] = await Promise.all([
       redisManager.userDetail.inAuthConnectionList(profileId,connectionId,ConnectionListType.FRIEND),
       redisManager.userDetail.inAuthConnectionList(profileId,connectionId,ConnectionListType.ARCHIVED),
@@ -69,33 +70,65 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
       const listType = connection.status === "FRIEND" ? ConnectionListType.FRIEND : ConnectionListType.ARCHIVED;
       await redisManager.userDetail.addSingleAuthConnection(profileId, connectionId, listType);
     }
-    let messages = await redisManager.chat.getMessages(connectionId);
-    if (!messages || messages.length === 0) {
+    let orderedMessages: CachedMessage[] = [];
+    let nextCursor: string | undefined = undefined;
+    if (cursor) {
       const dbMessages = await prisma.message.findMany({
         where: { connectionId },
         orderBy: { createdAt: 'desc' },
-        take: 50,
+        take: limit + 1,
+        skip: 1,
+        cursor: { id: cursor },
         select: {
-          id: true,
-          content: true,
-          senderId: true,
-          createdAt: true,
-          type: true
+          id: true, content: true, senderId: true, createdAt: true, type: true
         }
       });
-      const orderedMessages = dbMessages.reverse();
-      messages = orderedMessages.map(msg=>({
-        id:msg.id,
-        content:msg.content,
-        senderId:msg.senderId,
-        createdAt:msg.createdAt.toISOString(),
-        type:msg.type
+      if (dbMessages.length > limit) {
+        const nextItem = dbMessages.pop();
+        nextCursor = nextItem!.id;
+      }
+      orderedMessages = dbMessages.reverse().map(msg => ({
+        id: msg.id, 
+        content: msg.content, 
+        senderId: msg.senderId,
+        createdAt: msg.createdAt.toISOString(), 
+        type: msg.type
       } as CachedMessage));
-      await redisManager.chat.seedMessages(connectionId, messages);
+    }
+    else {
+      let messages = await redisManager.chat.getMessages(connectionId);
+      if (!messages || messages.length === 0) {
+        const dbMessages = await prisma.message.findMany({
+          where: { connectionId },
+          orderBy: { createdAt: 'desc' },
+          take: limit + 1,
+          select: {
+            id: true, content: true, senderId: true, createdAt: true, type: true
+          }
+        });
+        if (dbMessages.length > limit) {
+          const nextItem = dbMessages.pop();
+          nextCursor = nextItem!.id;
+        }
+        orderedMessages = dbMessages.reverse().map(msg=>({
+          id:msg.id,
+          content:msg.content,
+          senderId:msg.senderId,
+          createdAt:msg.createdAt.toISOString(),
+          type:msg.type
+        } as CachedMessage));
+        await redisManager.chat.seedMessages(connectionId, orderedMessages);
+      } else {
+        orderedMessages = messages;
+        if (orderedMessages.length === limit && orderedMessages[0]) {
+          nextCursor = orderedMessages[0].id; 
+        }
+      }
     }
     return res.json({
       success: true,
-      data: messages
+      data: orderedMessages,
+      nextCursor
     });
   } catch (err: any) {
     err.context = { location: "messageController.getChatHistory", profileId: req.user!.profile!.id, connectionId: req.validatedData.params.connectionId };
