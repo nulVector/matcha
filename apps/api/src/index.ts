@@ -25,10 +25,22 @@ app.use(helmet({
 }));
 app.use(cookieParser());
 app.use(express.json());
+
+const allowedOrigins = process.env.CLIENT_URL 
+  ? process.env.CLIENT_URL.split(',').map(url => url.trim())
+  : ["http://localhost:5173"];
 app.use(cors({
     credentials:true,
-    origin:process.env.CLIENT_URL || "http://localhost:5173" 
+    origin:(origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            logger.warn({ origin }, "Blocked by CORS");
+            callback(new Error('Not allowed by CORS'));
+        }
+    }
 }))
+
 app.use(pinoHttp({
   logger,
   autoLogging: {
