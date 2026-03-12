@@ -34,6 +34,14 @@ export class RedisManager {
     this.bloom = new BloomFilterManager(this.redis);
     this.notification = new NotificationManager(this.redis)
   }
+  async ping(): Promise<boolean> {
+    try {
+      const result = await this.redis.ping();
+      return result === 'PONG';
+    } catch (err) {
+      return false;
+    }
+  }
   async quit() {
     await Promise.all([
       this.redis.quit(),

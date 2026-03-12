@@ -11,6 +11,7 @@ import { configurePassport } from "./config/passport";
 import mainRouter from "./routes/index";
 import { redisManager } from "./services/redis";
 import { serverAdapter, adminAuth } from "./config/bullboard";
+import { checkHealth } from "./controllers/health.controller";
 const app = express();
 const PORT = process.env.PORT || 3001;
 app.use(helmet({
@@ -44,13 +45,13 @@ app.use(cors({
 app.use(pinoHttp({
   logger,
   autoLogging: {
-    //TODO: implement health check
     ignore: (req) => req.url === '/health'
   }
 }));
 app.use(passport.initialize());
 configurePassport(passport);
 app.use('/admin/queues/dashboard', adminAuth, serverAdapter.getRouter());
+app.get('/health', checkHealth);
 app.use("/api/v1",mainRouter);
 
 async function bootstrap() {
