@@ -12,6 +12,8 @@ import mainRouter from "./routes/index";
 import { redisManager } from "./services/redis";
 import { serverAdapter, adminAuth } from "./config/bullboard";
 import { checkHealth } from "./controllers/health.controller";
+import prisma from "@matcha/prisma";
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 app.use(helmet({
@@ -54,13 +56,14 @@ app.use('/admin/queues/dashboard', adminAuth, serverAdapter.getRouter());
 app.get('/health', checkHealth);
 app.use("/api/v1",mainRouter);
 
+let server: any;
 async function bootstrap() {
   try {
     await redisManager.match.createIndex();
     await redisManager.bloom.reserve('bf:usernames', 0.001, 100000);
     await redisManager.bloom.reserve('bf:matches', 0.01, 5000000);
 
-    app.listen(PORT, () => {
+    server = app.listen(PORT, () => {
       logger.info(`HTTP Backend running on port ${PORT}`);
     });
   } catch (err) {
@@ -69,3 +72,33 @@ async function bootstrap() {
   }
 }
 bootstrap();
+
+let isShuttingDown = false;
+async function gracefulShutdown(signal: string) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  logger.info(`Received ${signal}, shutting down API gracefully...`);
+  setTimeout(() => {
+    logger.error("Could not close connections in time, forcefully shutting down");
+    process.exit(1);
+  }, 10000);
+  if (server) {
+    server.close(async () => {
+      logger.info("HTTP server closed. Disconnecting databases...");
+      try {
+        await redisManager.quit();
+        await prisma.$disconnect();
+        logger.info("API graceful shutdown complete.");
+        process.exit(0);
+      } catch (err) {
+        logger.error({ err }, "Error during database disconnection");
+        process.exit(1); 
+      }
+    });
+  } else {
+    process.exit(0);
+  }
+}
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

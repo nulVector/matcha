@@ -204,6 +204,7 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
   }
 });
 
+let httpServer: any;
 async function bootstrap(){
   await redisManager.chat.subscribe('chat_router');
   redisManager.chat.onMessage((channel, payload) => {
@@ -223,7 +224,7 @@ async function bootstrap(){
       }
     }
   });
-  server.listen(PORT,()=>{
+  httpServer = server.listen(PORT,()=>{
     logger.info(`WebSocket running on port ${PORT}`);
   })
 }
@@ -242,3 +243,41 @@ wss.on('close', () => {
 });
 
 bootstrap();
+
+let isShuttingDown = false;
+
+async function gracefulShutdown(signal: string) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  logger.info(`Received ${signal}, shutting down WebSocket server gracefully...`);
+  setTimeout(() => {
+    logger.error("Could not close connections in time, forcefully shutting down");
+    process.exit(1);
+  }, 10000);
+  clearInterval(heartbeatInterval);
+  logger.info(`Disconnecting ${wss.clients.size} active WebSocket clients...`);
+  wss.clients.forEach((ws) => {
+    ws.close(1001, 'Server shutting down or restarting'); 
+  });
+  wss.close(async () => {
+    logger.info("WebSocket server closed.");
+    if (httpServer) {
+      httpServer.close(async () => {
+        logger.info("Underlying HTTP server closed. Disconnecting Redis...");
+        try {
+          await redisManager.quit();
+          logger.info("WebSocket graceful shutdown complete.");
+          process.exit(0);
+        } catch (err) {
+          logger.error({ err }, "Error during Redis disconnection");
+          process.exit(1);
+        }
+      });
+    } else {
+      process.exit(0);
+    }
+  });
+}
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

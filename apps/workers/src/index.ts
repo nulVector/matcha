@@ -49,6 +49,38 @@ async function bootstrap() {
   logger.info("All background services are up and running!");
 }
 
+let isShuttingDown = false;
+async function gracefulShutdown(signal: string) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  logger.info(`Received ${signal}, shutting down workers gracefully...`);
+  stopMatchmakingLoop();
+  try {
+    await Promise.all([
+      taskWorker.close(),
+      dbBufferWorker.close(),
+      cronWorker.close()
+    ]);
+    logger.info("Queue workers closed successfully.");
+  } catch (err) {
+    logger.error({ err }, "Error closing queue workers");
+  }
+  healthServer.close();
+  try {
+    await workerConnection.quit();
+    await redisManager.quit();
+    await prisma.$disconnect();
+    logger.info("Data store connections closed successfully.");
+  } catch (err) {
+    logger.error({ err }, "Error closing data stores");
+  }
+  logger.info("Worker graceful shutdown complete.");
+  process.exit(0);
+}
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
 bootstrap().catch((err: any) => {
   logger.error({ err }, "Failed to bootstrap worker node:");
   process.exit(1);
