@@ -1,5 +1,4 @@
 import { RedisManager } from "@matcha/redis";
-import "dotenv/config";
 import Redis, { RedisOptions } from "ioredis";
 
 const connectionString = process.env.REDIS_URL;

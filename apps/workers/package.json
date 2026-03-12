@@ -11,12 +11,11 @@
     "clean": "rimraf dist .turbo"
   },
   "dependencies": {
-    "@matcha/prisma": "workspace:*",
-    "@matcha/redis": "workspace:*",
-    "@matcha/queue": "workspace:*",
     "@matcha/logger": "workspace:*",
+    "@matcha/prisma": "workspace:*",
+    "@matcha/queue": "workspace:*",
+    "@matcha/redis": "workspace:*",
     "bullmq": "^5.70.1",
-    "dotenv": "^17.2.3",
     "ioredis": "^5.9.2"
   },
   "devDependencies": {

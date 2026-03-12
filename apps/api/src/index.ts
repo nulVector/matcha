@@ -1,5 +1,3 @@
-import dotenv from "dotenv";
-dotenv.config();
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import helmet from "helmet";
@@ -15,7 +13,7 @@ import { checkHealth } from "./controllers/health.controller";
 import prisma from "@matcha/prisma";
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.API_PORT || 3001;
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
