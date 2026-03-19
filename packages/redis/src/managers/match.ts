@@ -1,6 +1,6 @@
+import { logger } from "@matcha/logger";
 import Redis from "ioredis";
 import { MASTER_INTERESTS, MatchAction, UserState } from "../common";
-import { logger } from "@matcha/logger";
 
 export class MatchManager {
   constructor (private redis:Redis) {}
@@ -43,7 +43,7 @@ export class MatchManager {
     try {
       await this.redis.call('FT.INFO', indexName);
     } catch (err:any) {
-      if (err.message && err.message.includes('Unknown Index name')) {
+      if (err.message && err.message.includes('Unknown index name')) {
         await this.redis.call(
           'FT.CREATE', 
           indexName,
@@ -112,11 +112,11 @@ export class MatchManager {
     if (queueStatus !== UserState.QUEUED) return null;
     const vectorBuffer = await this.redis.hgetBuffer(key, 'embedding');
     if (!vectorBuffer) return null;
-    const searcherVector = new Float32Array(
-      vectorBuffer.buffer, 
-      vectorBuffer.byteOffset, 
-      vectorBuffer.length / Float32Array.BYTES_PER_ELEMENT
+    const alignedBuffer = vectorBuffer.buffer.slice(
+      vectorBuffer.byteOffset,
+      vectorBuffer.byteOffset + vectorBuffer.length
     );
+    const searcherVector = new Float32Array(alignedBuffer);
     return {
       queueStatus,
       queuedAt: queuedAtStr ? parseInt(queuedAtStr, 10) : Date.now(),
@@ -133,7 +133,7 @@ export class MatchManager {
   ) {
     const indexName = `idx:users`;
     const vectorBuffer = Buffer.from(userVector.buffer, userVector.byteOffset, userVector.byteLength);
-    const query = `@queueStatus:{${UserState.QUEUED}} @geo:[${long} ${lat} ${radiusKm} km]=>[KNN 10 @embedding $vec AS score]`;
+    const query = `(@queueStatus:{${UserState.QUEUED}} @geo:[${long} ${lat} ${radiusKm} km])=>[KNN 10 @embedding $vec AS score]`;
     try {
       const results = await this.redis.call(
         "FT.SEARCH", indexName, query,
@@ -159,8 +159,8 @@ export class MatchManager {
       const pipeline = this.redis.pipeline();
       pipeline.hget(keyA,"queueStatus");
       pipeline.hget(keyB,"queueStatus");
-      pipeline.get(presAKey);
-      pipeline.get(presBKey);
+      pipeline.exists(presAKey);
+      pipeline.exists(presBKey);
       const results = await pipeline.exec();
       if (!results || !results[0] || !results[1] || !results[2] || !results[3]) {
         await this.redis.unwatch();
@@ -168,8 +168,8 @@ export class MatchManager {
       }
       const statusA = results[0][1] as string;
       const statusB = results[1][1] as string;
-      const isOnlineA = results[2][1] === "1";
-      const isOnlineB = results[3][1] === "1";
+      const isOnlineA = !!results[2][1];
+      const isOnlineB = !!results[3][1];
       if (!isOnlineA || !isOnlineB) {
         await this.redis.unwatch();
         const tx = this.redis.multi();
