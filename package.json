@@ -4,6 +4,7 @@
   "scripts": {
     "build": "dotenv -e .env -- turbo run build",
     "dev": "dotenv -e .env -- turbo run dev",
+    "test": "dotenv -e .env -- vitest",
     "clean": "turbo run clean && rimraf node_modules .turbo",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
@@ -16,7 +17,8 @@
     "prettier": "^3.7.4",
     "rimraf": "^6.1.2",
     "turbo": "^2.6.3",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "vitest": "^4.1.0"
   },
   "packageManager": "pnpm@9.0.0",
   "engines": {
