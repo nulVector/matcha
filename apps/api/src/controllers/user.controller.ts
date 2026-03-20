@@ -19,39 +19,6 @@ if (!jwtSecret) {
   throw new Error("Environment variables not available");
 }
 
-export const seedDB = async (req:Request,res:Response,next:NextFunction) =>{
-  try {
-    const avatarUrls = [
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=Buddy',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=Max',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=Luna',
-  ];
-
-  const cityNames = ['Delhi', 'Banglore', 'Mumbai', 'Pune', 'Chennai'];
-
-  const interestNames = ['Coding', 'Hiking', 'Photography', 'Cooking', 'Gaming'];
-
-  await Promise.all([
-    Promise.all(avatarUrls.map(url => 
-      prisma.avatar.create({ data: { url: url } })
-    )),
-    Promise.all(cityNames.map(name => 
-      prisma.location.create({ data: { name: name, latitude:1,longitude:0} })
-    )),
-    Promise.all(interestNames.map(name => 
-      prisma.interest.create({ data: { name: name } })
-    )),
-  ]);
-  res.json({
-    message:"Done"
-  })
-  } catch (err) {
-    next(err)
-  }
-}
-
 export const checkUsername = async (req:Request,res:Response,next:NextFunction) =>{
   try{
     const {username}:usernameCheckType= req.validatedData.query;

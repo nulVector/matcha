@@ -24,16 +24,15 @@ export default async function setup(project: TestProject) {
   const testRedisUrl = redisContainer.getConnectionUrl();
   console.log("Containers running");
   console.log("Pushing Prisma schema...");
-  execSync("pnpm --filter @matcha/prisma exec prisma db push ", {
+  execSync("pnpm --filter @matcha/prisma exec prisma db push", {
     stdio: "inherit",
     env: { ...process.env, DATABASE_URL: testDatabaseUrl },
   });
   console.log("Seeding Reference Data");
-  //TODO - add seed command
-  // execSync("pnpm db:seed", {
-  //   stdio: "inherit",
-  //   env: { ...process.env, DATABASE_URL: testDatabaseUrl },
-  // });
+  execSync("pnpm --filter @matcha/prisma run db:seed", {
+    stdio: "inherit",
+    env: { ...process.env, DATABASE_URL: testDatabaseUrl },
+  });
   project.provide('databaseUrl', testDatabaseUrl);
   project.provide('redisUrl', testRedisUrl);
   console.log("Test infrastructure is ready!");
