@@ -26,6 +26,11 @@
       "interactive": true,
       "env": ["DATABASE_URL"]
     },
+    "db:seed": {
+      "cache": false,
+      "interactive": true,
+      "env": ["DATABASE_URL"]
+    },
     "clean": {
       "cache": false
     },

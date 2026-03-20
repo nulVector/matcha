@@ -11,7 +11,8 @@
     "check-types": "turbo run check-types",
     "db:migrate": "dotenv -e .env -- turbo run db:migrate --filter=@matcha/prisma",
     "db:push": "dotenv -e .env -- turbo run db:push --filter=@matcha/prisma",
-    "db:studio": "dotenv -e .env -- turbo run db:studio --filter=@matcha/prisma"
+    "db:studio": "dotenv -e .env -- turbo run db:studio --filter=@matcha/prisma",
+    "db:seed": "dotenv -e .env -- turbo run db:seed --filter=@matcha/prisma"
   },
   "devDependencies": {
     "dotenv-cli": "^11.0.0",
