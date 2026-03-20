@@ -11,6 +11,11 @@
       "dependsOn": ["^build"],
       "outputs": []
     },
+    "db:migrate": {
+      "cache": false,
+      "interactive": true,
+      "env": ["DATABASE_URL"]
+    },
     "db:push": {
       "cache": false,
       "interactive": true,

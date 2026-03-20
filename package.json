@@ -9,6 +9,7 @@
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
+    "db:migrate": "dotenv -e .env -- turbo run db:migrate --filter=@matcha/prisma",
     "db:push": "dotenv -e .env -- turbo run db:push --filter=@matcha/prisma",
     "db:studio": "dotenv -e .env -- turbo run db:studio --filter=@matcha/prisma"
   },

@@ -69,7 +69,7 @@ model UserProfile {
 //Catalog model
 model Avatar {
   id  String @id @default(cuid(2))
-  url String
+  url String @unique
 }
 
 model Location {
@@ -80,8 +80,10 @@ model Location {
 }
 
 model Interest {
-  id   String @id @default(cuid(2))
-  name String @unique
+  id       String @id @default(cuid(2))
+  name     String @unique
+  category String
+  emoji    String
 }
 
 model Connection {
