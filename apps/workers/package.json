@@ -19,6 +19,7 @@
     "ioredis": "^5.9.2"
   },
   "devDependencies": {
-    "@matcha/typescript-config": "workspace:*"
+    "@matcha/typescript-config": "workspace:*",
+    "@matcha/shared": "workspace:*"
   }
 }

@@ -1,5 +1,5 @@
 {
-  "name": "@matcha/redis",
+  "name": "@matcha/shared",
   "version": "1.0.0",
   "private": true,
   "type": "commonjs",
@@ -20,11 +20,6 @@
     "clean": "rimraf dist .turbo"
   },
   "devDependencies": {
-    "@matcha/shared": "workspace:*",
     "@matcha/typescript-config": "workspace:*"
-  },
-  "dependencies": {
-    "ioredis": "^5.9.2",
-    "@matcha/logger": "workspace:*"
   }
 }

@@ -93,6 +93,9 @@ importers:
       '@matcha/queue':
         specifier: workspace:*
         version: link:../../packages/queue
+      '@matcha/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@matcha/typescript-config':
         specifier: workspace:*
         version: link:../../packages/config/typescript
@@ -142,6 +145,9 @@ importers:
         specifier: ^8.19.0
         version: 8.19.0
     devDependencies:
+      '@matcha/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@matcha/typescript-config':
         specifier: workspace:*
         version: link:../../packages/config/typescript
@@ -213,6 +219,9 @@ importers:
         specifier: ^5.9.2
         version: 5.9.3
     devDependencies:
+      '@matcha/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@matcha/typescript-config':
         specifier: workspace:*
         version: link:../../packages/config/typescript
@@ -270,6 +279,9 @@ importers:
         specifier: ^7.2.0
         version: 7.2.0(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2)
     devDependencies:
+      '@matcha/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@matcha/typescript-config':
         specifier: workspace:*
         version: link:../config/typescript
@@ -320,6 +332,15 @@ importers:
       ioredis:
         specifier: ^5.9.2
         version: 5.9.2
+    devDependencies:
+      '@matcha/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@matcha/typescript-config':
+        specifier: workspace:*
+        version: link:../config/typescript
+
+  packages/shared:
     devDependencies:
       '@matcha/typescript-config':
         specifier: workspace:*
@@ -393,6 +414,9 @@ importers:
         specifier: ^4.2.1
         version: 4.2.1
     devDependencies:
+      '@matcha/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@matcha/typescript-config':
         specifier: workspace:*
         version: link:../config/typescript

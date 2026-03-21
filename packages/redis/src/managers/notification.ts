@@ -1,5 +1,6 @@
 import Redis from 'ioredis'
 import { NotificationCategory } from '../common';
+import { EventType } from '@matcha/shared';
 
 export class NotificationManager {
   constructor(private redis: Redis) {}
@@ -10,7 +11,7 @@ export class NotificationManager {
     tx.hset(key, category, "1"); 
     const publishPayload = JSON.stringify({
       receiverId: userId,
-      eventType: 'NOTIFICATION_UPDATE',
+      eventType: EventType.NOTIFICATION_UPDATE,
       eventData: { category }
     });
     tx.publish('chat_router', publishPayload);

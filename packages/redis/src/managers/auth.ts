@@ -1,5 +1,6 @@
 import Redis from "ioredis";
-import { RATE_LIMIT_SCRIPT, UserSession } from "../common";
+import { RATE_LIMIT_SCRIPT } from "../common";
+import { UserSession } from "@matcha/shared";
 
 export class AuthManager {
   constructor (private redis:Redis) {}

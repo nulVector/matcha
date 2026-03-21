@@ -58,3 +58,7 @@ export const INTERESTS = [
   { name: "reading fiction", category: "Intellectual", emoji: "📚" },
   { name: "reading nonfiction", category: "Intellectual", emoji: "📖" }
 ];
+
+export const MASTER_INTERESTS_LIST = INTERESTS.map((i) => i.name);
+
+export const VIBE_OPTIONS = ['cyber', 'nature', 'tiny', 'legendary', 'chaos'] as const;

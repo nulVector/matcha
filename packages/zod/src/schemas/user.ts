@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { VIBE_OPTIONS } from "@matcha/shared";
+
 const username = z
   .string()
   .trim()
@@ -15,7 +17,7 @@ export const usernameCheckSchema = z.object({
 export type usernameCheckType = z.infer<typeof usernameCheckSchema>;
 
 export const vibeCheck = z.object({
-  vibe:z.enum(['cyber' , 'nature' , 'tiny' , 'legendary' , 'chaos'])
+  vibe:z.enum(VIBE_OPTIONS)
 })
 export type vibeCheckType = z.infer<typeof vibeCheck>
 

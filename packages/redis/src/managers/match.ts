@@ -1,6 +1,7 @@
 import { logger } from "@matcha/logger";
 import Redis from "ioredis";
-import { MASTER_INTERESTS, MatchAction, UserState } from "../common";
+import { MatchAction, UserState } from "../common";
+import { MASTER_INTERESTS_LIST } from "@matcha/shared";
 
 export class MatchManager {
   constructor (private redis:Redis) {}
@@ -28,9 +29,9 @@ export class MatchManager {
     return parsedMatches;
   }
   private generateVector(userInterests:string[]){
-    const vector = new Float32Array(MASTER_INTERESTS.length).fill(0);
+    const vector = new Float32Array(MASTER_INTERESTS_LIST.length).fill(0);
     userInterests.forEach((interest, rank) => {
-      const masterIndex = MASTER_INTERESTS.indexOf(interest);
+      const masterIndex = MASTER_INTERESTS_LIST.indexOf(interest);
       if (masterIndex !== -1) {
         const weight = Math.max(0.1, 1.0 - (rank * 0.1));
         vector[masterIndex] = weight;
@@ -55,7 +56,7 @@ export class MatchManager {
           'embedding', 'VECTOR', 'HNSW', 
             '6',
             'TYPE', 'FLOAT32',
-            'DIM', MASTER_INTERESTS.length.toString(), 
+            'DIM', MASTER_INTERESTS_LIST.length.toString(), 
             'DISTANCE_METRIC', 'COSINE' 
         );
       } else {

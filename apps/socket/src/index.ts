@@ -5,23 +5,8 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { redisManager } from './services/redis';
 import { createId } from '@paralleldrive/cuid2';
 import { logger } from '@matcha/logger';
+import { JwtPayload, UserSession, EventType } from "@matcha/shared"
 
-interface JwtPayload {
-  id:string,
-  sessionId: string,
-  tokenVersion:number
-}
-interface UserSession {
-  userId:string,
-  tokenVersion: number,
-  userProfileId:string | null
-}
-enum EventType {
-  CHAT_MESSAGE = "Chat_Message",
-  USER_TYPING = "User_Typing",
-  STOPPED_TYPING = "Stopped_Typing",
-  MESSAGE_READ = "Message_Read"
-}
 const server = createServer((req, res) => {
   res.writeHead(200);
   res.end("WebSocket Server Running");

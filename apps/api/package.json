@@ -34,6 +34,7 @@
   },
   "devDependencies": {
     "@matcha/queue": "workspace:*",
+    "@matcha/shared": "workspace:*",
     "@matcha/typescript-config": "workspace:*",
     "@types/bcrypt": "^6.0.0",
     "@types/cookie-parser": "^1.4.10",

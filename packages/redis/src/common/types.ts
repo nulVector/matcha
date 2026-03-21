@@ -43,13 +43,6 @@ export interface UserProfile {
   embedding?: Buffer;
 }
 
-export interface UserSession {
-  userId: string;
-  tokenVersion: number;
-  userProfileId: string | null;
-  hasPassword: boolean
-}
-
 export interface ConnectionListItem { 
   otherUserId: string, 
   timestamp: number 

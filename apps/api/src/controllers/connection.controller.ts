@@ -3,6 +3,7 @@ import { redisManager } from "../services/redis";
 import { ConnectionListType, MatchAction, UserState } from "@matcha/redis";
 import { connectionIdType } from "@matcha/zod";
 import prisma, { ConnectionStatus } from "@matcha/prisma";
+import { EventType, SystemAction } from "@matcha/shared";
 
 export const joinQueue = async (req:Request,res:Response,next:NextFunction) => {
   try {
@@ -55,9 +56,9 @@ export const extendTimer = async (req:Request,res:Response,next:NextFunction) =>
         'chat_router',
         JSON.stringify({
           receiverId,
-          eventType: 'SYSTEM_EVENT',
+          eventType: EventType.SYSTEM_EVENT,
           eventData:{
-            event:"EXTEND_REQUESTED",
+            event: SystemAction.EXTEND_REQUESTED,
             senderId:profileId,
             connectionId
           }
@@ -80,9 +81,9 @@ export const extendTimer = async (req:Request,res:Response,next:NextFunction) =>
         redisManager.match.clearMatchVotes(connectionId)
       ]);
       const successEvent = {
-        eventType:"SYSTEM_EVENT",
+        eventType: EventType.SYSTEM_EVENT,
         eventData:{
-          event:"EXTEND_ACCEPTED",
+          event: SystemAction.EXTEND_ACCEPTED,
           expiresAt:newExpiresAt.toISOString(),
           connectionId
         }
@@ -123,9 +124,9 @@ export const convertConnection = async (req:Request,res:Response,next:NextFuncti
         'chat_router',
         JSON.stringify({
           receiverId,
-          eventType:'SYSTEM_EVENT',
+          eventType: EventType.SYSTEM_EVENT,
           eventData:{
-            event: "CONVERT_REQUESTED",
+            event: SystemAction.CONVERT_REQUESTED,
             senderId: profileId,
             connectionId
           }
@@ -149,9 +150,9 @@ export const convertConnection = async (req:Request,res:Response,next:NextFuncti
         redisManager.userDetail.invalidateConnectionList(receiverId, ConnectionListType.FRIEND)
       ]);
       const successEvent = {
-        eventType: "SYSTEM_EVENT",
+        eventType: EventType.SYSTEM_EVENT,
         eventData: { 
-          event: "CONVERT_ACCEPTED",
+          event: SystemAction.CONVERT_ACCEPTED,
           connectionId
         }
       };
@@ -199,9 +200,9 @@ export const skipConnection = async (req:Request,res:Response,next:NextFunction)
       'chat_router',
       JSON.stringify({
         receiverId: receiverId,
-        eventType: "SYSTEM_EVENT",
+        eventType: EventType.SYSTEM_EVENT,
         eventData: {
-          event: "CHAT_ENDED",
+          event: SystemAction.CHAT_ENDED,
           message: "The other user has left the chat."
         }
       })
@@ -218,4 +219,4 @@ export const skipConnection = async (req:Request,res:Response,next:NextFunction)
     err.context = { location: "connectionController.skipConnection", profileId: req.user!.profile!.id, connectionId: req.validatedData.params.connectionId };
     next(err)
   }
-}
+} 

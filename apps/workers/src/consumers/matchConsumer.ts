@@ -2,6 +2,7 @@ import { redisManager } from "../config/redis";
 import prisma, { ConnectionStatus } from "@matcha/prisma";
 import { UserState } from "@matcha/redis";
 import { logger } from "@matcha/logger";
+import { EventType } from "@matcha/shared";
 
 interface MatchConstraints {
   radiusKm: number;
@@ -59,12 +60,12 @@ export async function startMatchmakingLoop() {
             await Promise.all([
               redisManager.chat.publish('chat_router', JSON.stringify({ 
                 receiverId: searcherId, 
-                eventType: "MATCH_FOUND", 
+                eventType: EventType.MATCH_FOUND, 
                 eventData: { ...baseEventData, matchedUserId: candidate.id } 
               })),
               redisManager.chat.publish('chat_router', JSON.stringify({ 
                 receiverId: candidate.id, 
-                eventType: "MATCH_FOUND", 
+                eventType: EventType.MATCH_FOUND, 
                 eventData: { ...baseEventData, matchedUserId: searcherId } 
               }))
             ]);

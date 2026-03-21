@@ -1,5 +1,5 @@
 import Redis from "ioredis";
-import { ConnectionListItem, ConnectionListType, UserProfile, UserState } from "../common";
+import { ConnectionListItem, ConnectionListType, UserProfile } from "../common";
 
 export class UserDetailManager {
   constructor (private redis:Redis) {}

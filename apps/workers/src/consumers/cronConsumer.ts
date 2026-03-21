@@ -4,6 +4,7 @@ import { redisManager, workerConnection } from "../config/redis";
 import prisma, { ConnectionStatus } from "@matcha/prisma";
 import { ConnectionListType, UserState } from "@matcha/redis";
 import { logger } from "@matcha/logger";
+import { EventType } from "@matcha/shared";
 
 export const cronWorker = new Worker(
   QueueName.CRON,
@@ -41,7 +42,7 @@ export const cronWorker = new Worker(
         const publishPromises = [];
         for (const conn of expiredConnections) {
           const payload = JSON.stringify({
-            eventType: "MATCH_EXPIRED",
+            eventType: EventType.MATCH_EXPIRED,
             eventData: { connectionId: conn.id },
           });
           publishPromises.push(

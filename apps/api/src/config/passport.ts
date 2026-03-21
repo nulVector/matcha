@@ -1,16 +1,12 @@
 import prisma from "@matcha/prisma";
 import bcrypt from "bcrypt";
+import { JwtPayload } from "@matcha/shared";
 import { PassportStatic } from "passport";
 import { ExtractJwt, Strategy as JwtStrategy } from "passport-jwt";
 import { Strategy as LocalStrategy } from "passport-local";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { redisManager } from "../services/redis";
 
-interface JwtPayload {
-  id:string,
-  sessionId: string,
-  tokenVersion:number
-}
 const jwtSecret = process.env.JWT_SECRET;
 const clientID = process.env.GOOGLE_CLIENT_ID;
 const clientSecret = process.env.GOOGLE_CLIENT_SECRET;

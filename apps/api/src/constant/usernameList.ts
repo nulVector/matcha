@@ -1,4 +1,4 @@
-export type VibeType = 'cyber' | 'nature' | 'tiny' | 'legendary' | 'chaos';
+import { VibeType } from "@matcha/shared";
 
 interface VibeLists {
   adjectives: string[];
