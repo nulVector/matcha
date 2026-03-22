@@ -1,13 +1,14 @@
 import {z} from "zod";
 
 const emailSchema = z.email()
+  .trim()
   .min(1)
   .max(200,"Email is too long")
-  .trim()
+  
 const passwordSchema = z.string()
+  .trim()
   .min(8,"Password must be at least 8 characters")
   .max(20,"Password is too long")
-  .trim()
   .regex(
     /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/,
     "Password must contain at least one number, one uppercase, and one lowercase letter",
@@ -46,7 +47,7 @@ export type signupType = z.infer<typeof signupSchema>;
 export const loginSchema = z
   .object({
     email: emailSchema,
-    password:z.string().min(1, "Password is required").trim()
+    password:z.string().trim().min(1, "Password is required")
   })
 export type loginType = z.infer<typeof loginSchema>;
 
