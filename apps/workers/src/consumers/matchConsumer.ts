@@ -10,6 +10,7 @@ interface MatchConstraints {
 }
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 let isRunning = false;
+let loopPromise: Promise<void> | null = null;
 
 function getMatchConstraints(waitTimeMs: number): MatchConstraints {
   if (waitTimeMs > 30000) return { radiusKm: 3000, maxScore: 1.0 };
@@ -19,8 +20,21 @@ function getMatchConstraints(waitTimeMs: number): MatchConstraints {
   if (waitTimeMs > 5000)  return { radiusKm: 80,   maxScore: 0.25 };
   return { radiusKm: 30, maxScore: 0.2 };
 }
-export async function startMatchmakingLoop() {
+export function startMatchmakingLoop() {
+  if (isRunning) return;
   isRunning = true;
+  loopPromise = runLoop().catch(err => {
+    logger.error({ err }, "Fatal error in matchmaking loop");
+  });
+}
+export async function stopMatchmakingLoop() {
+  isRunning = false;
+  if (loopPromise) {
+    await loopPromise; 
+    loopPromise = null;
+  }
+}
+async function runLoop() {
   while (isRunning) {
     try {
       const usersInQueue = await redisManager.match.getUsersInQueue();
@@ -44,43 +58,50 @@ export async function startMatchmakingLoop() {
           if (candidate.id === searcherId || candidate.score > maxScore) continue;
           const locked = await redisManager.match.lockMatch(searcherId, candidate.id);
           if (locked) {
-            const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-            const newConnection = await prisma.connection.create({
-              data: {
-                user1Id: searcherId,
-                user2Id: candidate.id,
-                status: ConnectionStatus.MATCHED,
-                expiresAt: expiresAt,
-              }
-            });
-            const baseEventData = {
-              connectionId: newConnection.id,
-              expiresAt: expiresAt.toISOString(),
-            };
-            await Promise.all([
-              redisManager.chat.publish('chat_router', JSON.stringify({ 
-                receiverId: searcherId, 
-                eventType: EventType.MATCH_FOUND, 
-                eventData: { ...baseEventData, matchedUserId: candidate.id } 
-              })),
-              redisManager.chat.publish('chat_router', JSON.stringify({ 
-                receiverId: candidate.id, 
-                eventType: EventType.MATCH_FOUND, 
-                eventData: { ...baseEventData, matchedUserId: searcherId } 
-              }))
-            ]);
-            break; 
+            try {
+              const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+              const newConnection = await prisma.connection.create({
+                data: {
+                  user1Id: searcherId,
+                  user2Id: candidate.id,
+                  status: ConnectionStatus.MATCHED,
+                  expiresAt: expiresAt,
+                }
+              });
+              const baseEventData = {
+                connectionId: newConnection.id,
+                expiresAt: expiresAt.toISOString(),
+              };
+              await Promise.all([
+                redisManager.chat.publish('chat_router', JSON.stringify({ 
+                  receiverId: searcherId, 
+                  eventType: EventType.MATCH_FOUND, 
+                  eventData: { ...baseEventData, matchedUserId: candidate.id } 
+                })),
+                redisManager.chat.publish('chat_router', JSON.stringify({ 
+                  receiverId: candidate.id, 
+                  eventType: EventType.MATCH_FOUND, 
+                  eventData: { ...baseEventData, matchedUserId: searcherId } 
+                }))
+              ]);
+              break;
+            } catch (dbError) {
+              logger.error({ err: dbError, searcherId, candidateId: candidate.id }, "Postgres failed after Redis lock. Reverting.");
+              await redisManager.match.addToQueue(searcherId);
+              await redisManager.match.addToQueue(candidate.id);
+              break;
+            }
           }
         }
       }
       await sleep(1000);
     } catch (error: any) {
+      if (error.message && error.message.includes('Connection is closed')) {
+        logger.info("Matchmaking loop cleanly aborted due to Redis disconnect.");
+        break;
+      }
       logger.error({ err: error }, "Matchmaking Loop Error");
       await sleep(5000);
     }
   }
-}
-
-export function stopMatchmakingLoop() {
-  isRunning = false;
 }
