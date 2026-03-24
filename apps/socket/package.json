@@ -12,6 +12,7 @@
   },
   "devDependencies": {
     "@matcha/shared": "workspace:*",
+    "@matcha/prisma": "workspace:*",
     "@matcha/typescript-config": "workspace:*",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.3.0",
