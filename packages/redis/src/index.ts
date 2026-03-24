@@ -1,4 +1,5 @@
 import Redis from "ioredis";
+import { logger } from "@matcha/logger";
 import { AuthManager } from "./managers/auth";
 import { BloomFilterManager } from "./managers/bloom";
 import { ChatManager } from "./managers/chat";
@@ -23,7 +24,18 @@ export class RedisManager {
 
   constructor (connectionString:string) {
     this.redis = new Redis(connectionString);
-    this.subRedis = new Redis(connectionString);
+    this.subRedis = new Redis(connectionString, { enableReadyCheck: false });
+
+    this.redis.on("error", (err: any) => {
+      if (err.message && !err.message.includes("Connection is closed")) {
+        logger.error({ err }, "Redis Core Unexpected connection error");
+      }
+    });
+    this.subRedis.on("error", (err: any) => {
+      if (err.message && !err.message.includes("Connection is closed")) {
+        logger.error({ err }, "Redis Sub Subscriber connection error");
+      }
+    });
     
     this.auth = new AuthManager(this.redis);
     this.userDetail = new UserDetailManager(this.redis);
