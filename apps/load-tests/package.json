@@ -1,0 +1,32 @@
+{
+  "name": "load-tests",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "clean": "rimraf dist .turbo",
+    "test:seed-matchmaking": "ts-node src/scripts/seed-matchmaking.ts",
+    "test:seed-messaging": "ts-node src/scripts/seed-messaging.ts",
+    "test:seed-app": "ts-node src/scripts/seed-app.ts",
+    "test:heartbeats": "artillery run src/scenarios/heartbeats.yml",
+    "test:messaging": "artillery run src/scenarios/messaging.yml",
+    "test:receipts": "artillery run src/scenarios/receipts.yml",
+    "test:matchmaking": "artillery run src/scenarios/matchmaking.yml",
+    "test:real-world": "artillery run src/scenarios/real-world.yml"
+  },
+  "dependencies": {
+    "@matcha/prisma": "workspace:*",
+    "@matcha/redis": "workspace:*",
+    "@paralleldrive/cuid2": "^3.3.0",
+    "artillery": "^2.0.30",
+    "ioredis": "^5.9.2",
+    "jsonwebtoken": "^9.0.2",
+    "undici": "^7.24.6"
+  },
+  "devDependencies": {
+    "@matcha/typescript-config": "workspace:*",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/node": "^25.5.0",
+    "ts-node": "^10.9.2"
+  }
+}

@@ -1,0 +1,15 @@
+services:
+  postgres-test:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_DB: matcha_test
+    ports:
+      - "5433:5432"
+
+  redis-test:
+    image: redis/redis-stack:latest
+    ports:
+      - "6380:6379"
+      - "8002:8001"

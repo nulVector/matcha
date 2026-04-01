@@ -1,0 +1,80 @@
+config:
+  target: "ws://127.0.0.1:8080"
+  processor: "../helpers/index.ts"
+  http:
+    pool: 100
+
+  environments:
+    smoke:
+      phases:
+        - duration: 60
+          arrivalRate: 17
+          name: "1k Users"
+      variables:
+        thinkTime: 2
+
+    capacity:
+      phases:
+        - duration: 60
+          arrivalRate: 50
+          name: "3k Users"
+      variables:
+        thinkTime: 2
+
+    endurance:
+      phases:
+        - duration: 60
+          arrivalRate: 84
+          name: "5k Users"
+      variables:
+        thinkTime: 2
+
+    flood:
+      phases:
+        - duration: 60
+          arrivalRate: 167
+          name: "10k Users"
+      variables:
+        thinkTime: 2
+
+    chaos:
+      phases:
+        - duration: 60
+          arrivalRate: 200
+          name: "12k Users"
+      variables:
+        thinkTime: 1
+
+    extreme:
+      phases:
+        - duration: 60
+          arrivalRate: 250
+          name: "15k Users"
+      variables:
+        thinkTime: 1
+        
+    soak:
+      phases:
+        - duration: 120
+          arrivalRate: 85
+          name: "Ramp to 10k"
+        - duration: 900
+          arrivalRate: 167 
+          name: "15-Minute Receipts Soak"
+      variables:
+        thinkTime: 2
+
+scenarios:
+  - engine: ws
+    name: "Read Receipt Stress Test"
+    flow:
+      - connect:
+          target: "{{ target }}"
+          function: "setupUser"
+      - loop:
+          - send: '{"type": "VIEWING_CHAT", "payload": {"connectionId": "{{ connectionId }}", "receiverId": "{{ receiverId }}", "lastMessageId": "{{ messageId }}"}}'
+          - think: "{{ thinkTime }}"
+        count: 5
+      - send: '{"type": "LEAVING_CHAT", "payload": {"connectionId": "{{ connectionId }}"}}'
+      - think: 10
+      - function: "cleanupSession"

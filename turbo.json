@@ -42,7 +42,23 @@
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "passThroughEnv": ["*"]
+    },
+    "dev:test": {
+      "cache": false,
+      "persistent": true,
+      "passThroughEnv": ["*"]
+    },
+    "loadtest": {
+      "cache": false,
+      "interactive": true,
+      "env": [
+        "DATABASE_URL",
+        "JWT_SECRET",
+        "REDIS_URL",
+        "API_URL"
+    ]
     }
   }
 }

@@ -1,0 +1,117 @@
+config:
+  target: "ws://127.0.0.1:8080"
+  processor: "../helpers/index.ts"
+  http:
+    pool: 100
+
+  environments:
+    smoke:
+      phases:
+        - duration: 60
+          arrivalRate: 17
+          name: "1k Users"
+      variables:
+        thinkTime: 15
+        cronWaitTime: 125
+
+    capacity:
+      phases:
+        - duration: 60
+          arrivalRate: 50
+          name: "3k Users"
+      variables:
+        thinkTime: 20
+        cronWaitTime: 125
+
+    endurance:
+      phases:
+        - duration: 60
+          arrivalRate: 84
+          name: "5k Users"
+      variables:
+        thinkTime: 25
+        cronWaitTime: 125
+
+    flood:
+      phases:
+        - duration: 60
+          arrivalRate: 167
+          name: "10k Users"
+      variables:
+        thinkTime: 30
+        cronWaitTime: 125
+        
+    chaos:
+      phases:
+        - duration: 60
+          arrivalRate: 200
+          name: "12k Users"
+      variables:
+        thinkTime: 30
+        cronWaitTime: 125
+
+    extreme:
+      phases:
+        - duration: 60
+          arrivalRate: 250
+          name: "15k Users"
+      variables:
+        thinkTime: 30
+        cronWaitTime: 125
+
+    soak:
+      phases:
+        - duration: 120
+          arrivalRate: 85
+          name: "Ramp to 10k"
+        - duration: 900
+          arrivalRate: 167 
+          name: "15-Minute Endurance Soak"
+      variables:
+        thinkTime: 30
+        cronWaitTime: 125
+
+scenarios:
+  - engine: ws
+    name: "The Active Chatter"
+    weight: 5
+    flow:
+      - connect:
+          target: "{{ target }}"
+          function: "setupUser"
+      - think: 2
+      - loop:
+          - send: '{"type": "TYPING_INDICATOR", "payload": {"connectionId": "{{ connectionId }}", "receiverId": "{{ receiverId }}"}}'
+          - think: 1
+          - function: "generateMessagePayload"
+          - send: '{"type": "CHAT_MESSAGE", "payload": {"connectionId": "{{ connectionId }}", "receiverId": "{{ receiverId }}", "content": "{{ chatMessage }}"}}'
+          - send: '{"type": "STOPPED_TYPING", "payload": {"connectionId": "{{ connectionId }}", "receiverId": "{{ receiverId }}"}}'
+          - think: 2
+          - send: '{"type": "VIEWING_CHAT", "payload": {"connectionId": "{{ connectionId }}", "receiverId": "{{ receiverId }}", "lastMessageId": "{{ messageId }}"}}'
+          - think: 3
+        count: 3
+      - send: '{"type": "LEAVING_CHAT", "payload": {"connectionId": "{{ connectionId }}"}}'
+      - think: 10
+      - function: "cleanupSession"
+
+  - engine: ws
+    name: "The Matchmaking Searcher"
+    weight: 3
+    flow:
+      - connect:
+          target: "{{ target }}"
+          function: "setupUser"
+      - function: "joinMatchmakingQueue"
+      - think: "{{ thinkTime }}"
+      - think: "{{ cronWaitTime }}"
+      - function: "cleanupSession"
+
+  - engine: ws
+    name: "The Network Drop"
+    weight: 2
+    flow:
+      - connect:
+          target: "{{ target }}"
+          function: "setupUser"
+      - function: "joinMatchmakingQueue"
+      - think: 2 
