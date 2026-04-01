@@ -11,6 +11,7 @@ interface MatchConstraints {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 let isRunning = false;
 let loopPromise: Promise<void> | null = null;
+const MATCH_EXPIRY_MS = process.env.ARTILLERY_TEST === "true" ? 1 * 60 * 1000 : 5 * 60 * 1000;
 
 function getMatchConstraints(waitTimeMs: number): MatchConstraints {
   if (waitTimeMs > 30000) return { radiusKm: 3000, maxScore: 1.0 };
@@ -20,7 +21,7 @@ function getMatchConstraints(waitTimeMs: number): MatchConstraints {
   if (waitTimeMs > 5000)  return { radiusKm: 80,   maxScore: 0.25 };
   return { radiusKm: 30, maxScore: 0.2 };
 }
-export function startMatchmakingLoop() {
+export async function startMatchmakingLoop() {
   if (isRunning) return;
   isRunning = true;
   loopPromise = runLoop().catch(err => {
@@ -59,7 +60,7 @@ async function runLoop() {
           const locked = await redisManager.match.lockMatch(searcherId, candidate.id);
           if (locked) {
             try {
-              const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+              const expiresAt = new Date(Date.now() + MATCH_EXPIRY_MS);
               const newConnection = await prisma.connection.create({
                 data: {
                   user1Id: searcherId,

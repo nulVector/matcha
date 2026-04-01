@@ -6,6 +6,7 @@ import { workerConnection, redisManager } from "./config/redis";
 import prisma from "@matcha/prisma";
 import { logger } from "@matcha/logger";
 import http from "http";
+import { CronProducer, DbBufferProducer } from "@matcha/queue";
 
 const healthServer = http.createServer(async (req, res) => {
   if (req.url === '/health') {
@@ -40,8 +41,16 @@ async function bootstrap() {
   logger.info(`Task Worker listening on ${taskWorker.name}`);
   logger.info(`DB Buffer Worker listening on ${dbBufferWorker.name}`);
   logger.info(`Cron Worker listening on ${cronWorker.name}`);
+  try {
+    logger.info("Initializing Recurring Jobs");
+    await CronProducer.initializeSchedules();
+    await DbBufferProducer.initializeSchedules(); 
+    logger.info("Recurring Jobs successfully registered in BullMQ!");
+  } catch (err) {
+    logger.error({ err }, "Failed to initialize Recurring Jobs");
+  }
+
   logger.info(`Initializing Matchmaking Consumer...`);
-  
   startMatchmakingLoop().catch((err: any) => {
     logger.error({ err }, "Native Matchmaking Loop crashed:");
   });
