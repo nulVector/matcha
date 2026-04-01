@@ -13,7 +13,7 @@ const server = createServer((req, res) => {
 });
 const wss = new WebSocketServer({noServer:true});
 const jwtSecret = process.env.JWT_SECRET;
-const PORT = process.env.WS_PORT || 8080;
+const PORT = Number(process.env.WS_PORT) || 8080;
 const localSockets = new Map<string,Set<WebSocket>>();
 
 if(!jwtSecret){
@@ -32,7 +32,12 @@ const parseCookies = (cookieString:string) => {
 server.on('upgrade',async (request,socket,head)=>{
   try {
     const cookies = parseCookies(request.headers.cookie || "");
-    const token = cookies.token;
+    let token = cookies.token;
+    // For passing cookies during Artillery testing
+    if (!token && process.env.ARTILLERY_TEST === "true") {
+      const url = new URL(request.url || "", `http://${request.headers.host}`);
+      token = url.searchParams.get('token') || undefined;
+    }
     if(!token) {
       socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
       socket.destroy();
@@ -62,6 +67,8 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
   }
   const socketId = createId(); 
   (ws as any).isAlive = true;
+  if (!localSockets.has(profileId)) localSockets.set(profileId, new Set());
+  localSockets.get(profileId)!.add(ws);
   ws.on('pong', async () => {
     (ws as any).isAlive = true;
     try {
@@ -70,119 +77,115 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
       logger.error({ err, profileId }, "Heartbeat update failed");
     }
   });
+  ws.on('message', async (rawMessage: Buffer) => {
+    let parsedData;
+    try {
+      parsedData = JSON.parse(rawMessage.toString());
+    } catch (err: any) {
+      logger.warn({ err, profileId }, "Malformed JSON received");
+      return;
+    }
+    try {
+      switch (parsedData.type) {
+        case 'CHAT_MESSAGE': {
+          const { connectionId, receiverId, content } = parsedData.payload;
+          const message: CachedMessage = {
+            id: createId(),
+            connectionId,
+            content,
+            senderId: profileId,
+            createdAt: new Date().toISOString(),
+            type: MessageType.TEXT
+          };
+          await redisManager.chat.processNewMessage(
+            connectionId, 
+            receiverId, 
+            message, 
+            EventType.CHAT_MESSAGE
+          );
+          break;
+        }
+        case 'TYPING_INDICATOR': {
+          const { connectionId, receiverId} = parsedData.payload;
+          await redisManager.chat.publish(
+            'chat_router',
+            JSON.stringify({
+              receiverId,
+              eventData:{
+                senderId:profileId,
+                connectionId
+              },
+              eventType:EventType.USER_TYPING
+            })
+          )
+          break;
+        }
+        case 'STOPPED_TYPING': {
+          const { connectionId, receiverId } = parsedData.payload;
+          await redisManager.chat.publish(
+            'chat_router',
+            JSON.stringify({
+              receiverId,
+              eventType: EventType.STOPPED_TYPING,
+              eventData: {
+                senderId: profileId,
+                connectionId
+              }
+            })
+          );
+          break;
+        }
+        case 'VIEWING_CHAT': {
+          const { connectionId, receiverId, lastMessageId } = parsedData.payload;
+          await Promise.all([
+            redisManager.chat.setActiveChat(profileId,connectionId),
+            redisManager.chat.resetUnread(profileId,connectionId)
+          ])
+          if (lastMessageId) {
+            await redisManager.chat.bufferReadReceipt(connectionId, profileId, lastMessageId);
+          }
+          await redisManager.chat.publish(
+            'chat_router',
+            JSON.stringify({
+              receiverId,
+              eventType:EventType.MESSAGE_READ,
+              eventData: { connectionId }
+            })
+          )
+          break;
+        }
+        case 'LEAVING_CHAT': {
+          await redisManager.chat.removeActiveChat(profileId);
+          break;
+        }
+        default:
+          break;
+      }
+    } catch (err: any) {
+      logger.error({ err, profileId }, "Error processing message");
+    }
+  });
+  ws.on('close', async () => {
+    try {
+      const userTabs = localSockets.get(profileId);
+      if (userTabs) {
+        userTabs.delete(ws);
+        if (userTabs.size === 0) localSockets.delete(profileId);
+      }
+      const activeChat = await redisManager.chat.getActiveChat(profileId);
+      if (activeChat) {
+        await redisManager.chat.removeActiveChat(profileId);
+      }
+      const count = await redisManager.userConnection.removeSocket(socketId);
+      if (count === 0) {
+        await redisManager.match.leaveQueue(profileId, UserState.IDLE);
+      }
+    } catch (err: any) {
+      logger.error({ err, profileId }, "Error cleaning up socket");
+    }
+  });
   try {
     await redisManager.userConnection.mapSocket(profileId,socketId);
-    if (!localSockets.has(profileId)) localSockets.set(profileId, new Set());
-    localSockets.get(profileId)!.add(ws);
-    ws.on('message', async (rawMessage: Buffer) => {
-      let parsedData;
-      try {
-        parsedData = JSON.parse(rawMessage.toString());
-      } catch (err: any) {
-        logger.warn({ err, profileId }, "Malformed JSON received");
-        return;
-      }
-      try {
-        switch (parsedData.type) {
-          case 'CHAT_MESSAGE': {
-            const { connectionId, receiverId, content } = parsedData.payload;
-            const message: CachedMessage = {
-              id: createId(),
-              connectionId,
-              content,
-              senderId: profileId,
-              createdAt: new Date().toISOString(),
-              type: MessageType.TEXT
-            };
-            await redisManager.chat.processNewMessage(
-              connectionId, 
-              receiverId, 
-              message, 
-              EventType.CHAT_MESSAGE
-            );
-            break;
-          }
-          case 'TYPING_INDICATOR': {
-            const { connectionId, receiverId} = parsedData.payload;
-            await redisManager.chat.publish(
-              'chat_router',
-              JSON.stringify({
-                receiverId,
-                eventData:{
-                  senderId:profileId,
-                  connectionId
-                },
-                eventType:EventType.USER_TYPING
-              })
-            )
-            break;
-          }
-          case 'STOPPED_TYPING': {
-            const { connectionId, receiverId } = parsedData.payload;
-            await redisManager.chat.publish(
-              'chat_router',
-              JSON.stringify({
-                receiverId,
-                eventType: EventType.STOPPED_TYPING,
-                eventData: {
-                  senderId: profileId,
-                  connectionId
-                }
-              })
-            );
-            break;
-          }
-          case 'VIEWING_CHAT': {
-            const { connectionId, receiverId, lastMessageId } = parsedData.payload;
-            await Promise.all([
-              redisManager.chat.setActiveChat(profileId,connectionId),
-              redisManager.chat.resetUnread(profileId,connectionId)
-            ])
-            if (lastMessageId) {
-              await redisManager.chat.bufferReadReceipt(connectionId, profileId, lastMessageId);
-            }
-            await redisManager.chat.publish(
-              'chat_router',
-              JSON.stringify({
-                receiverId,
-                eventType:EventType.MESSAGE_READ,
-                eventData: { connectionId }
-              })
-            )
-            break;
-          }
-          case 'LEAVING_CHAT': {
-            const { connectionId } = parsedData.payload;
-            await redisManager.chat.removeActiveChat(profileId);
-            break;
-          }
-          default:
-            break;
-        }
-      } catch (err: any) {
-        logger.error({ err, profileId }, "Error processing message");
-      }
-    });
-
-    ws.on('close', async () => {
-      try {
-        const activeChat = await redisManager.chat.getActiveChat(profileId);
-        if (activeChat) {
-          await redisManager.chat.removeActiveChat(profileId);
-        }
-        const userTabs = localSockets.get(profileId);
-        if (userTabs) {
-          userTabs.delete(ws);
-          if (userTabs.size === 0) localSockets.delete(profileId);
-        }
-        const count = await redisManager.userConnection.removeSocket(socketId);
-        if (count === 0) {
-          await redisManager.match.leaveQueue(profileId, UserState.IDLE);
-        }
-      } catch (err: any) {
-        logger.error({ err, profileId }, "Error cleaning up socket");
-      }
-    });
   } catch (err: any) {
     logger.error({ err, profileId }, "Failed to initialize connection");
     ws.close();
@@ -209,7 +212,11 @@ async function bootstrap(){
       }
     }
   });
-  httpServer = server.listen(PORT,()=>{
+  httpServer = server.listen({
+  port: PORT,
+  host: '0.0.0.0',
+  backlog: 8192
+},()=>{
     logger.info(`WebSocket running on port ${PORT}`);
   })
 }
