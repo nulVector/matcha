@@ -13,7 +13,7 @@ import { checkHealth } from "./controllers/health.controller";
 import prisma from "@matcha/prisma";
 
 const app = express();
-const PORT = process.env.API_PORT || 3001;
+const PORT = Number(process.env.API_PORT) || 3001;
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -44,7 +44,7 @@ app.use(cors({
 
 app.use(pinoHttp({
   logger,
-  autoLogging: {
+  autoLogging: process.env.ARTILLERY_TEST === 'true' ? false : {
     ignore: (req) => req.url === '/health'
   }
 }));
@@ -61,8 +61,8 @@ async function bootstrap() {
     await redisManager.bloom.reserve('bf:usernames', 0.001, 100000);
     await redisManager.bloom.reserve('bf:matches', 0.01, 5000000);
 
-    server = app.listen(PORT, () => {
-      logger.info(`HTTP Backend running on port ${PORT}`);
+    server = app.listen(PORT, '0.0.0.0', 8192, () => {
+      logger.info('API listening on port 3001');
     });
   } catch (err) {
     logger.error({ err }, "Failed to start server");
