@@ -9,7 +9,8 @@ export const joinQueue = async (req:Request,res:Response,next:NextFunction) => {
   try {
     const profileId = req.user!.profile!.id;
     const {queueStatus} = await redisManager.userDetail.getProfileFields(profileId,["queueStatus"]);
-    if(queueStatus !== UserState.IDLE) {
+    const currentStatus = queueStatus || UserState.IDLE;
+    if(currentStatus !== UserState.IDLE) {
       return res.status(400).json({
         success:false,
         message:"You are already in the queue or currently in a match."
