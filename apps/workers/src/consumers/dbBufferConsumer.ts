@@ -48,9 +48,7 @@ export const dbBufferWorker = new Worker(
           const parts = hashField.split(":");
           const connectionId = parts[0];
           const userId = parts[1];
-          if (!connectionId || !userId) {
-            continue;
-          }
+          if (!connectionId || !userId) continue; 
           const parsed = JSON.parse(jsonStr);
           if (!connectionUpdates[connectionId]) {
             connectionUpdates[connectionId] = [];
@@ -62,24 +60,53 @@ export const dbBufferWorker = new Worker(
           where: { id: { in: connectionIds } },
           select: { id: true, user1Id: true, user2Id: true },
         });
-        const prismaUpdates = connections.map((conn) => {
+        const pgConnIds: string[] = [];
+        const pgU1Ids: (string | null)[] = [];
+        const pgU1Ats: (Date | null)[] = [];
+        const pgU2Ids: (string | null)[] = [];
+        const pgU2Ats: (Date | null)[] = [];
+        for (const conn of connections) {
           const updatesForThisConn = connectionUpdates[conn.id] || [];
-          const updateData: any = {};
+          if (updatesForThisConn.length === 0) continue;
+          let u1Id: string | null = null;
+          let u1At: Date | null = null;
+          let u2Id: string | null = null;
+          let u2At: Date | null = null;
           for (const update of updatesForThisConn) {
             if (update.userId === conn.user1Id) {
-              updateData.user1LastReadId = update.messageId;
-              updateData.user1LastReadAt = new Date(update.readAt);
+              u1Id = update.messageId;
+              u1At = new Date(update.readAt);
             } else if (update.userId === conn.user2Id) {
-              updateData.user2LastReadId = update.messageId;
-              updateData.user2LastReadAt = new Date(update.readAt);
+              u2Id = update.messageId;
+              u2At = new Date(update.readAt);
             }
           }
-          return prisma.connection.update({
-            where: { id: conn.id },
-            data: updateData,
-          });
-        });
-        await prisma.$transaction(prismaUpdates);
+          pgConnIds.push(conn.id);
+          pgU1Ids.push(u1Id);
+          pgU1Ats.push(u1At);
+          pgU2Ids.push(u2Id);
+          pgU2Ats.push(u2At);
+        }
+        if (pgConnIds.length > 0) {
+          await prisma.$executeRawUnsafe(`
+            UPDATE "Connection" AS c
+            SET 
+              "user1LastReadId" = COALESCE(v.u1_id, c."user1LastReadId"),
+              "user1LastReadAt" = COALESCE(v.u1_at, c."user1LastReadAt"),
+              "user2LastReadId" = COALESCE(v.u2_id, c."user2LastReadId"),
+              "user2LastReadAt" = COALESCE(v.u2_at, c."user2LastReadAt")
+            FROM (
+              SELECT * FROM UNNEST(
+                $1::text[], 
+                $2::text[], 
+                $3::timestamp[], 
+                $4::text[], 
+                $5::timestamp[]
+              )
+            ) AS v(conn_id, u1_id, u1_at, u2_id, u2_at)
+            WHERE c.id = v.conn_id
+          `, pgConnIds, pgU1Ids, pgU1Ats, pgU2Ids, pgU2Ats);
+        }
         break;
       }
       default:
