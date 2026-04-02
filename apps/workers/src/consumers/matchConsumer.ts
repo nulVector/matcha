@@ -21,6 +21,13 @@ function getMatchConstraints(waitTimeMs: number): MatchConstraints {
   if (waitTimeMs > 5000)  return { radiusKm: 80,   maxScore: 0.25 };
   return { radiusKm: 30, maxScore: 0.2 };
 }
+function chunkArray<T>(array: T[], size: number): T[][] {
+  const result = [];
+  for (let i = 0; i < array.length; i += size) {
+    result.push(array.slice(i, i + size));
+  }
+  return result;
+}
 export async function startMatchmakingLoop() {
   if (isRunning) return;
   isRunning = true;
@@ -43,57 +50,62 @@ async function runLoop() {
         await sleep(2000);
         continue;
       }
-      for (const searcherId of usersInQueue) {
+      const CHUNK_SIZE = 50; 
+      const chunks = chunkArray(usersInQueue, CHUNK_SIZE);
+      for (const chunk of chunks) {
         if (!isRunning) break;
-        const profile = await redisManager.match.getSearcherProfile(searcherId);
-        if (!profile || profile.queueStatus !== UserState.QUEUED) continue;
-        const waitTimeMs = Date.now() - profile.queuedAt;
-        const { radiusKm, maxScore } = getMatchConstraints(waitTimeMs);
-        const potentialMatches = await redisManager.match.findMatchesInRadius(
-          profile.searcherVector,
-          profile.lat,
-          profile.long,
-          radiusKm
-        );
-        for (const candidate of potentialMatches) {
-          if (candidate.id === searcherId || candidate.score > maxScore) continue;
-          const locked = await redisManager.match.lockMatch(searcherId, candidate.id);
-          if (locked) {
-            try {
-              const expiresAt = new Date(Date.now() + MATCH_EXPIRY_MS);
-              const newConnection = await prisma.connection.create({
-                data: {
-                  user1Id: searcherId,
-                  user2Id: candidate.id,
-                  status: ConnectionStatus.MATCHED,
-                  expiresAt: expiresAt,
-                }
-              });
-              const baseEventData = {
-                connectionId: newConnection.id,
-                expiresAt: expiresAt.toISOString(),
-              };
-              await Promise.all([
-                redisManager.chat.publish('chat_router', JSON.stringify({ 
-                  receiverId: searcherId, 
-                  eventType: EventType.MATCH_FOUND, 
-                  eventData: { ...baseEventData, matchedUserId: candidate.id } 
-                })),
-                redisManager.chat.publish('chat_router', JSON.stringify({ 
-                  receiverId: candidate.id, 
-                  eventType: EventType.MATCH_FOUND, 
-                  eventData: { ...baseEventData, matchedUserId: searcherId } 
-                }))
-              ]);
-              break;
-            } catch (dbError) {
-              logger.error({ err: dbError, searcherId, candidateId: candidate.id }, "Postgres failed after Redis lock. Reverting.");
-              await redisManager.match.addToQueue(searcherId);
-              await redisManager.match.addToQueue(candidate.id);
-              break;
+        await Promise.all(chunk.map(async (searcherId) => {
+          if (!isRunning) return;
+          const profile = await redisManager.match.getSearcherProfile(searcherId);
+          if (!profile || profile.queueStatus !== UserState.QUEUED) return;
+          const waitTimeMs = Date.now() - profile.queuedAt;
+          const { radiusKm, maxScore } = getMatchConstraints(waitTimeMs);
+          const potentialMatches = await redisManager.match.findMatchesInRadius(
+            profile.searcherVector,
+            profile.lat,
+            profile.long,
+            radiusKm
+          );
+          for (const candidate of potentialMatches) {
+            if (candidate.id === searcherId || candidate.score > maxScore) continue;
+            const locked = await redisManager.match.lockMatch(searcherId, candidate.id);
+            if (locked) {
+              try {
+                const expiresAt = new Date(Date.now() + MATCH_EXPIRY_MS);
+                const newConnection = await prisma.connection.create({
+                  data: {
+                    user1Id: searcherId,
+                    user2Id: candidate.id,
+                    status: ConnectionStatus.MATCHED,
+                    expiresAt: expiresAt,
+                  }
+                });
+                const baseEventData = {
+                  connectionId: newConnection.id,
+                  expiresAt: expiresAt.toISOString(),
+                };
+                await Promise.all([
+                  redisManager.chat.publish('chat_router', JSON.stringify({ 
+                    receiverId: searcherId, 
+                    eventType: EventType.MATCH_FOUND, 
+                    eventData: { ...baseEventData, matchedUserId: candidate.id } 
+                  })),
+                  redisManager.chat.publish('chat_router', JSON.stringify({ 
+                    receiverId: candidate.id, 
+                    eventType: EventType.MATCH_FOUND, 
+                    eventData: { ...baseEventData, matchedUserId: searcherId } 
+                  }))
+                ]);
+                break;
+              } catch (dbError) {
+                logger.error({ err: dbError, searcherId, candidateId: candidate.id }, "Postgres failed after Redis lock. Reverting.");
+                await redisManager.match.addToQueue(searcherId);
+                await redisManager.match.addToQueue(candidate.id);
+                break;
+              }
             }
           }
-        }
+        }));
       }
       await sleep(1000);
     } catch (error: any) {
