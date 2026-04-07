@@ -1,7 +1,10 @@
 {
-  "extends": "@repo/typescript-config/react-library.json",
+  "extends": "@matcha/typescript-config/react-library.json",
   "compilerOptions": {
-    "outDir": "dist"
+    "paths": {
+      "@matcha/ui/*": ["./src/*"]
+    }
   }, 
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["node_modules"]
 }
