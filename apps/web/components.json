@@ -12,6 +12,7 @@
   "iconLibrary": "lucide",
   "aliases": {
     "components": "@/components",
+    "providers": "@/providers",
     "hooks": "@/hooks",
     "lib": "@/lib",
     "utils": "@matcha/ui/lib/utils",

@@ -2,6 +2,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import '@matcha/ui/globals.css';
 import { cn } from "@matcha/ui/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
+import QueryProvider from "@/providers/queryProvider";
+import AuthProvider from "@/providers/authProvider";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -26,7 +28,13 @@ export default function RootLayout({
           geistMono.variable
         )}
       >
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <QueryProvider>
+            <AuthProvider>
+              {children}
+            </AuthProvider>
+          </QueryProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
