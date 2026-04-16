@@ -5,6 +5,23 @@ import { connectionIdType } from "@matcha/zod";
 import prisma, { ConnectionStatus } from "@matcha/prisma";
 import { EventType, SystemAction } from "@matcha/shared";
 
+async function getSafeMatchInfo(connectionId: string) {
+  let matchInfo = await redisManager.match.getMatchInfo(connectionId);
+  if (matchInfo) return matchInfo;
+  const connection = await prisma.connection.findUnique({
+    where: { id: connectionId },
+    select: { user1Id: true, user2Id: true, status: true }
+  });
+  if (!connection || connection.status !== ConnectionStatus.MATCHED) {
+    return null;
+  }
+  await redisManager.match.setMatchInfo(connectionId,connection.user1Id,connection.user2Id);
+  return {
+    user1Id: connection.user1Id,
+    user2Id: connection.user2Id
+  };
+}
+
 export const joinQueue = async (req:Request,res:Response,next:NextFunction) => {
   try {
     const profileId = req.user!.profile!.id;
@@ -43,7 +60,7 @@ export const extendTimer = async (req:Request,res:Response,next:NextFunction) =>
   try {
     const profileId = req.user!.profile!.id;
     const {connectionId}:connectionIdType = req.validatedData.params;
-    const matchInfo = await redisManager.match.getMatchInfo(connectionId);
+    const matchInfo = await getSafeMatchInfo(connectionId);
     if (!matchInfo) {
       return res.status(400).json({
         success:false,
@@ -111,7 +128,7 @@ export const convertConnection = async (req:Request,res:Response,next:NextFuncti
   try {
     const profileId = req.user!.profile!.id;
     const {connectionId} : connectionIdType = req.validatedData.params;
-    const matchInfo = await redisManager.match.getMatchInfo(connectionId);
+    const matchInfo = await getSafeMatchInfo(connectionId);
     if(!matchInfo){
       return res.status(400).json({
         success:false,
@@ -176,7 +193,7 @@ export const skipConnection = async (req:Request,res:Response,next:NextFunction)
   try {
     const profileId = req.user!.profile!.id;
     const { connectionId }: connectionIdType = req.validatedData.params;
-    const matchInfo = await redisManager.match.getMatchInfo(connectionId);
+    const matchInfo = await getSafeMatchInfo(connectionId);
     if (!matchInfo) {
       return res.status(400).json({ 
         success: false,

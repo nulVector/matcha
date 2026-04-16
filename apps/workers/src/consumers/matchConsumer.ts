@@ -85,6 +85,7 @@ async function runLoop() {
                   expiresAt: expiresAt.toISOString(),
                 };
                 await Promise.all([
+                  redisManager.match.setMatchInfo(newConnection.id, searcherId, candidate.id),
                   redisManager.chat.publish('chat_router', JSON.stringify({ 
                     receiverId: searcherId, 
                     eventType: EventType.MATCH_FOUND, 
