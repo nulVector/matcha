@@ -75,7 +75,8 @@ export const initiateProfile = async (req:Request, res:Response,next:NextFunctio
       location,
       locationLatitude,
       locationLongitude,
-      interest
+      interest,
+      allowDiscovery
     }:initiateProfileType = req.validatedData.body;
     const userId = req.user!.id;
     const tokenVersion = req.user!.tokenVersion;
@@ -93,7 +94,8 @@ export const initiateProfile = async (req:Request, res:Response,next:NextFunctio
         location,
         locationLatitude,
         locationLongitude,
-        interest
+        interest,
+        allowDiscovery
       },
       select: {
         id: true,
@@ -113,7 +115,7 @@ export const initiateProfile = async (req:Request, res:Response,next:NextFunctio
       locationLongitude,
       interest,
       isActive: true,
-      allowDiscovery: false
+      allowDiscovery
     });
     await TaskProducer.dispatchProfileInit({
       userId: userProfile.id,

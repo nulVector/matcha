@@ -66,7 +66,8 @@ export const initiateProfileSchema = z.object({
   location: locationNameSchema,
   locationLatitude: latitudeSchema,
   locationLongitude: longitudeSchema,
-  interest: interestsSchema
+  interest: interestsSchema,
+  allowDiscovery: z.boolean()
 })
 export type initiateProfileType = z.infer<typeof initiateProfileSchema>;
 
