@@ -68,14 +68,19 @@ async function runLoop() {
           );
           for (const candidate of potentialMatches) {
             if (candidate.id === searcherId || candidate.score > maxScore) continue;
+            const alreadyMatched = await redisManager.bloom.existsPair('bf:matches', searcherId, candidate.id);
+            if (alreadyMatched) continue;
             const locked = await redisManager.match.lockMatch(searcherId, candidate.id);
             if (locked) {
               try {
                 const expiresAt = new Date(Date.now() + MATCH_EXPIRY_MS);
+                const [u1, u2] = searcherId < candidate.id 
+                  ? [searcherId, candidate.id] 
+                  : [candidate.id, searcherId];
                 const newConnection = await prisma.connection.create({
                   data: {
-                    user1Id: searcherId,
-                    user2Id: candidate.id,
+                    user1Id: u1,
+                    user2Id: u2,
                     status: ConnectionStatus.MATCHED,
                     expiresAt: expiresAt,
                   }
@@ -86,6 +91,7 @@ async function runLoop() {
                 };
                 await Promise.all([
                   redisManager.match.setMatchInfo(newConnection.id, searcherId, candidate.id),
+                  redisManager.bloom.addPair('bf:matches', searcherId, candidate.id),
                   redisManager.chat.publish('chat_router', JSON.stringify({ 
                     receiverId: searcherId, 
                     eventType: EventType.MATCH_FOUND, 
