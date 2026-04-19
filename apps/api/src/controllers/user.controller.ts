@@ -327,7 +327,8 @@ export const updatePassword = async (req:Request,res:Response, next:NextFunction
     await redisManager.auth.invalidateAllUserSessions(userId);
     await redisManager.auth.cacheSession(userId, sessionId, updatedUser.tokenVersion, profileId, true);
     const token = jwt.sign({ 
-        id: userId, 
+        id: userId,
+        sessionId,
         tokenVersion: updatedUser.tokenVersion 
       },jwtSecret,{ expiresIn: '7d' });
     res.cookie("token", token, COOKIE_OPTIONS);
@@ -555,8 +556,12 @@ export const getUserProfile = async (req:Request,res:Response,next:NextFunction)
     const requestedUserProfile = await prisma.userProfile.findFirst({
       where: {
         username: requestedUsername,
-        allowDiscovery: true,
         isActive: true,
+        OR: [
+          { allowDiscovery: true },
+          { matchAsUser1: { some: { user2Id: myUserProfileId } } },
+          { matchAsUser2: { some: { user1Id: myUserProfileId } } }
+        ]
       },
       select: {
         id: true,
