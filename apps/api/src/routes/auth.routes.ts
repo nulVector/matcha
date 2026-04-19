@@ -1,6 +1,6 @@
 import { loginSchema, requestPasswordResetSchema, resetPasswordSchema, signupSchema } from "@matcha/zod";
 import { Router } from "express";
-import { confirmResetPassword, googleAuthCallback, login, logout, requestResetPassword, signup } from "../controllers/auth.controller";
+import { confirmResetPassword, googleAuthCallback, login, logout, logoutAll, requestResetPassword, signup } from "../controllers/auth.controller";
 import { idempotencyGuard } from "../middleware/idempotency";
 import { rateLimiter } from "../middleware/rateLimiter";
 import { requireAuth } from "../middleware/requireAuth";
@@ -54,6 +54,11 @@ authRouter.post(
     "/logout",
     requireAuth,
     logout
+);
+authRouter.post(
+    "/logout-all",
+    requireAuth,  
+    logoutAll
 );
 
 export default authRouter;

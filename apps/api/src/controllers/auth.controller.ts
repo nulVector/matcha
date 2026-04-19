@@ -150,3 +150,18 @@ export const logout = async (req:Request,res:Response,next:NextFunction)=>{
     next(err);
   }
 }
+export const logoutAll = async (req:Request,res:Response,next:NextFunction)=>{
+  try {
+    const userId = req.user!.id;
+    await redisManager.auth.invalidateAllUserSessions(userId);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { tokenVersion: { increment: 1 } }
+    });
+    res.clearCookie("token", COOKIE_OPTIONS);
+    return res.json({ message: "Logged out of all devices." });
+  } catch (err: any) {
+    err.context = { location: "authController.logoutAll", userId: req.user!.id };
+    next(err);
+  }
+}
