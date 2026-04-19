@@ -232,14 +232,14 @@ export class MatchManager {
     tx.del(`match:votes:${connectionId}:CONVERT`);
     await tx.exec();
   }
-  async setMatchInfo(connectionId:string,user1Id:string,user2Id:string){
+  async setMatchInfo(connectionId:string,user1Id:string,user2Id:string, ttlSeconds: number = 60 * 40){
     const key = `match:info:${connectionId}`;
     const tx = this.redis.multi();
     tx.hset(key,{
       user1Id,
       user2Id
     })
-    tx.expire(key, 60 * 40 )
+    tx.expire(key, ttlSeconds)
     await tx.exec()
   }
   async getMatchInfo(connectionId:string){

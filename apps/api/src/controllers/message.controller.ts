@@ -44,31 +44,63 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
     const profileId = req.user!.profile!.id;
     const {connectionId}:connectionIdType = req.validatedData.params;
     const { cursor, limit = 50 }: getChatHistoryType = req.validatedData.query;
+    let chatPartnerMeta = null;
     let [isFriend,isArchived] = await Promise.all([
       redisManager.userDetail.inAuthConnectionList(profileId,connectionId,ConnectionListType.FRIEND),
       redisManager.userDetail.inAuthConnectionList(profileId,connectionId,ConnectionListType.ARCHIVED),
     ])
-    if(!isFriend && !isArchived){
-      const connection = await prisma.connection.findFirst({
-        where:{
-          id:connectionId,
-          OR:[
-            {user1Id:profileId},{user2Id:profileId}
-          ],
-          status: {
-            in: ["FRIEND", "ARCHIVED"] 
-          }
-        },
-        select:{ id:true, status:true}
-      });
-      if(!connection){
-        return res.status(403).json({
-          success:false,
-          message:"Forbidden: You can not access this chat."
-        })
+    const isAuthorizedInCache = isFriend || isArchived;
+    if (isAuthorizedInCache) {
+      const matchInfo = await redisManager.match.getMatchInfo(connectionId);
+      if (matchInfo) {
+        const partnerId = matchInfo.user1Id === profileId ? matchInfo.user2Id : matchInfo.user1Id;
+        const partnerProfile = await redisManager.userDetail.getProfileFields(partnerId, ['username', 'avatarUrl']);
+        if (partnerProfile && partnerProfile.username) {
+          chatPartnerMeta = {
+            id: partnerId,
+            username: partnerProfile.username,
+            avatarUrl: partnerProfile.avatarUrl
+          };
+        }
       }
+    }
+    if (!chatPartnerMeta) {
+      const connection = await prisma.connection.findFirst({
+        where: {
+          id: connectionId,
+          OR: [{ user1Id: profileId }, { user2Id: profileId }],
+          status: { in: ["FRIEND", "ARCHIVED"] }
+        },
+        select: {
+          id: true, status: true, user1Id: true, user2Id: true,
+          user1: { select: { id: true, username: true, avatarUrl: true } },
+          user2: { select: { id: true, username: true, avatarUrl: true } }
+        }
+      });
+      if (!connection) {
+        return res.status(403).json({
+          success: false,
+          message: "Forbidden: You can not access this chat."
+        });
+      }
+      const otherUser = connection.user1.id === profileId ? connection.user2 : connection.user1;
+      chatPartnerMeta = {
+        id: otherUser.id,
+        username: otherUser.username,
+        avatarUrl: otherUser.avatarUrl
+      };
       const listType = connection.status === "FRIEND" ? ConnectionListType.FRIEND : ConnectionListType.ARCHIVED;
-      await redisManager.userDetail.addSingleAuthConnection(profileId, connectionId, listType);
+      const SEVEN_DAYS_IN_SECONDS = 60 * 60 * 24 * 7;
+      
+      await Promise.all([
+        redisManager.userDetail.addSingleAuthConnection(profileId, connectionId, listType),
+        redisManager.match.setMatchInfo(
+          connectionId, 
+          connection.user1Id, 
+          connection.user2Id, 
+          SEVEN_DAYS_IN_SECONDS
+        )
+      ]);
     }
     let orderedMessages: CachedMessage[] = [];
     let nextCursor: string | undefined = undefined;
@@ -128,7 +160,8 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
     return res.json({
       success: true,
       data: orderedMessages,
-      nextCursor
+      nextCursor,
+      meta: chatPartnerMeta
     });
   } catch (err: any) {
     err.context = { location: "messageController.getChatHistory", profileId: req.user!.profile!.id, connectionId: req.validatedData.params.connectionId };
