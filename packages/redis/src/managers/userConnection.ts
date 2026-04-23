@@ -1,5 +1,5 @@
 import Redis from "ioredis";
-import { REMOVE_SOCKET_SCRIPT } from "../common";
+import { ConnectionListType, REMOVE_SOCKET_SCRIPT } from "../common";
 
 export class UserConnectionManager {
   constructor (private redis:Redis) {}
@@ -33,5 +33,24 @@ export class UserConnectionManager {
   async checkUserStatus(userId: string): Promise<boolean> {
     const exists = await this.redis.exists(`user:status:${userId}`);
     return exists === 1;
+  }
+  async setConnectionInfo(connectionId:string,user1Id:string,user2Id:string, status:ConnectionListType){
+    const key = `connection:info:${connectionId}`;
+    const tx = this.redis.multi();
+    tx.hset(key,{
+      user1Id,
+      user2Id,
+      status
+    })
+    tx.expire(key, 60 * 60 * 24 * 7)
+    await tx.exec()
+  }
+  async getConnectionInfo(connectionId:string){
+    const info = await this.redis.hgetall(`connection:info:${connectionId}`);
+    if (Object.keys(info).length === 0) return null;
+    return info as { user1Id: string; user2Id: string; status:ConnectionListType};
+  }
+  async clearConnectionInfo(connectionId:string){
+    await this.redis.del(`connection:info:${connectionId}`);
   }
 }

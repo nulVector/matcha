@@ -90,7 +90,7 @@ async function runLoop() {
                   expiresAt: expiresAt.toISOString(),
                 };
                 await Promise.all([
-                  redisManager.match.setMatchInfo(newConnection.id, searcherId, candidate.id),
+                  redisManager.match.setMatchInfo(newConnection.id, searcherId, candidate.id, expiresAt.toISOString()),
                   redisManager.bloom.addPair('bf:matches', searcherId, candidate.id),
                   redisManager.chat.publish('chat_router', JSON.stringify({ 
                     receiverId: searcherId, 
@@ -104,7 +104,11 @@ async function runLoop() {
                   }))
                 ]);
                 break;
-              } catch (dbError) {
+              } catch (dbError: any) {
+                if (dbError.code === 'P2002') {
+                  logger.info({ searcherId, candidateId: candidate.id }, "Concurrent match detected. Skipping.");
+                  break; 
+                }
                 logger.error({ err: dbError, searcherId, candidateId: candidate.id }, "Postgres failed after Redis lock. Reverting.");
                 await redisManager.match.addToQueue(searcherId);
                 await redisManager.match.addToQueue(candidate.id);

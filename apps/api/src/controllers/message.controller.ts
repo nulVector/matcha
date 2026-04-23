@@ -43,38 +43,45 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
   try {
     const profileId = req.user!.profile!.id;
     const {connectionId}:connectionIdType = req.validatedData.params;
-    const { cursor, limit = 50 }: getChatHistoryType = req.validatedData.query;
+    const { cursor, limit = 50 }: getChatHistoryType = req.validatedData.query;   
     let chatPartnerMeta = null;
-    let [isFriend,isArchived] = await Promise.all([
-      redisManager.userDetail.inAuthConnectionList(profileId,connectionId,ConnectionListType.FRIEND),
-      redisManager.userDetail.inAuthConnectionList(profileId,connectionId,ConnectionListType.ARCHIVED),
-    ])
-    const isAuthorizedInCache = isFriend || isArchived;
-    if (isAuthorizedInCache) {
-      const matchInfo = await redisManager.match.getMatchInfo(connectionId);
+    let connectionStatus: string | null = null;
+    let connectionExpiresAt: string | null = null;
+    const [matchInfo, connInfo] = await Promise.all([
+      redisManager.match.getMatchInfo(connectionId),
+      redisManager.userConnection.getConnectionInfo(connectionId)
+    ]);
+    const activeInfo = matchInfo || connInfo;
+    if (activeInfo) {
       if (matchInfo) {
-        const partnerId = matchInfo.user1Id === profileId ? matchInfo.user2Id : matchInfo.user1Id;
-        const partnerProfile = await redisManager.userDetail.getProfileFields(partnerId, ['username', 'avatarUrl']);
-        if (partnerProfile && partnerProfile.username) {
-          chatPartnerMeta = {
-            id: partnerId,
-            username: partnerProfile.username,
-            avatarUrl: partnerProfile.avatarUrl
-          };
-        }
+        connectionStatus = "MATCHED";
+        connectionExpiresAt = matchInfo.expiresAt;
+      } else if (connInfo) {
+        connectionStatus = connInfo.status;
+        connectionExpiresAt = null;
+      }
+      const partnerId = activeInfo.user1Id === profileId ? activeInfo.user2Id : activeInfo.user1Id;
+      const partnerProfile = await redisManager.userDetail.getProfileFields(partnerId, ['username', 'avatarUrl', 'openingQues']);
+      if (partnerProfile && partnerProfile.username) {
+        chatPartnerMeta = {
+          id: partnerId,
+          username: partnerProfile.username,
+          avatarUrl: partnerProfile.avatarUrl,
+          openingQues: partnerProfile.openingQues || null
+        };
       }
     }
-    if (!chatPartnerMeta) {
+    if (!chatPartnerMeta || !connectionStatus) {
       const connection = await prisma.connection.findFirst({
         where: {
           id: connectionId,
           OR: [{ user1Id: profileId }, { user2Id: profileId }],
-          status: { in: ["FRIEND", "ARCHIVED"] }
+          status: { in: ["MATCHED", "FRIEND", "ARCHIVED"] }
         },
         select: {
-          id: true, status: true, user1Id: true, user2Id: true,
-          user1: { select: { id: true, username: true, avatarUrl: true } },
-          user2: { select: { id: true, username: true, avatarUrl: true } }
+          id: true, status: true, user1Id: true, user2Id: true, expiresAt: true,
+          user1: { select: { id: true, username: true, avatarUrl: true, openingQues: true } },
+          user2: { select: { id: true, username: true, avatarUrl: true, openingQues: true } }
         }
       });
       if (!connection) {
@@ -83,24 +90,37 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
           message: "Forbidden: You can not access this chat."
         });
       }
+      connectionStatus = connection.status;
+      connectionExpiresAt = connection.expiresAt ? connection.expiresAt.toISOString() : null;
       const otherUser = connection.user1.id === profileId ? connection.user2 : connection.user1;
       chatPartnerMeta = {
         id: otherUser.id,
         username: otherUser.username,
-        avatarUrl: otherUser.avatarUrl
+        avatarUrl: otherUser.avatarUrl,
+        openingQues: otherUser.openingQues || null
       };
-      const listType = connection.status === "FRIEND" ? ConnectionListType.FRIEND : ConnectionListType.ARCHIVED;
-      const SEVEN_DAYS_IN_SECONDS = 60 * 60 * 24 * 7;
-      
-      await Promise.all([
-        redisManager.userDetail.addSingleAuthConnection(profileId, connectionId, listType),
-        redisManager.match.setMatchInfo(
+      if (connection.status === "MATCHED" && connection.expiresAt) {
+        await redisManager.match.setMatchInfo(
           connectionId, 
           connection.user1Id, 
           connection.user2Id, 
-          SEVEN_DAYS_IN_SECONDS
-        )
-      ]);
+          connection.expiresAt.toISOString()
+        );
+      } else if (connection.status === "FRIEND" || connection.status === "ARCHIVED") {
+        await Promise.all([
+          redisManager.userConnection.setConnectionInfo(
+            connectionId, 
+            connection.user1Id, 
+            connection.user2Id, 
+            connection.status as ConnectionListType
+          ),
+          redisManager.userDetail.addSingleAuthConnection(
+            profileId, 
+            connectionId, 
+            connection.status as ConnectionListType
+          )
+        ]);
+      }
     }
     let orderedMessages: CachedMessage[] = [];
     let nextCursor: string | undefined = undefined;
@@ -130,26 +150,25 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
     else {
       let messages = await redisManager.chat.getMessages(connectionId);
       if (!messages || messages.length === 0) {
-        const dbMessages = await prisma.message.findMany({
-          where: { connectionId },
-          orderBy: { createdAt: 'desc' },
-          take: limit + 1,
-          select: {
-            id: true, content: true, senderId: true, createdAt: true, type: true
+        if (connectionStatus === "MATCHED") {
+          orderedMessages = [];
+        } else {
+          const dbMessages = await prisma.message.findMany({
+            where: { connectionId },
+            orderBy: { createdAt: 'desc' },
+            take: limit + 1,
+            select: { id: true, content: true, senderId: true, createdAt: true, type: true }
+          });
+          if (dbMessages.length > limit) {
+            const nextItem = dbMessages.pop();
+            nextCursor = nextItem!.id;
           }
-        });
-        if (dbMessages.length > limit) {
-          const nextItem = dbMessages.pop();
-          nextCursor = nextItem!.id;
+          orderedMessages = dbMessages.reverse().map(msg=>({
+            id: msg.id, content: msg.content, senderId: msg.senderId,
+            createdAt: msg.createdAt.toISOString(), type: msg.type
+          } as CachedMessage));
+          await redisManager.chat.seedMessages(connectionId, orderedMessages);
         }
-        orderedMessages = dbMessages.reverse().map(msg=>({
-          id:msg.id,
-          content:msg.content,
-          senderId:msg.senderId,
-          createdAt:msg.createdAt.toISOString(),
-          type:msg.type
-        } as CachedMessage));
-        await redisManager.chat.seedMessages(connectionId, orderedMessages);
       } else {
         orderedMessages = messages;
         if (orderedMessages.length === limit && orderedMessages[0]) {
@@ -161,7 +180,12 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
       success: true,
       data: orderedMessages,
       nextCursor,
-      meta: chatPartnerMeta
+      meta: chatPartnerMeta,
+      matchData: {
+        id: connectionId,
+        status: connectionStatus,
+        expiresAt: connectionExpiresAt
+      }
     });
   } catch (err: any) {
     err.context = { location: "messageController.getChatHistory", profileId: req.user!.profile!.id, connectionId: req.validatedData.params.connectionId };

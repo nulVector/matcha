@@ -1,4 +1,4 @@
-import { CachedMessage, MessageType, UserState } from '@matcha/redis';
+import { CachedMessage, MessageType, UserState, ConnectionListType } from '@matcha/redis';
 import { createServer, IncomingMessage } from 'http';
 import jwt from 'jsonwebtoken';
 import { WebSocket, WebSocketServer } from 'ws';
@@ -89,10 +89,24 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
       switch (parsedData.type) {
         case 'CHAT_MESSAGE': {
           const { connectionId, receiverId, content } = parsedData.payload;
+          const trimmedContent = content?.trim();
+          if (!trimmedContent) return;
+          const [matchInfo, connInfo] = await Promise.all([
+            redisManager.match.getMatchInfo(connectionId),
+            redisManager.userConnection.getConnectionInfo(connectionId)
+          ]);
+          if (connInfo?.status === ConnectionListType.ARCHIVED) {
+            logger.warn({ profileId, connectionId }, "Attempted to send message to an archived chat");
+            return;
+          }
+          if (!matchInfo && !connInfo) {
+            logger.warn({ profileId, connectionId }, "Attempted to send message to an unknown chat");
+            return;
+          }
           const message: CachedMessage = {
             id: createId(),
             connectionId,
-            content,
+            content: trimmedContent,
             senderId: profileId,
             createdAt: new Date().toISOString(),
             type: MessageType.TEXT

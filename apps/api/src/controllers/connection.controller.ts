@@ -10,12 +10,12 @@ async function getSafeMatchInfo(connectionId: string) {
   if (matchInfo) return matchInfo;
   const connection = await prisma.connection.findUnique({
     where: { id: connectionId },
-    select: { user1Id: true, user2Id: true, status: true }
+    select: { user1Id: true, user2Id: true, status: true, expiresAt: true }
   });
-  if (!connection || connection.status !== ConnectionStatus.MATCHED) {
+  if (!connection || connection.status !== ConnectionStatus.MATCHED || !connection.expiresAt) {
     return null;
   }
-  await redisManager.match.setMatchInfo(connectionId,connection.user1Id,connection.user2Id);
+  await redisManager.match.setMatchInfo(connectionId,connection.user1Id,connection.user2Id, connection.expiresAt.toISOString());
   return {
     user1Id: connection.user1Id,
     user2Id: connection.user2Id
@@ -96,7 +96,8 @@ export const extendTimer = async (req:Request,res:Response,next:NextFunction) =>
           data:{ expiresAt:newExpiresAt }
         }),
         redisManager.match.setMatchTimer(connectionId, 60 * 30),
-        redisManager.match.clearMatchVotes(connectionId)
+        redisManager.match.clearMatchVotes(connectionId),
+        redisManager.match.setMatchInfo(connectionId, profileId, receiverId, newExpiresAt.toISOString())
       ]);
       const successEvent = {
         eventType: EventType.SYSTEM_EVENT,
@@ -164,6 +165,7 @@ export const convertConnection = async (req:Request,res:Response,next:NextFuncti
         redisManager.match.clearMatchVotes(connectionId),
         redisManager.match.clearMatchTimer(connectionId),
         redisManager.match.clearMatchInfo(connectionId),
+        redisManager.userConnection.setConnectionInfo(connectionId, profileId, receiverId, ConnectionListType.FRIEND),
         redisManager.userDetail.invalidateConnectionList(profileId, ConnectionListType.FRIEND),
         redisManager.userDetail.invalidateConnectionList(receiverId, ConnectionListType.FRIEND)
       ]);
@@ -206,13 +208,17 @@ export const skipConnection = async (req:Request,res:Response,next:NextFunction)
       where: { id: connectionId },
       data: { 
         status: "ARCHIVED",
+        expiresAt: null,
         finalDeleteAt: new Date(Date.now() + FIVE_DAYS_MS)
       }
     });
     await Promise.all([
       redisManager.match.clearMatchVotes(connectionId),
       redisManager.match.clearMatchTimer(connectionId),
-      redisManager.match.clearMatchInfo(connectionId)
+      redisManager.match.clearMatchInfo(connectionId),
+      redisManager.userConnection.setConnectionInfo(connectionId, profileId, receiverId, ConnectionListType.ARCHIVED),
+      redisManager.userDetail.invalidateConnectionList(profileId, ConnectionListType.ARCHIVED),
+      redisManager.userDetail.invalidateConnectionList(receiverId, ConnectionListType.ARCHIVED)
     ]);
     await redisManager.chat.publish(
       'chat_router',
@@ -221,7 +227,8 @@ export const skipConnection = async (req:Request,res:Response,next:NextFunction)
         eventType: EventType.SYSTEM_EVENT,
         eventData: {
           event: SystemAction.CHAT_ENDED,
-          message: "The other user has left the chat."
+          message: "The other user has left the chat.",
+          connectionId
         }
       })
     );

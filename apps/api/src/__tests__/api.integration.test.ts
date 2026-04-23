@@ -139,7 +139,8 @@ describe('API Integration Tests', () => {
           status: ConnectionStatus.MATCHED,
         }
       });
-      await redisManager.match.setMatchInfo(connectionId, user1.profileId!, user2.profileId!);
+      const mockExpiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+      await redisManager.match.setMatchInfo(connectionId, user1.profileId!, user2.profileId!, mockExpiresAt);
       const requestPromises = Array(5).fill(null).map(() => 
         request(app)
           .patch(`/api/v1/connections/${connectionId}/extend`)
