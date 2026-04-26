@@ -22,9 +22,7 @@ export const cronWorker = new Worker(
           where: { id: { in: connectionIds } },
         });
         const cachePromises = expiredConnections.flatMap(conn => [
-          redisManager.userConnection.clearConnectionInfo(conn.id),
-          redisManager.userDetail.invalidateConnectionList(conn.user1Id, ConnectionListType.ARCHIVED),
-          redisManager.userDetail.invalidateConnectionList(conn.user2Id, ConnectionListType.ARCHIVED)
+          redisManager.userConnection.clearConnectionInfo(conn.id)
         ]);
         await Promise.all(cachePromises);
         break;
@@ -61,8 +59,6 @@ export const cronWorker = new Worker(
           publishPromises.push(
             redisManager.chat.publish('chat_router', JSON.stringify({ receiverId: conn.user1Id, ...JSON.parse(payload) })),
             redisManager.chat.publish('chat_router', JSON.stringify({ receiverId: conn.user2Id, ...JSON.parse(payload) })),
-            redisManager.userDetail.invalidateConnectionList(conn.user1Id, ConnectionListType.ARCHIVED),
-            redisManager.userDetail.invalidateConnectionList(conn.user2Id, ConnectionListType.ARCHIVED),
             redisManager.match.clearMatchInfo(conn.id),
             redisManager.match.clearMatchVotes(conn.id),
             redisManager.match.clearMatchTimer(conn.id),

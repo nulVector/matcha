@@ -107,19 +107,12 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
           connection.expiresAt.toISOString()
         );
       } else if (connection.status === "FRIEND" || connection.status === "ARCHIVED") {
-        await Promise.all([
-          redisManager.userConnection.setConnectionInfo(
-            connectionId, 
-            connection.user1Id, 
-            connection.user2Id, 
-            connection.status as ConnectionListType
-          ),
-          redisManager.userDetail.addSingleAuthConnection(
-            profileId, 
-            connectionId, 
-            connection.status as ConnectionListType
-          )
-        ]);
+        await redisManager.userConnection.setConnectionInfo(
+          connectionId, 
+          connection.user1Id, 
+          connection.user2Id, 
+          connection.status as ConnectionListType
+        )
       }
     }
     let orderedMessages: CachedMessage[] = [];

@@ -382,34 +382,6 @@ export const getConnectionsList = async (req: Request, res: Response, next: Next
         timestamp: conn.updatedAt.getTime()
       };
     });
-
-    const redisListType = status === "FRIEND" 
-      ? ConnectionListType.FRIEND 
-      : ConnectionListType.ARCHIVED;
-    const cacheData = formattedList.map(item => ({ 
-      otherUserId: item.id, 
-      timestamp: item.timestamp 
-    }));
-    redisManager.userDetail.cachePaginatedUIConnections(userProfileId, cacheData, redisListType)
-      .catch(err => logger.error({ err, profileId: userProfileId }, "Failed to warm UI connection cache"));
-    
-    redisManager.userDetail.isAuthConnectionHydrated(userProfileId, redisListType).then(isHydrated => {
-      if (!isHydrated) {
-        prisma.connection.findMany({
-          where: {
-            status,
-            OR: [
-              { AND: [{ user1Id: userProfileId }, { user1DeletedAt: null }] },
-              { AND: [{ user2Id: userProfileId }, { user2DeletedAt: null }] }
-            ]
-          },
-          select: { id: true }
-        }).then(allConnections => {
-          const allAuthIds = allConnections.map(c => c.id);
-          return redisManager.userDetail.cacheAuthConnectionIds(userProfileId, allAuthIds, redisListType);
-        }).catch(err => logger.error({ err, profileId: userProfileId }, "Failed to warm complete Auth cache"));
-      }
-    }).catch(err => logger.error({ err, profileId: userProfileId }, "Redis error checking hydration"));
     res.json({
       success: true,
       status: status,
@@ -446,10 +418,6 @@ export const deleteConnection = async (req: Request, res: Response, next: NextFu
       where: { id: connectionId },
       data: isUser1 ? { user1DeletedAt: now } : { user2DeletedAt: now }
     });
-    await Promise.all([
-      redisManager.userDetail.invalidateConnectionList(profileId, ConnectionListType.FRIEND),
-      redisManager.userDetail.invalidateConnectionList(profileId, ConnectionListType.ARCHIVED)
-    ]);
     res.json({
       success:true
     })
@@ -826,8 +794,6 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
         }
       });
       await Promise.all([
-        redisManager.userDetail.invalidateConnectionList(userId, ConnectionListType.FRIEND),
-        redisManager.userDetail.invalidateConnectionList(friendRequest.senderId, ConnectionListType.FRIEND),
         redisManager.userConnection.setConnectionInfo(
           resolvedConnectionId!, 
           userId, 
@@ -888,12 +854,7 @@ export const handleUnfriendRequest = async (req:Request,res:Response,next:NextFu
         [isUser1 ? 'user1DeletedAt' : 'user2DeletedAt']: now
       }
     });
-    Promise.all([
-      redisManager.userDetail.invalidateConnectionList(myProfileId, ConnectionListType.FRIEND),
-      redisManager.userDetail.invalidateConnectionList(targetUserId, ConnectionListType.FRIEND),
-      redisManager.userConnection.clearConnectionInfo(connection.id)
-    ]).catch(err => logger.error({ err, myProfileId, targetUserId }, "Failed to invalidate friend cache on unfriend"));
-
+    await redisManager.userConnection.clearConnectionInfo(connection.id)
     res.json({
       success: true,
       status: 'UNFRIENDED',
@@ -958,8 +919,6 @@ export const deactivateProfile = async (req:Request,res:Response,next:NextFuncti
     })
     await Promise.all([
       redisManager.match.leaveQueue(profileId),
-      redisManager.userDetail.invalidateConnectionList(profileId, ConnectionListType.FRIEND),
-      redisManager.userDetail.invalidateConnectionList(profileId, ConnectionListType.ARCHIVED),
       redisManager.auth.invalidateAllUserSessions(userId)
     ])
     res.clearCookie("token",{...COOKIE_OPTIONS,maxAge:0});

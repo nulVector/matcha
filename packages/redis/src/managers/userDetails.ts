@@ -1,5 +1,5 @@
 import Redis from "ioredis";
-import { ConnectionListItem, ConnectionListType, UserProfile } from "../common";
+import { UserProfile } from "../common";
 
 export class UserDetailManager {
   constructor (private redis:Redis) {}
@@ -56,45 +56,6 @@ export class UserDetailManager {
   async invalidateProfile(userId:string){
     await this.redis.del(`user:profile:${userId}`)
   }
-  async cachePaginatedUIConnections(userId:string, connections:ConnectionListItem[], type:ConnectionListType){
-    if (connections.length === 0 ) return;
-    const key = `user:connection:ui:${type}:${userId}`;
-    const tx = this.redis.multi();
-    connections.forEach(conn => {
-      tx.zadd(key,conn.timestamp,conn.otherUserId);
-    })
-    tx.expire(key, 60 * 60 * 24);
-    await tx.exec();
-  }
-  async cacheAuthConnectionIds(userId:string, connectionIds: string[], type: ConnectionListType){
-    if (connectionIds.length === 0 ) return;
-    const key = `user:connection:auth:${type}:${userId}`;
-    const tx = this.redis.multi();
-    tx.sadd(key, ...connectionIds);
-    tx.expire(key, 60 * 60 * 24);
-    await tx.exec();
-  }
-  async invalidateConnectionList(userId: string, type: ConnectionListType) {
-    const tx = this.redis.multi();
-    tx.del(`user:connection:ui:${type}:${userId}`);
-    tx.del(`user:connection:auth:${type}:${userId}`);
-    await tx.exec();
-  }
-  async getConnectionList(userId:string,type:ConnectionListType){
-    return await this.redis.zrevrange(`user:connection:ui:${type}:${userId}`, 0, -1);
-  }
-  async isAuthConnectionHydrated(userId: string, type: ConnectionListType) {
-    const exists = await this.redis.exists(`user:connection:auth:${type}:${userId}`);
-    return exists === 1;
-  }
-  async addSingleAuthConnection(userId: string, connectionId: string, type: ConnectionListType) {
-    const key = `user:connection:auth:${type}:${userId}`;
-    await this.redis.sadd(key, connectionId);
-  }
-  async inAuthConnectionList(userId: string, connectionId: string, type: ConnectionListType) {
-    const exists = await this.redis.sismember(`user:connection:auth:${type}:${userId}`, connectionId);
-    return exists === 1;
-  }
   async getManyProfiles(
     ids: string[], 
     fields: string[] = ["id", "username", "avatarUrl"]
@@ -117,13 +78,5 @@ export class UserDetailManager {
       });
       return userObj;
     }).filter((item): item is Record<string, string> => item !== null)|| [];
-  }
-  async getConnectionsWithDetails(userId: string,type: ConnectionListType) {
-    const ids = await this.getConnectionList(userId, type);
-    const profiles = await this.getManyProfiles(ids);
-    return profiles.map(p => ({
-      ...p,
-      connectionStatus: type
-    }));
   }
 }

@@ -165,9 +165,7 @@ export const convertConnection = async (req:Request,res:Response,next:NextFuncti
         redisManager.match.clearMatchVotes(connectionId),
         redisManager.match.clearMatchTimer(connectionId),
         redisManager.match.clearMatchInfo(connectionId),
-        redisManager.userConnection.setConnectionInfo(connectionId, profileId, receiverId, ConnectionListType.FRIEND),
-        redisManager.userDetail.invalidateConnectionList(profileId, ConnectionListType.FRIEND),
-        redisManager.userDetail.invalidateConnectionList(receiverId, ConnectionListType.FRIEND)
+        redisManager.userConnection.setConnectionInfo(connectionId, profileId, receiverId, ConnectionListType.FRIEND)
       ]);
       const successEvent = {
         eventType: EventType.SYSTEM_EVENT,
@@ -216,9 +214,7 @@ export const skipConnection = async (req:Request,res:Response,next:NextFunction)
       redisManager.match.clearMatchVotes(connectionId),
       redisManager.match.clearMatchTimer(connectionId),
       redisManager.match.clearMatchInfo(connectionId),
-      redisManager.userConnection.setConnectionInfo(connectionId, profileId, receiverId, ConnectionListType.ARCHIVED),
-      redisManager.userDetail.invalidateConnectionList(profileId, ConnectionListType.ARCHIVED),
-      redisManager.userDetail.invalidateConnectionList(receiverId, ConnectionListType.ARCHIVED)
+      redisManager.userConnection.setConnectionInfo(connectionId, profileId, receiverId, ConnectionListType.ARCHIVED)
     ]);
     await redisManager.chat.publish(
       'chat_router',
