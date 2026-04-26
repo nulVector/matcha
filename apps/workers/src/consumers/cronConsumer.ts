@@ -12,13 +12,21 @@ export const cronWorker = new Worker(
     const task = { name: job.name, data: job.data } as CronQueueJob;
     switch (task.name) {
       case JobName.CLEANUP_ARCHIVE_CHATS: {
-        await prisma.connection.deleteMany({
-          where: {
-            finalDeleteAt: {
-              lte: new Date(),
-            },
-          },
+        const expiredConnections = await prisma.connection.findMany({
+          where: { finalDeleteAt: { lte: new Date() } },
+          select: { id: true, user1Id: true, user2Id: true }
         });
+        if (expiredConnections.length === 0) break;
+        const connectionIds = expiredConnections.map((c) => c.id);
+        await prisma.connection.deleteMany({
+          where: { id: { in: connectionIds } },
+        });
+        const cachePromises = expiredConnections.flatMap(conn => [
+          redisManager.userConnection.clearConnectionInfo(conn.id),
+          redisManager.userDetail.invalidateConnectionList(conn.user1Id, ConnectionListType.ARCHIVED),
+          redisManager.userDetail.invalidateConnectionList(conn.user2Id, ConnectionListType.ARCHIVED)
+        ]);
+        await Promise.all(cachePromises);
         break;
       }
       case JobName.ARCHIVE_EXPIRED_MATCHES: {
@@ -35,9 +43,14 @@ export const cronWorker = new Worker(
           return;
         }
         const connectionIds = expiredConnections.map((c) => c.id);
+        const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
         await prisma.connection.updateMany({
           where: { id: { in: connectionIds } },
-          data: { status: ConnectionStatus.ARCHIVED },
+          data: { 
+            status: ConnectionStatus.ARCHIVED,
+            expiresAt: null,
+            finalDeleteAt: new Date(Date.now() + FIVE_DAYS_MS)
+          },
         });
         const publishPromises = [];
         for (const conn of expiredConnections) {
@@ -50,6 +63,10 @@ export const cronWorker = new Worker(
             redisManager.chat.publish('chat_router', JSON.stringify({ receiverId: conn.user2Id, ...JSON.parse(payload) })),
             redisManager.userDetail.invalidateConnectionList(conn.user1Id, ConnectionListType.ARCHIVED),
             redisManager.userDetail.invalidateConnectionList(conn.user2Id, ConnectionListType.ARCHIVED),
+            redisManager.match.clearMatchInfo(conn.id),
+            redisManager.match.clearMatchVotes(conn.id),
+            redisManager.match.clearMatchTimer(conn.id),
+            redisManager.userConnection.setConnectionInfo(conn.id, conn.user1Id, conn.user2Id, ConnectionListType.ARCHIVED)
           );
         }
         await Promise.all(publishPromises);
