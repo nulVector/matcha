@@ -9,6 +9,7 @@ import { COOKIE_OPTIONS } from '../constant/cookie';
 import { USERNAME_VIBES } from '../constant/usernameList';
 import { redisManager } from '../services/redis';
 import { logger } from '@matcha/logger';
+import { EventType } from '@matcha/shared';
 
 type LocationMetadata = { id: string; name: string; latitude: number; longitude: number };
 type InterestMetadata = { id: string; name: string };
@@ -781,19 +782,21 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
       });
     }
     if (action === "ACCEPT") {
+      let resolvedConnectionId = friendRequest.connectionId;
       await prisma.$transaction(async (tx) => {
         await tx.friendRequest.update({
           where: { id: requestId },
           data: { status: 'ACCEPTED' }
         });
         if (friendRequest.origin === 'SEARCH' || !friendRequest.connectionId) {
-          await tx.connection.create({
+          const newConn = await tx.connection.create({
             data: { 
               status: 'FRIEND',
               user1Id: userId,
               user2Id: friendRequest.senderId 
-            }
+            }, select:{ id: true }
           });
+          resolvedConnectionId = newConn.id;
         } else if (friendRequest.origin === 'ARCHIVE') {
           const updateResult = await tx.connection.updateMany({
             where: {
@@ -811,19 +814,37 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
             }
           });
           if (updateResult.count === 0) {
-            await tx.connection.create({
+            const newConn = await tx.connection.create({
               data: {
                 status: 'FRIEND',
                 user1Id: userId,
                 user2Id: friendRequest.senderId
-              }
+              }, select:{ id: true }
             });
+            resolvedConnectionId = newConn.id;
           }
         }
       });
       await Promise.all([
         redisManager.userDetail.invalidateConnectionList(userId, ConnectionListType.FRIEND),
-        redisManager.userDetail.invalidateConnectionList(friendRequest.senderId, ConnectionListType.FRIEND)
+        redisManager.userDetail.invalidateConnectionList(friendRequest.senderId, ConnectionListType.FRIEND),
+        redisManager.userConnection.setConnectionInfo(
+          resolvedConnectionId!, 
+          userId, 
+          friendRequest.senderId, 
+          ConnectionListType.FRIEND
+        ),
+        redisManager.chat.publish(
+          'chat_router',
+          JSON.stringify({
+            receiverId: friendRequest.senderId,
+            eventType: EventType.NOTIFICATION_UPDATE, 
+            eventData: {
+              category: "FRIEND_REQUEST_ACCEPTED",
+              connectionId: resolvedConnectionId
+            }
+          })
+        )
       ])
       return res.status(200).json({
         success: true,
@@ -869,7 +890,8 @@ export const handleUnfriendRequest = async (req:Request,res:Response,next:NextFu
     });
     Promise.all([
       redisManager.userDetail.invalidateConnectionList(myProfileId, ConnectionListType.FRIEND),
-      redisManager.userDetail.invalidateConnectionList(targetUserId, ConnectionListType.FRIEND)
+      redisManager.userDetail.invalidateConnectionList(targetUserId, ConnectionListType.FRIEND),
+      redisManager.userConnection.clearConnectionInfo(connection.id)
     ]).catch(err => logger.error({ err, myProfileId, targetUserId }, "Failed to invalidate friend cache on unfriend"));
 
     res.json({
