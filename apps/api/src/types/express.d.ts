@@ -4,7 +4,6 @@ declare global {
   namespace Express {
     interface User {
       id: string;
-      tokenVersion:number;
       profile: {
         id:string;
       } | null;

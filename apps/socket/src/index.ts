@@ -45,7 +45,7 @@ server.on('upgrade',async (request,socket,head)=>{
     }
     const jwt_payload = jwt.verify(token,jwtSecret) as JwtPayload;
     const userSession = await redisManager.auth.getSession(jwt_payload.id, jwt_payload.sessionId);
-    if (!userSession || userSession.tokenVersion !== jwt_payload.tokenVersion){
+    if (!userSession){
       socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
       socket.destroy();
       return;

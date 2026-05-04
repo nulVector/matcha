@@ -80,7 +80,6 @@ export const initiateProfile = async (req:Request, res:Response,next:NextFunctio
       allowDiscovery
     }:initiateProfileType = req.validatedData.body;
     const userId = req.user!.id;
-    const tokenVersion = req.user!.tokenVersion;
     const hasPassword = req.user!.hasPassword;
     const token = req.cookies['token'];
     const decoded = jwt.decode(token) as any; 
@@ -104,7 +103,7 @@ export const initiateProfile = async (req:Request, res:Response,next:NextFunctio
         avatarUrl: true
       }
     });
-    await redisManager.auth.cacheSession(userId, sessionId, tokenVersion, userProfile.id, hasPassword);
+    await redisManager.auth.cacheSession(userId, sessionId, userProfile.id, hasPassword);
     await redisManager.userDetail.cacheProfile(userProfile.id, {
       id: userProfile.id,
       username: userProfile.username,
@@ -317,20 +316,15 @@ export const updatePassword = async (req:Request,res:Response, next:NextFunction
       }
     }
     const hashedPassword = await bcrypt.hash(newPassword,10);
-    const updatedUser = await prisma.user.update({
+    await prisma.user.update({
       where:{ id:userId },
-      data:{
-        password:hashedPassword,
-        tokenVersion: { increment: 1 }
-      },
-      select: { tokenVersion: true }
+      data:{ password:hashedPassword }
     })
     await redisManager.auth.invalidateAllUserSessions(userId);
-    await redisManager.auth.cacheSession(userId, sessionId, updatedUser.tokenVersion, profileId, true);
+    await redisManager.auth.cacheSession(userId, sessionId, profileId, true);
     const token = jwt.sign({ 
         id: userId,
-        sessionId,
-        tokenVersion: updatedUser.tokenVersion 
+        sessionId
       },jwtSecret,{ expiresIn: '7d' });
     res.cookie("token", token, COOKIE_OPTIONS);
     return res.json({
@@ -911,7 +905,6 @@ export const deactivateProfile = async (req:Request,res:Response,next:NextFuncti
       where:{ id:userId },
       data:{
         deletedAt: now,
-        tokenVersion:{increment:1},
         profile:{ 
           update:{ isActive: false }
         }

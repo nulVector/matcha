@@ -49,8 +49,8 @@ describe('WebSocket Integration Tests', () => {
         avatarUrl: '', location: 'Bengaluru', locationLatitude: 0, locationLongitude: 0, interest: []
       }
     });
-    await serverRedisManager.auth.cacheSession(userId, sessionId, 1, profileId, true);
-    const token = jwt.sign({ id: userId, sessionId, tokenVersion: 1 }, JWT_SECRET);
+    await serverRedisManager.auth.cacheSession(userId, sessionId, profileId, true);
+    const token = jwt.sign({ id: userId, sessionId}, JWT_SECRET);
     return { userId, profileId, token };
   }
 

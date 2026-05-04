@@ -63,8 +63,8 @@ describe('API Integration Tests', () => {
         }
       });
     }
-    await redisManager.auth.cacheSession(userId, sessionId, 1, profileId, true);
-    const token = jwt.sign({ id: userId, sessionId, tokenVersion: 1 }, JWT_SECRET, { expiresIn: '1h' });
+    await redisManager.auth.cacheSession(userId, sessionId, profileId, true);
+    const token = jwt.sign({ id: userId, sessionId}, JWT_SECRET, { expiresIn: '1h' });
     return { userId, profileId, token };
   }
 

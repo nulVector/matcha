@@ -38,7 +38,6 @@ export const configurePassport = (passport:PassportStatic) =>{
           id: true,
           googleId: true,
           password: true,
-          tokenVersion: true,
           deletedAt: true,
           profile: {
             select: { id: true }
@@ -53,7 +52,6 @@ export const configurePassport = (passport:PassportStatic) =>{
             id: true,
             googleId: true,
             password: true,
-            tokenVersion: true,
             deletedAt: true,
             profile: { select: { id: true } }
           }
@@ -68,8 +66,7 @@ export const configurePassport = (passport:PassportStatic) =>{
           select: {
             id: true,
             googleId: true,
-            password: true,  
-            tokenVersion: true,
+            password: true,
             deletedAt: true,
             profile: { select: { id: true } }
           }
@@ -90,7 +87,6 @@ export const configurePassport = (passport:PassportStatic) =>{
       }
       return done(null, {
         id: user.id,
-        tokenVersion: user.tokenVersion,
         profile: hasProfile ? { id: user.profile!.id } : null,
         hasPassword: !!user.password
       });
@@ -110,7 +106,6 @@ export const configurePassport = (passport:PassportStatic) =>{
           select:{
             id:true,
             password:true,
-            tokenVersion:true,
             deletedAt:true,
             profile: {
               select:{
@@ -145,7 +140,6 @@ export const configurePassport = (passport:PassportStatic) =>{
         }
         return done(null, {
           id:user.id,
-          tokenVersion:user.tokenVersion,
           profile:hasProfile ? {id:user.profile!.id} : null,
           hasPassword:true
         });                  
@@ -171,12 +165,11 @@ export const configurePassport = (passport:PassportStatic) =>{
     async (jwt_payload:JwtPayload,done) => {
       try {
         const session = await redisManager.auth.getSession(jwt_payload.id, jwt_payload.sessionId);
-        if (!session || session.tokenVersion !== jwt_payload.tokenVersion) {
+        if (!session) {
           return done(null, false);
         }
         const user: Express.User = {
           id: session.userId,
-          tokenVersion: session.tokenVersion,
           profile: session.userProfileId ? { id: session.userProfileId } : null,
           hasPassword: session.hasPassword
         };

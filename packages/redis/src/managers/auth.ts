@@ -5,8 +5,8 @@ import { UserSession } from "@matcha/shared";
 export class AuthManager {
   constructor (private redis:Redis) {}
 
-  async cacheSession(userId:string, sessionId: string, tokenVersion: number, userProfileId:string | null, hasPassword: boolean){
-    const data:UserSession = {userId,tokenVersion,userProfileId, hasPassword};
+  async cacheSession(userId:string, sessionId: string, userProfileId:string | null, hasPassword: boolean){
+    const data:UserSession = {userId,userProfileId, hasPassword};
     await this.redis.set(`session:${userId}:${sessionId}`,JSON.stringify(data),"EX",60 * 60 * 24 * 7);
   } 
   async getSession(userId:string, sessionId: string): Promise<UserSession | null>{

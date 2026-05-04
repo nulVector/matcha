@@ -20,17 +20,15 @@ export function setupUser(params: any, context: any, done: Function) {
       throw new Error("Malformed user data popped from Redis!");
     }
     const sessionId = createId();
-    const tokenVersion = 1;
     const sessionData = {
       userId,
-      tokenVersion,
       userProfileId: profileId,
       hasPassword: true
     };
     await redisClient.set(`session:${userId}:${sessionId}`, JSON.stringify(sessionData), 'EX', 60 * 30);
     
     const token = jwt.sign(
-      { id: userId, sessionId, tokenVersion },
+      { id: userId, sessionId },
       JWT_SECRET!,
       { expiresIn: '2h' }
     );

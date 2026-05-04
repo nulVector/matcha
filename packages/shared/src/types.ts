@@ -2,12 +2,10 @@ import { VIBE_OPTIONS } from "./constants";
 
 export interface JwtPayload {
   id:string,
-  sessionId: string,
-  tokenVersion:number
+  sessionId: string
 }
 export interface UserSession {
   userId: string;
-  tokenVersion: number;
   userProfileId: string | null;
   hasPassword: boolean
 }

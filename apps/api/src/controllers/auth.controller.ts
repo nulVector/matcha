@@ -23,16 +23,14 @@ export const signup = async (req:Request, res:Response,next:NextFunction) =>{
         email,
         password:hashedPassword
       },select:{
-        id:true,
-        tokenVersion:true
+        id:true
       }
     });
     const sessionId = createId();
-    await redisManager.auth.cacheSession(newUser.id, sessionId, newUser.tokenVersion, null, true);
+    await redisManager.auth.cacheSession(newUser.id, sessionId, null, true);
     const token = jwt.sign({
       id:newUser.id,
-      sessionId,
-      tokenVersion:newUser.tokenVersion
+      sessionId
     },jwtSecret,{expiresIn:'7d'});
     res.cookie("token",token,COOKIE_OPTIONS);
     return res.status(201).json({message:"User created successfully"});
@@ -56,11 +54,10 @@ export const login = async (req:Request,res:Response,next:NextFunction)=>{
     }
     try {
       const sessionId = createId();
-      await redisManager.auth.cacheSession(user.id, sessionId, user.tokenVersion, user.profile ? user.profile.id : null, true);
+      await redisManager.auth.cacheSession(user.id, sessionId, user.profile ? user.profile.id : null, true);
       const token = jwt.sign({
         id:user.id,
-        sessionId,
-        tokenVersion:user.tokenVersion
+        sessionId
       },jwtSecret,{expiresIn:'7d'});
       res.cookie("token",token,COOKIE_OPTIONS);
       return res.json({message:"Logged in successfully"});
@@ -75,14 +72,13 @@ export const googleAuthCallback = async (req: Request, res: Response, next: Next
   try {
     const user = req.user!;
     const sessionId = createId();
-    await redisManager.auth.cacheSession(user.id, sessionId, user.tokenVersion, user.profile ? user.profile.id : null, user.hasPassword);
+    await redisManager.auth.cacheSession(user.id, sessionId, user.profile ? user.profile.id : null, user.hasPassword);
     const token = jwt.sign({
       id: user.id,
-      sessionId: sessionId,
-      tokenVersion: user.tokenVersion
+      sessionId: sessionId
     }, jwtSecret, { expiresIn: '7d' });
     res.cookie("token", token, COOKIE_OPTIONS);
-    const frontendUrl = process.env.CLIENT_URL || "http://localhost:5173";
+    const frontendUrl = process.env.CLIENT_URL || "http://localhost:3000";
     const redirectUrl = user.profile ? `${frontendUrl}/home` : `${frontendUrl}/onboarding`;
     res.redirect(redirectUrl);
   } catch (err: any) {
@@ -101,7 +97,7 @@ export const requestResetPassword = async (req:Request,res:Response,next:NextFun
     if (user) {
       const resetToken = crypto.randomBytes(32).toString('hex');
       await redisManager.auth.setResetToken(resetToken, user.id);
-      const frontendUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+      const frontendUrl = process.env.CLIENT_URL || 'http://localhost:3000';
       const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
       // TODO - send email to user via Nodemailer/Resend/SendGrid
     }
@@ -122,10 +118,7 @@ export const confirmResetPassword = async (req: Request, res: Response,next:Next
     const hashedPassword = await bcrypt.hash(password, 10);
     await prisma.user.update({
       where: { id:userId },
-      data: { 
-        password: hashedPassword,
-        tokenVersion: { increment: 1 }
-      }
+      data: { password: hashedPassword }
     });
     await redisManager.auth.consumeResetToken(token);
     await redisManager.auth.invalidateAllUserSessions(userId);
@@ -154,10 +147,6 @@ export const logoutAll = async (req:Request,res:Response,next:NextFunction)=>{
   try {
     const userId = req.user!.id;
     await redisManager.auth.invalidateAllUserSessions(userId);
-    await prisma.user.update({
-      where: { id: userId },
-      data: { tokenVersion: { increment: 1 } }
-    });
     res.clearCookie("token", COOKIE_OPTIONS);
     return res.json({ message: "Logged out of all devices." });
   } catch (err: any) {

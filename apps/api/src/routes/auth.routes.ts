@@ -33,7 +33,7 @@ authRouter.get(
   "/google/callback",
   passport.authenticate("google", { 
     session: false, 
-    failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:5173'}/login?error=GoogleAuthFailed` 
+    failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3000'}/login?error=GoogleAuthFailed` 
   }),
   googleAuthCallback
 );

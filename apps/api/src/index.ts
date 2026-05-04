@@ -29,7 +29,7 @@ app.use(express.json());
 
 const allowedOrigins = process.env.CLIENT_URL 
   ? process.env.CLIENT_URL.split(',').map(url => url.trim())
-  : ["http://localhost:5173"];
+  : ["http://localhost:3000"];
 app.use(cors({
     credentials:true,
     origin:(origin, callback) => {

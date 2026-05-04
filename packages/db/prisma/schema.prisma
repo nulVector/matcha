@@ -40,7 +40,6 @@ model User {
   reactivatedAt DateTime?
   profile       UserProfile?
   updatedAt     DateTime     @updatedAt
-  tokenVersion  Int          @default(1)
 }
 
 model UserProfile {
