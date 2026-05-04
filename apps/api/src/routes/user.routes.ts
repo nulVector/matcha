@@ -1,15 +1,12 @@
 import { connectionIdSchema, deactivatePasswordSchema, getConnectionsListSchema, getFriendRequestsSchema, initiateProfileSchema, requestHandleSchema, requestIdSchema, sendRequestSchema, updatePasswordSchema, updateProfileSchema, userIdSchema, usernameCheckSchema, vibeCheck } from "@matcha/zod";
 import { Router } from "express";
 import { cancelRequest, checkUsername, deactivateProfile, deleteConnection, generateUsername, getConnectionsList, getFriendRequests, getMetadata, getProfile, getUserProfile, handleRequest, handleUnfriendRequest, initiateProfile, searchUser, sendRequest, updatePassword, updateProfile } from "../controllers/user.controller";
-import { authGuard } from "../middleware/authGuard";
 import { idempotencyGuard } from "../middleware/idempotency";
 import { profileGuard } from "../middleware/profileGuard";
 import { rateLimiter } from "../middleware/rateLimiter";
-import { requireAuth } from "../middleware/requireAuth";
 import { validate } from "../middleware/validate";
 const userRouter: Router = Router();
 
-userRouter.use(requireAuth,authGuard);
 userRouter.get(
   "/check-username",
   rateLimiter('check-username', 'user', 15, 60),

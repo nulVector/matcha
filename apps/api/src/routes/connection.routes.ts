@@ -1,15 +1,11 @@
 import { Router } from "express";
 import { convertConnection, extendTimer, joinQueue, leaveQueue, skipConnection } from "../controllers/connection.controller";
-import { authGuard } from "../middleware/authGuard";
-import { profileGuard } from "../middleware/profileGuard";
-import { requireAuth } from "../middleware/requireAuth";
 import { validate } from "../middleware/validate";
 import { connectionIdSchema } from "@matcha/zod";
 import { rateLimiter } from "../middleware/rateLimiter";
 import { idempotencyGuard } from "../middleware/idempotency";
 const connectionRouter: Router = Router();
 
-connectionRouter.use(requireAuth,authGuard,profileGuard);
 connectionRouter.post(
   "/queue/join",
   rateLimiter("join_queue", "user", 5, 10),

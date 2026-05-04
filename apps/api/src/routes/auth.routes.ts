@@ -6,6 +6,7 @@ import { rateLimiter } from "../middleware/rateLimiter";
 import { requireAuth } from "../middleware/requireAuth";
 import { validate } from "../middleware/validate";
 import passport from "passport";
+import { authGuard } from "../middleware/authGuard";
 const authRouter: Router = Router();
 
 authRouter.post(
@@ -50,14 +51,14 @@ authRouter.post(
     validate(resetPasswordSchema),
     confirmResetPassword
 );
+
+authRouter.use(requireAuth,authGuard);
 authRouter.post(
     "/logout",
-    requireAuth,
     logout
 );
 authRouter.post(
     "/logout-all",
-    requireAuth,  
     logoutAll
 );
 
