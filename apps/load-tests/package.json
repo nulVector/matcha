@@ -17,6 +17,7 @@
   "dependencies": {
     "@matcha/prisma": "workspace:*",
     "@matcha/redis": "workspace:*",
+    "@matcha/shared": "workspace:*",
     "@paralleldrive/cuid2": "^3.3.0",
     "artillery": "^2.0.30",
     "ioredis": "^5.9.2",

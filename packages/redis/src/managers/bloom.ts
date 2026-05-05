@@ -1,3 +1,4 @@
+import { getDeterministicIds } from "@matcha/shared";
 import Redis from "ioredis";
 
 export class BloomFilterManager {
@@ -41,7 +42,8 @@ export class BloomFilterManager {
   //   return results.map(r => r === 1);
   // }
   private getPairKey(id1: string, id2: string): string {
-    return id1 < id2 ? `${id1}:${id2}` : `${id2}:${id1}`;
+    const [u1, u2] = getDeterministicIds(id1, id2);
+    return `${u1}:${u2}`;
   }
 
   async addPair(key: string, id1: string, id2: string) {

@@ -1,5 +1,6 @@
 import prisma, { ConnectionStatus } from '@matcha/prisma';
 import { RedisManager } from '@matcha/redis';
+import { getDeterministicIds } from '@matcha/shared';
 import { createId } from '@paralleldrive/cuid2';
 
 const REDIS_URL = process.env.REDIS_URL;
@@ -36,7 +37,7 @@ async function seedRealWorldData() {
       const profileBId = createId();
       const connectionId = createId();
       const messageId = createId();
-
+      const [u1, u2] = getDeterministicIds(profileAId,profileBId);
       const numInterestsA = Math.floor(Math.random() * 8) + 3;
       const interestsA = [...INTEREST_POOL].sort(() => 0.5 - Math.random()).slice(0, numInterestsA);
       const numInterestsB = Math.floor(Math.random() * 8) + 3;
@@ -50,7 +51,7 @@ async function seedRealWorldData() {
         { id: profileAId, userId: userAId, username: `userA_${profileAId.slice(0, 6)}`, avatarUrl: '', location: 'Bengaluru', locationLatitude: BENGALURU_LAT, locationLongitude: BENGALURU_LNG, interest: interestsA },
         { id: profileBId, userId: userBId, username: `userB_${profileBId.slice(0, 6)}`, avatarUrl: '', location: 'Bengaluru', locationLatitude: BENGALURU_LAT, locationLongitude: BENGALURU_LNG, interest: interestsB }
       );
-      dbConnections.push({ id: connectionId, user1Id: profileAId, user2Id: profileBId, status: ConnectionStatus.FRIEND });
+      dbConnections.push({ id: connectionId, user1Id: u1, user2Id: u2, status: ConnectionStatus.FRIEND });
       dbMessages.push({ id: messageId, connectionId: connectionId, senderId: profileAId, content: "Load test message" });
 
       redisPromises.push(

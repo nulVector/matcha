@@ -1,4 +1,4 @@
-import prisma from '@matcha/prisma';
+import prisma, { ConnectionStatus, RequestOrigin, RequestStatus } from '@matcha/prisma';
 import { TaskProducer } from '@matcha/queue';
 import { ConnectionListType, NotificationCategory } from '@matcha/redis';
 import { connectionIdType, deactivatePasswordType, getConnectionsListType, getFriendRequestsType, initiateProfileType, requestHandleType, requestIdType, sendRequestType, updatePasswordType, updateProfileType, userIdType, usernameCheckType, vibeCheckType } from '@matcha/zod';
@@ -9,7 +9,7 @@ import { COOKIE_OPTIONS } from '../constant/cookie';
 import { USERNAME_VIBES } from '../constant/usernameList';
 import { redisManager } from '../services/redis';
 import { logger } from '@matcha/logger';
-import { EventType } from '@matcha/shared';
+import { getDeterministicIds, EventType } from '@matcha/shared';
 
 type LocationMetadata = { id: string; name: string; latitude: number; longitude: number };
 type InterestMetadata = { id: string; name: string };
@@ -609,12 +609,13 @@ export const sendRequest = async (req:Request,res:Response,next:NextFunction) =>
       })
     }
     const requestData = await prisma.$transaction(async (tx) => {
-      const existingConnection = await tx.connection.findFirst({
+      const [user1Id,user2Id] = getDeterministicIds(myProfileId, targetUserId);
+      const existingConnection = await tx.connection.findUnique({
         where: {
-          OR: [
-            { user1Id: myProfileId, user2Id: targetUserId },
-            { user1Id: targetUserId, user2Id: myProfileId }
-          ]
+          user1Id_user2Id:{
+            user1Id,
+            user2Id
+          }
         },
         select:{
           id:true,
@@ -628,19 +629,19 @@ export const sendRequest = async (req:Request,res:Response,next:NextFunction) =>
             { senderId: myProfileId, receiverId:targetUserId },
             { senderId: targetUserId, receiverId: myProfileId }
           ],
-          status: "PENDING"
+          status: RequestStatus.PENDING
         },
         select: { senderId: true }
       });
 
       if (pendingRequest) {
-        return { status: "PENDING", senderId: pendingRequest.senderId };
+        return { status: RequestStatus.PENDING, senderId: pendingRequest.senderId };
       }
       let finalOrigin = origin;
       let finalconnectionId = connectionId;
 
       if (existingConnection) {
-        finalOrigin = "ARCHIVE";
+        finalOrigin = RequestOrigin.ARCHIVE;
         finalconnectionId = existingConnection.id;
       }
       await tx.friendRequest.create({
@@ -725,7 +726,7 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
         sender:{
           isActive:true,
         },
-        status: 'PENDING'
+        status: RequestStatus.PENDING
       },
       select: {
         senderId: true,
@@ -745,31 +746,30 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
     }
     if (action === "ACCEPT") {
       let resolvedConnectionId = friendRequest.connectionId;
+      const [user1Id,user2Id] = getDeterministicIds(userId,friendRequest.senderId);
       await prisma.$transaction(async (tx) => {
         await tx.friendRequest.update({
           where: { id: requestId },
-          data: { status: 'ACCEPTED' }
+          data: { status: RequestStatus.ACCEPTED }
         });
-        if (friendRequest.origin === 'SEARCH' || !friendRequest.connectionId) {
+        if (friendRequest.origin === RequestOrigin.SEARCH || !friendRequest.connectionId) {
           const newConn = await tx.connection.create({
             data: { 
-              status: 'FRIEND',
-              user1Id: userId,
-              user2Id: friendRequest.senderId 
+              status: ConnectionStatus.FRIEND,
+              user1Id,
+              user2Id
             }, select:{ id: true }
           });
           resolvedConnectionId = newConn.id;
-        } else if (friendRequest.origin === 'ARCHIVE') {
+        } else if (friendRequest.origin === RequestOrigin.ARCHIVE) {
           const updateResult = await tx.connection.updateMany({
             where: {
               id: friendRequest.connectionId,
-              OR: [
-                { user1Id: userId, user2Id: friendRequest.senderId },
-                { user1Id: friendRequest.senderId, user2Id: userId }
-              ]
+              user1Id,
+              user2Id
              },
             data: { 
-              status: 'FRIEND',
+              status: ConnectionStatus.FRIEND,
               finalDeleteAt: null,
               user1DeletedAt:null,
               user2DeletedAt:null
@@ -778,9 +778,9 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
           if (updateResult.count === 0) {
             const newConn = await tx.connection.create({
               data: {
-                status: 'FRIEND',
-                user1Id: userId,
-                user2Id: friendRequest.senderId
+                status: ConnectionStatus.FRIEND,
+                user1Id,
+                user2Id
               }, select:{ id: true }
             });
             resolvedConnectionId = newConn.id;
@@ -790,8 +790,8 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
       await Promise.all([
         redisManager.userConnection.setConnectionInfo(
           resolvedConnectionId!, 
-          userId, 
-          friendRequest.senderId, 
+          user1Id,
+          user2Id, 
           ConnectionListType.FRIEND
         ),
         redisManager.chat.publish(
@@ -821,19 +821,19 @@ export const handleUnfriendRequest = async (req:Request,res:Response,next:NextFu
   try{
     const { userId: targetUserId }: userIdType = req.validatedData.params;
     const myProfileId = req.user!.profile!.id;
+    const [user1Id,user2Id] = getDeterministicIds(myProfileId,targetUserId);
     const now = new Date();
     const THIRTY_DAYS = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-    const connection = await prisma.connection.findFirst({
+    const connection = await prisma.connection.findUnique({
       where: {
-        status: 'FRIEND',
-        OR: [
-          { user1Id: myProfileId, user2Id: targetUserId },
-          { user1Id: targetUserId, user2Id: myProfileId }
-        ]
+        user1Id_user2Id:{
+          user1Id,
+          user2Id
+        }
       },
-      select: { id: true, user1Id: true }
+      select: { id: true, user1Id: true, status:true }
     });
-    if (!connection) {
+    if (!connection || connection.status !== ConnectionStatus.FRIEND) {
       return res.status(404).json({
         success: false,
         message: "No active friendship found" 
@@ -843,7 +843,7 @@ export const handleUnfriendRequest = async (req:Request,res:Response,next:NextFu
     await prisma.connection.update({
       where: { id: connection.id },
       data: {
-        status: 'UNFRIENDED',
+        status: ConnectionStatus.UNFRIENDED,
         finalDeleteAt: THIRTY_DAYS,
         [isUser1 ? 'user1DeletedAt' : 'user2DeletedAt']: now
       }

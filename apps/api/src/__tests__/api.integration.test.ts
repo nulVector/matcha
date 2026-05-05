@@ -4,6 +4,7 @@ import { createId } from '@paralleldrive/cuid2';
 import jwt from 'jsonwebtoken';
 import type { PrismaClient, ConnectionStatus as ConnectionStatusEnum } from '@matcha/prisma';
 import type { RedisManager } from '@matcha/redis';
+import { getDeterministicIds } from '@matcha/shared';
 
 let app: any;
 let redisManager: RedisManager;
@@ -129,13 +130,14 @@ describe('API Integration Tests', () => {
     it('should handle simultaneous identical requests safely', async () => {
       const user1 = await createAuthUser(true);
       const user2 = await createAuthUser(true);
+      const [u1, u2] = getDeterministicIds(user1.profileId!, user2.profileId!);
       const connectionId = createId();
       const idempotencyKey = createId();
       await prisma.connection.create({
         data: {
           id: connectionId,
-          user1Id: user1.profileId!,
-          user2Id: user2.profileId!,
+          user1Id: u1,
+          user2Id: u2,
           status: ConnectionStatus.MATCHED,
         }
       });

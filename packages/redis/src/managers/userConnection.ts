@@ -1,5 +1,6 @@
 import Redis from "ioredis";
 import { ConnectionListType, REMOVE_SOCKET_SCRIPT } from "../common";
+import { getDeterministicIds } from "@matcha/shared";
 
 export class UserConnectionManager {
   constructor (private redis:Redis) {}
@@ -34,8 +35,9 @@ export class UserConnectionManager {
     const exists = await this.redis.exists(`user:status:${userId}`);
     return exists === 1;
   }
-  async setConnectionInfo(connectionId:string,user1Id:string,user2Id:string, status:ConnectionListType){
+  async setConnectionInfo(connectionId:string,id1:string,id2:string, status:ConnectionListType){
     const key = `connection:info:${connectionId}`;
+    const [user1Id,user2Id] = getDeterministicIds(id1,id2)
     const tx = this.redis.multi();
     tx.hset(key,{
       user1Id,

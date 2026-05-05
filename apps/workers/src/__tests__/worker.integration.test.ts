@@ -3,6 +3,7 @@ import { QueueEvents, Queue } from 'bullmq';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { PrismaClient, ConnectionStatus as ConnectionStatusEnum } from '@matcha/prisma';
 import type { RedisManager } from '@matcha/redis';
+import { getDeterministicIds } from '@matcha/shared';
 
 import type { 
   QueueName as QueueNameEnum, 
@@ -70,8 +71,9 @@ describe('Worker Integration Tests', () => {
   describe('The DB Buffer Consumer', () => {
     it('should flush the Redis message buffer into PostgreSQL in a single batch', async () => {
       const connectionId = createId();
-      const user1Id = createId();
-      const user2Id = createId();
+      const rawUser1Id = createId();
+      const rawUser2Id = createId();
+      const [user1Id, user2Id] = getDeterministicIds(rawUser1Id, rawUser2Id);
       await prisma.userProfile.createMany({
         data: [
           { id: user1Id, username: 'buffer_u1', avatarUrl: '', location: 'Bengaluru', locationLatitude: 0, locationLongitude: 0 },
@@ -87,7 +89,7 @@ describe('Worker Integration Tests', () => {
         content: `Test message ${i}`,
         senderId: user1Id,
         createdAt: new Date().toISOString(),
-        type: 'TEXT'
+        type: 'TEXT' as const
       }));
       const stringifiedMessages = fakeMessages.map(msg => JSON.stringify(msg));
       await redisManager['redis'].rpush('buffer:messages', ...stringifiedMessages);
@@ -103,9 +105,10 @@ describe('Worker Integration Tests', () => {
 
     it('should flush the Redis read receipt buffer into PostgreSQL', async () => {
       const connectionId = createId();
-      const user1Id = createId();
-      const user2Id = createId();
+      const rawUser1Id = createId();
+      const rawUser2Id = createId();
       const messageId = createId();
+      const [user1Id, user2Id] = getDeterministicIds(rawUser1Id, rawUser2Id);
       const readTimestamp = new Date().toISOString();
       await prisma.userProfile.createMany({
         data: [
@@ -190,12 +193,13 @@ describe('Worker Integration Tests', () => {
       const queueLength = await redisManager['redis'].llen('match:queue');
       expect(searcherStatus).toBe('MATCHED');
       expect(queueLength).toBe(0);
-      const newConnection = await prisma.connection.findFirst({
+      const [u1, u2] = getDeterministicIds(searcherId, candidateId);
+      const newConnection = await prisma.connection.findUnique({
         where: {
-          OR: [
-            { user1Id: searcherId, user2Id: candidateId },
-            { user1Id: candidateId, user2Id: searcherId }
-          ]
+          user1Id_user2Id: {
+            user1Id: u1,
+            user2Id: u2
+          }
         }
       });
       expect(newConnection).toBeDefined();

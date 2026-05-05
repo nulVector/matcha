@@ -2,7 +2,7 @@ import { redisManager } from "../config/redis";
 import prisma, { ConnectionStatus } from "@matcha/prisma";
 import { UserState } from "@matcha/redis";
 import { logger } from "@matcha/logger";
-import { EventType } from "@matcha/shared";
+import { EventType, getDeterministicIds } from "@matcha/shared";
 
 interface MatchConstraints {
   radiusKm: number;
@@ -74,9 +74,7 @@ async function runLoop() {
             if (locked) {
               try {
                 const expiresAt = new Date(Date.now() + MATCH_EXPIRY_MS);
-                const [u1, u2] = searcherId < candidate.id 
-                  ? [searcherId, candidate.id] 
-                  : [candidate.id, searcherId];
+                const [u1, u2] = getDeterministicIds(searcherId, candidate.id);
                 const newConnection = await prisma.connection.create({
                   data: {
                     user1Id: u1,

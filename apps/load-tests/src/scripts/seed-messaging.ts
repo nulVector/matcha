@@ -1,5 +1,6 @@
 import prisma, { ConnectionStatus } from '@matcha/prisma';
 import { RedisManager } from '@matcha/redis';
+import { getDeterministicIds } from '@matcha/shared';
 import { createId } from '@paralleldrive/cuid2';
 
 const REDIS_URL = process.env.REDIS_URL;
@@ -28,6 +29,7 @@ async function seedMessagingData() {
       const profileBId = createId();
       const connectionId = createId();
 			const messageId = createId();
+      const [u1, u2] = getDeterministicIds(profileAId,profileBId);
       dbUsers.push(
         { id: userAId, email: `${userAId}@gmail.com`, password: 'password' },
         { id: userBId, email: `${userBId}@gmail.com`, password: 'password' }
@@ -38,8 +40,8 @@ async function seedMessagingData() {
       );
       dbConnections.push({
         id: connectionId,
-        user1Id: profileAId,
-        user2Id: profileBId,
+        user1Id: u1,
+        user2Id: u2,
         status: ConnectionStatus.FRIEND
       });
 			dbMessages.push({

@@ -1,7 +1,7 @@
 import { logger } from "@matcha/logger";
 import Redis from "ioredis";
 import { MatchAction, UserState } from "../common";
-import { MASTER_INTERESTS_LIST } from "@matcha/shared";
+import { getDeterministicIds, MASTER_INTERESTS_LIST } from "@matcha/shared";
 
 export class MatchManager {
   constructor (private redis:Redis) {}
@@ -232,8 +232,9 @@ export class MatchManager {
     tx.del(`match:votes:${connectionId}:CONVERT`);
     await tx.exec();
   }
-  async setMatchInfo(connectionId:string,user1Id:string,user2Id:string, expiresAt:string){
+  async setMatchInfo(connectionId:string,id1:string,id2:string, expiresAt:string){
     const key = `match:info:${connectionId}`;
+    const [user1Id,user2Id] = getDeterministicIds(id1,id2);
     const tx = this.redis.multi();
     tx.hset(key,{
       user1Id,
