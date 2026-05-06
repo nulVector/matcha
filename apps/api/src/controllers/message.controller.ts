@@ -44,75 +44,60 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
     const profileId = req.user!.profile!.id;
     const {connectionId}:connectionIdType = req.validatedData.params;
     const { cursor, limit = 50 }: getChatHistoryType = req.validatedData.query;   
-    let chatPartnerMeta = null;
-    let connectionStatus: string | null = null;
-    let connectionExpiresAt: string | null = null;
-    const [matchInfo, connInfo] = await Promise.all([
-      redisManager.match.getMatchInfo(connectionId),
-      redisManager.userConnection.getConnectionInfo(connectionId)
-    ]);
-    const activeInfo = matchInfo || connInfo;
-    if (activeInfo) {
-      if (matchInfo) {
-        connectionStatus = "MATCHED";
-        connectionExpiresAt = matchInfo.expiresAt;
-      } else if (connInfo) {
-        connectionStatus = connInfo.status;
-        connectionExpiresAt = null;
+    
+    const connection = await prisma.connection.findUnique({
+      where: { id: connectionId },
+      select: { 
+        user1Id: true,
+        user2Id: true,
+        status: true,
+        expiresAt: true, 
+        user1HistoryClearedAt: true, 
+        user2HistoryClearedAt: true 
       }
-      const partnerId = activeInfo.user1Id === profileId ? activeInfo.user2Id : activeInfo.user1Id;
-      const partnerProfile = await redisManager.userDetail.getProfileFields(partnerId, ['username', 'avatarUrl', 'openingQues']);
-      if (partnerProfile && partnerProfile.username) {
-        chatPartnerMeta = {
-          id: partnerId,
-          username: partnerProfile.username,
-          avatarUrl: partnerProfile.avatarUrl,
-          openingQues: partnerProfile.openingQues || null
-        };
-      }
-    }
-    if (!chatPartnerMeta || !connectionStatus) {
-      const connection = await prisma.connection.findFirst({
-        where: {
-          id: connectionId,
-          OR: [{ user1Id: profileId }, { user2Id: profileId }],
-          status: { in: ["MATCHED", "FRIEND", "ARCHIVED"] }
-        },
-        select: {
-          id: true, status: true, user1Id: true, user2Id: true, expiresAt: true,
-          user1: { select: { id: true, username: true, avatarUrl: true, openingQues: true } },
-          user2: { select: { id: true, username: true, avatarUrl: true, openingQues: true } }
-        }
+    });
+    const isParticipant = connection && (connection.user1Id === profileId || connection.user2Id === profileId);
+    const isUnfriended = connection?.status === "UNFRIENDED";
+    if (!connection || !isParticipant || isUnfriended) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden: You can not access this chat."
       });
-      if (!connection) {
-        return res.status(403).json({
-          success: false,
-          message: "Forbidden: You can not access this chat."
-        });
-      }
-      connectionStatus = connection.status;
-      connectionExpiresAt = connection.expiresAt ? connection.expiresAt.toISOString() : null;
-      const otherUser = connection.user1.id === profileId ? connection.user2 : connection.user1;
+    }
+    const [ partnerId, historyClearedAt] = connection.user1Id === profileId 
+      ? [connection.user2Id, connection.user1HistoryClearedAt]
+      : [connection.user1Id, connection.user2HistoryClearedAt]
+    
+    const connectionStatus = connection.status;
+    const connectionExpiresAt = connection.expiresAt ? connection.expiresAt.toISOString() : null;
+      
+    let chatPartnerMeta = null;
+    const partnerProfile = await redisManager.userDetail.getProfileFields(partnerId, ['username', 'avatarUrl', 'openingQues', 'isActive']);
+    
+    if (partnerProfile && partnerProfile.username) {
       chatPartnerMeta = {
-        id: otherUser.id,
-        username: otherUser.username,
-        avatarUrl: otherUser.avatarUrl,
-        openingQues: otherUser.openingQues || null
+        id: partnerId,
+        username: partnerProfile.username,
+        avatarUrl: partnerProfile.avatarUrl,
+        openingQues: partnerProfile.openingQues || null,
+        isActive: partnerProfile.isActive
       };
-      if (connection.status === "MATCHED" && connection.expiresAt) {
-        await redisManager.match.setMatchInfo(
-          connectionId, 
-          connection.user1Id, 
-          connection.user2Id, 
-          connection.expiresAt.toISOString()
-        );
-      } else if (connection.status === "FRIEND" || connection.status === "ARCHIVED") {
-        await redisManager.userConnection.setConnectionInfo(
-          connectionId, 
-          connection.user1Id, 
-          connection.user2Id, 
-          connection.status as ConnectionListType
-        )
+    } else {
+      const dbPartnerProfile = await prisma.userProfile.findUnique({
+        where: { id: partnerId },
+        select: { username: true, avatarUrl: true, openingQues: true, isActive: true }
+      });
+      chatPartnerMeta = {
+        id: partnerId,
+        username: dbPartnerProfile?.username || "Unknown",
+        avatarUrl: dbPartnerProfile?.avatarUrl || "",
+        openingQues: dbPartnerProfile?.openingQues || null,
+        isActive: dbPartnerProfile?.isActive ?? false
+      };
+      if (connectionStatus === "MATCHED" && connection.expiresAt) {
+        await redisManager.match.setMatchInfo(connectionId, connection.user1Id, connection.user2Id, connection.expiresAt.toISOString());
+      } else if (connectionStatus === "FRIEND" || connectionStatus === "ARCHIVED") {
+        await redisManager.userConnection.setConnectionInfo(connectionId, connection.user1Id, connection.user2Id, connectionStatus as ConnectionListType);
       }
     }
     let orderedMessages: CachedMessage[] = [];
@@ -169,6 +154,14 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
         }
       }
     }
+
+    if (historyClearedAt) {
+      const historyClearedTime = historyClearedAt.getTime();
+      orderedMessages = orderedMessages.filter(
+        (msg) => new Date(msg.createdAt).getTime() >= historyClearedTime
+      );
+    }
+
     return res.json({
       success: true,
       data: orderedMessages,
