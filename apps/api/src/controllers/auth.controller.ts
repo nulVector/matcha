@@ -8,6 +8,7 @@ import passport from 'passport';
 import { COOKIE_OPTIONS } from "../constant/cookie";
 import { redisManager } from "../services/redis";
 import { createId } from '@paralleldrive/cuid2';
+import { EventType, JwtPayload } from "@matcha/shared";
 
 const jwtSecret = process.env.JWT_SECRET;
 if (!jwtSecret){
@@ -116,12 +117,31 @@ export const confirmResetPassword = async (req: Request, res: Response,next:Next
       return res.status(400).json({ message: "Invalid or expired reset token." });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
-    await prisma.user.update({
+    const updatedUser = await prisma.user.update({
       where: { id:userId },
-      data: { password: hashedPassword }
+      data: { password: hashedPassword },
+      select: { profile: { select: { id: true }}}
     });
     await redisManager.auth.consumeResetToken(token);
-    await redisManager.auth.invalidateAllUserSessions(userId);
+    const killPromises: Promise<any>[] = [
+      redisManager.auth.invalidateAllUserSessions(userId)
+    ];
+    if (updatedUser.profile) {
+      killPromises.push(
+        redisManager.chat.publish(
+          'chat_router',
+          JSON.stringify({
+            receiverId: updatedUser.profile.id,
+            eventType: EventType.FORCE_DISCONNECT,
+            eventData: {
+              killAll: true,
+              reason: "Password reset"
+            }
+          })
+        )
+      );
+    }
+    await Promise.all(killPromises);
     return res.json({ message: "Password has been successfully reset. Please log in." });
   } catch (err: any) {
     err.context = { location: "authController.confirmResetPassword" };
@@ -132,11 +152,23 @@ export const confirmResetPassword = async (req: Request, res: Response,next:Next
 export const logout = async (req:Request,res:Response,next:NextFunction)=>{
   try {
     const userId = req.user!.id;
+    const userProfileId = req.user!.profile!.id;
     //TODO - extract this out 
     const token = req.cookies['token'];
-    const decoded = jwt.decode(token) as any; 
+    const decoded = jwt.decode(token) as JwtPayload; 
     await redisManager.auth.invalidateSession(userId, decoded.sessionId);
     res.clearCookie("token", COOKIE_OPTIONS);
+    await redisManager.chat.publish(
+      'chat_router',
+      JSON.stringify({
+        receiverId: userProfileId,
+        eventType: EventType.FORCE_DISCONNECT,
+        eventData: {
+          sessionId: decoded.sessionId,
+          reason: "Logged out of device."
+        }
+      })
+    )
     return res.json({ message: "Logged out successfully" });
   } catch (err: any) {
     err.context = { location: "authController.logout", userId: req.user!.id };
@@ -146,8 +178,20 @@ export const logout = async (req:Request,res:Response,next:NextFunction)=>{
 export const logoutAll = async (req:Request,res:Response,next:NextFunction)=>{
   try {
     const userId = req.user!.id;
+    const userProfileId = req.user!.profile!.id;
     await redisManager.auth.invalidateAllUserSessions(userId);
     res.clearCookie("token", COOKIE_OPTIONS);
+    await redisManager.chat.publish(
+      'chat_router',
+      JSON.stringify({
+        receiverId: userProfileId,
+        eventType: EventType.FORCE_DISCONNECT,
+        eventData: {
+          killAll: true,
+          reason: "Auth state change"
+        }
+      })
+    )
     return res.json({ message: "Logged out of all devices." });
   } catch (err: any) {
     err.context = { location: "authController.logoutAll", userId: req.user!.id };

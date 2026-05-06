@@ -8,6 +8,13 @@ import { createId } from '@paralleldrive/cuid2';
 import { logger } from '@matcha/logger';
 import { JwtPayload, UserSession, EventType } from "@matcha/shared"
 
+interface AuthenticatedWebSocket extends WebSocket {
+  isAlive: boolean;
+  userId: string;
+  sessionId: string;
+  exp: number;
+}
+
 const server = createServer((req, res) => {
   res.writeHead(200);
   res.end("WebSocket Server Running");
@@ -44,7 +51,7 @@ server.on('upgrade',async (request,socket,head)=>{
       socket.destroy();
       return;
     }
-    const jwt_payload = jwt.verify(token,jwtSecret) as JwtPayload;
+    const jwt_payload = jwt.verify(token,jwtSecret) as (JwtPayload & { exp:number });
     const userSession = await redisManager.auth.getSession(jwt_payload.id, jwt_payload.sessionId);
     if (!userSession){
       socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
@@ -52,7 +59,7 @@ server.on('upgrade',async (request,socket,head)=>{
       return;
     }
     wss.handleUpgrade(request,socket,head,(ws)=>{
-      wss.emit('connection',ws,request,userSession);
+      wss.emit('connection',ws,request,userSession,jwt_payload);
     })
   } catch (err) {
     socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
@@ -60,25 +67,46 @@ server.on('upgrade',async (request,socket,head)=>{
     return;
   }
 })
-wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:UserSession)=>{
+wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:UserSession, jwtPayload:(JwtPayload & { exp:number }))=>{
   const profileId = userSession.userProfileId;
   if (!profileId) {
     ws.close(1008, "Profile required to connect");
     return;
   }
   const socketId = createId(); 
-  (ws as any).isAlive = true;
+  const authWs = ws as AuthenticatedWebSocket;
+  authWs.isAlive = true;
+  authWs.userId = jwtPayload.id;
+  authWs.sessionId = jwtPayload.sessionId;
+  authWs.exp = jwtPayload.exp;
   if (!localSockets.has(profileId)) localSockets.set(profileId, new Set());
-  localSockets.get(profileId)!.add(ws);
-  ws.on('pong', async () => {
-    (ws as any).isAlive = true;
+  localSockets.get(profileId)!.add(authWs);
+  try {
+    await redisManager.userConnection.mapSocket(profileId,socketId);
+  } catch (err: any) {
+    logger.error({ err, profileId }, "Failed to initialize connection");
+    ws.close();
+    return;
+  }
+  authWs.on('pong', async () => {
+    authWs.isAlive = true;
+    const currentTime = Math.floor(Date.now() / 1000);
+    if (currentTime > authWs.exp) {
+      logger.warn({ profileId }, "Token expired. Forcing disconnect.");
+      return authWs.close(4001, "Token Expired");
+    }
     try {
+      const isValidSession = await redisManager.auth.checkSessionExists(authWs.userId, authWs.sessionId);
+      if (!isValidSession) {
+        logger.warn({profileId},"Session revoked. Forcing disconnect.")
+        return authWs.close(4001, "Session Revoked");  
+      }
       await redisManager.userConnection.setUserStatus(profileId);
     } catch (err: any) {
-      logger.error({ err, profileId }, "Heartbeat update failed");
+      logger.error({ err, profileId }, "Heartbeat update failed/validation failed");
     }
   });
-  ws.on('message', async (rawMessage: Buffer) => {
+  authWs.on('message', async (rawMessage: Buffer) => {
     let parsedData;
     try {
       parsedData = JSON.parse(rawMessage.toString());
@@ -192,11 +220,11 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
       logger.error({ err, profileId }, "Error processing message");
     }
   });
-  ws.on('close', async () => {
+  authWs.on('close', async () => {
     try {
       const userTabs = localSockets.get(profileId);
       if (userTabs) {
-        userTabs.delete(ws);
+        userTabs.delete(authWs);
         if (userTabs.size === 0) localSockets.delete(profileId);
       }
       const activeChat = await redisManager.chat.getActiveChat(profileId);
@@ -211,12 +239,6 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
       logger.error({ err, profileId }, "Error cleaning up socket");
     }
   });
-  try {
-    await redisManager.userConnection.mapSocket(profileId,socketId);
-  } catch (err: any) {
-    logger.error({ err, profileId }, "Failed to initialize connection");
-    ws.close();
-  }
 });
 
 let httpServer: any;
@@ -228,11 +250,23 @@ async function bootstrap(){
         const { receiverId, eventData, eventType } = JSON.parse(payload);
         const receiverSockets = localSockets.get(receiverId);
         if (receiverSockets) {
+          if (eventType === EventType.FORCE_DISCONNECT){
+            receiverSockets.forEach(ws => {
+              const authWs = ws as AuthenticatedWebSocket;
+              if (eventData.exceptSessionId && authWs.sessionId === eventData.exceptSessionId) {
+                return;
+              }
+              if (eventData.killAll || authWs.sessionId === eventData.sessionId) {
+                authWs.close(4001, eventData.reason || "Session Revoked");
+              }
+            });
+            return;
+          }
           const outGoingPayload = JSON.stringify({
             type: eventType,
             payload: eventData
           });
-          receiverSockets.forEach(ws => ws.send(outGoingPayload));
+          receiverSockets.forEach(authWs => authWs.send(outGoingPayload));
         }
       } catch (err: any) {
         logger.error({ err }, "Failed to parse Redis router message");
@@ -249,12 +283,12 @@ async function bootstrap(){
 }
 
 const heartbeatInterval = setInterval(() => {
-  wss.clients.forEach((ws) => {
-    if ((ws as any).isAlive === false) {
-      return ws.terminate(); 
+  wss.clients.forEach((authWs) => {
+    if ((authWs as any).isAlive === false) {
+      return authWs.terminate(); 
     }
-    (ws as any).isAlive = false;
-    ws.ping();
+    (authWs as any).isAlive = false;
+    authWs.ping();
   });
 }, 30000);
 wss.on('close', () => {
@@ -275,8 +309,8 @@ async function gracefulShutdown(signal: string) {
   }, 10000);
   clearInterval(heartbeatInterval);
   logger.info(`Disconnecting ${wss.clients.size} active WebSocket clients...`);
-  wss.clients.forEach((ws) => {
-    ws.close(1001, 'Server shutting down or restarting'); 
+  wss.clients.forEach((authWs) => {
+    authWs.close(1001, 'Server shutting down or restarting'); 
   });
   wss.close(async () => {
     logger.info("WebSocket server closed.");

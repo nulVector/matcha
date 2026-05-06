@@ -13,6 +13,10 @@ export class AuthManager {
     const data = await this.redis.get(`session:${userId}:${sessionId}`);
     return data ? JSON.parse(data) : null;
   }
+  async checkSessionExists(userId:string, sessionId:string){
+    const session = await this.redis.exists(`session:${userId}:${sessionId}`);
+    return session === 1;
+  }
   async invalidateSession(userId:string, sessionId: string){
     await this.redis.del(`session:${userId}:${sessionId}`);
   }

@@ -7,6 +7,7 @@ import { requireAuth } from "../middleware/requireAuth";
 import { validate } from "../middleware/validate";
 import passport from "passport";
 import { authGuard } from "../middleware/authGuard";
+import { profileGuard } from "../middleware/profileGuard";
 const authRouter: Router = Router();
 
 authRouter.post(
@@ -52,7 +53,7 @@ authRouter.post(
     confirmResetPassword
 );
 
-authRouter.use(requireAuth,authGuard);
+authRouter.use(requireAuth,authGuard,profileGuard);
 authRouter.post(
     "/logout",
     logout

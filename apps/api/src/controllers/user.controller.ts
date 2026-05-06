@@ -320,7 +320,21 @@ export const updatePassword = async (req:Request,res:Response, next:NextFunction
       where:{ id:userId },
       data:{ password:hashedPassword }
     })
-    await redisManager.auth.invalidateAllUserSessions(userId);
+    await Promise.all([
+      redisManager.auth.invalidateAllUserSessions(userId),
+      redisManager.chat.publish(
+        'chat_router',
+        JSON.stringify({
+          receiverId: profileId,
+          eventType: EventType.FORCE_DISCONNECT,
+          eventData: {
+            killAll: true,
+            exceptSessionId: sessionId,
+            reason: "Password changed"
+          }
+        })
+      )
+    ]);
     await redisManager.auth.cacheSession(userId, sessionId, profileId, true);
     const token = jwt.sign({ 
         id: userId,
@@ -915,7 +929,18 @@ export const deactivateProfile = async (req:Request,res:Response,next:NextFuncti
     })
     await Promise.all([
       redisManager.match.leaveQueue(profileId),
-      redisManager.auth.invalidateAllUserSessions(userId)
+      redisManager.auth.invalidateAllUserSessions(userId),
+      redisManager.chat.publish(
+        'chat_router',
+        JSON.stringify({
+          receiverId: profileId,
+          eventType: EventType.FORCE_DISCONNECT,
+          eventData: {
+            killAll: true,
+            reason: "Auth state change"
+          }
+        })
+      )
     ])
     res.clearCookie("token",{...COOKIE_OPTIONS,maxAge:0});
     res.json({
