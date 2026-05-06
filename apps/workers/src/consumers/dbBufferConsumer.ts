@@ -31,7 +31,11 @@ export const dbBufferWorker = new Worker(
         if (uniqueConnectionIds.length > 0) {
           await prisma.connection.updateMany({
             where: { id: { in: uniqueConnectionIds } },
-            data: { updatedAt: new Date() }
+            data: { 
+              updatedAt: new Date(),
+              user1ChatVisible: true,
+              user2ChatVisible: true 
+            }
           });
         }
         await redisManager.chat.trimMessageBufferBatch(messages.length);

@@ -86,30 +86,32 @@ model Interest {
 }
 
 model Connection {
-  id              String           @id @default(cuid(2))
-  createdAt       DateTime         @default(now())
-  status          ConnectionStatus @default(MATCHED)
-  updatedAt       DateTime         @default(now())
-  expiresAt       DateTime?
-  user1Id         String
-  user1           UserProfile      @relation("MatchUser1", fields: [user1Id], references: [id])
-  user2Id         String
-  user2           UserProfile      @relation("MatchUser2", fields: [user2Id], references: [id])
-  messages        Message[]
-  friendRequest   FriendRequest[]
-  user1LastReadId String?
-  user1LastReadAt DateTime?
-  user2LastReadId String?
-  user2LastReadAt DateTime?
-  user1LastRead   Message?         @relation("User1Read", fields: [user1LastReadId], references: [id])
-  user2LastRead   Message?         @relation("User2Read", fields: [user2LastReadId], references: [id])
-  user1DeletedAt  DateTime?
-  user2DeletedAt  DateTime?
-  finalDeleteAt   DateTime?
+  id                    String           @id @default(cuid(2))
+  createdAt             DateTime         @default(now())
+  status                ConnectionStatus @default(MATCHED)
+  updatedAt             DateTime         @default(now())
+  expiresAt             DateTime?
+  user1Id               String
+  user1                 UserProfile      @relation("MatchUser1", fields: [user1Id], references: [id])
+  user2Id               String
+  user2                 UserProfile      @relation("MatchUser2", fields: [user2Id], references: [id])
+  messages              Message[]
+  friendRequest         FriendRequest[]
+  user1LastReadId       String?
+  user1LastReadAt       DateTime?
+  user2LastReadId       String?
+  user2LastReadAt       DateTime?
+  user1LastRead         Message?         @relation("User1Read", fields: [user1LastReadId], references: [id])
+  user2LastRead         Message?         @relation("User2Read", fields: [user2LastReadId], references: [id])
+  user1ChatVisible      Boolean          @default(true)
+  user2ChatVisible      Boolean          @default(true)
+  user1HistoryClearedAt DateTime?
+  user2HistoryClearedAt DateTime?
+  finalDeleteAt         DateTime?
 
   @@unique([user1Id, user2Id])
-  @@index([user1Id, user1DeletedAt])
-  @@index([user2Id, user2DeletedAt])
+  @@index([user1Id, user1ChatVisible])
+  @@index([user2Id, user2ChatVisible])
   @@index([finalDeleteAt])
 }
 

@@ -349,8 +349,8 @@ export const getConnectionsList = async (req: Request, res: Response, next: Next
       where: {
         status,
         OR: [
-          { AND: [{ user1Id: userProfileId }, { user1DeletedAt: null }] },
-          { AND: [{ user2Id: userProfileId }, { user2DeletedAt: null }] }
+          { AND: [{ user1Id: userProfileId }, { user1ChatVisible: true }] },
+          { AND: [{ user2Id: userProfileId }, { user2ChatVisible: true }] }
         ]
       },
       select: {
@@ -410,8 +410,11 @@ export const deleteConnection = async (req: Request, res: Response, next: NextFu
     const isUser1 = connection.user1Id === profileId;
     await prisma.connection.update({
       where: { id: connectionId },
-      data: isUser1 ? { user1DeletedAt: now } : { user2DeletedAt: now }
+      data: isUser1 
+        ? { user1ChatVisible: false, user1HistoryClearedAt: now } 
+        : { user2ChatVisible: false, user2HistoryClearedAt: now }
     });
+    await redisManager.chat.hideChat(connectionId);
     res.json({
       success:true
     })
@@ -771,8 +774,8 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
             data: { 
               status: ConnectionStatus.FRIEND,
               finalDeleteAt: null,
-              user1DeletedAt:null,
-              user2DeletedAt:null
+              user1ChatVisible: true, 
+              user2ChatVisible: true
             }
           });
           if (updateResult.count === 0) {
@@ -831,7 +834,7 @@ export const handleUnfriendRequest = async (req:Request,res:Response,next:NextFu
           user2Id
         }
       },
-      select: { id: true, user1Id: true, status:true }
+      select: { id: true, status:true }
     });
     if (!connection || connection.status !== ConnectionStatus.FRIEND) {
       return res.status(404).json({
@@ -839,13 +842,13 @@ export const handleUnfriendRequest = async (req:Request,res:Response,next:NextFu
         message: "No active friendship found" 
       });
     }
-    const isUser1 = connection.user1Id === myProfileId;
     await prisma.connection.update({
       where: { id: connection.id },
       data: {
         status: ConnectionStatus.UNFRIENDED,
         finalDeleteAt: THIRTY_DAYS,
-        [isUser1 ? 'user1DeletedAt' : 'user2DeletedAt']: now
+        user1ChatVisible: false,
+        user2ChatVisible: false
       }
     });
     await redisManager.userConnection.clearConnectionInfo(connection.id)

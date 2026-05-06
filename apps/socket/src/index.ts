@@ -1,6 +1,7 @@
 import { CachedMessage, MessageType, UserState, ConnectionListType } from '@matcha/redis';
 import { createServer, IncomingMessage } from 'http';
 import jwt from 'jsonwebtoken';
+import prisma from '@matcha/prisma';
 import { WebSocket, WebSocketServer } from 'ws';
 import { redisManager } from './services/redis';
 import { createId } from '@paralleldrive/cuid2';
@@ -117,6 +118,18 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
             message, 
             EventType.CHAT_MESSAGE
           );
+          const wasHidden = await redisManager.chat.checkAndUnhideChat(connectionId);
+          if (wasHidden){
+            prisma.connection.update({
+              where:{
+                id:connectionId
+              }, data: {
+                user1ChatVisible: true,
+                user2ChatVisible: true,
+                updatedAt: new Date()
+              }
+            }).catch(err => logger.error({err, connectionId}, "Failed to unhide the chat."))
+          }
           break;
         }
         case 'TYPING_INDICATOR': {

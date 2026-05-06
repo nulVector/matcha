@@ -51,6 +51,14 @@ export class ChatManager {
     const rawMessages = await this.redis.lrange(`chat:${connectionId}`, 0, -1);
     return rawMessages.map((msg) => JSON.parse(msg) as CachedMessage);
   }
+  async hideChat(connectionId:string) {
+    await this.redis.set(`chat:hidden:${connectionId}`,"1");
+  }
+  async checkAndUnhideChat(connectionId:string){
+    const key = `chat:hidden:${connectionId}`;
+    const deletedCount = await this.redis.del(key);
+    return deletedCount === 1;
+  }
   async seedUnreadCount(userId:string,unreadData:UnreadCountData[]){
     const key = `user:unread:${userId}`;
     const tx = this.redis.multi();

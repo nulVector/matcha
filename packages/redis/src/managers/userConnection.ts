@@ -53,6 +53,9 @@ export class UserConnectionManager {
     return info as { user1Id: string; user2Id: string; status:ConnectionListType};
   }
   async clearConnectionInfo(connectionId:string){
-    await this.redis.del(`connection:info:${connectionId}`);
+    const tx = this.redis.multi();
+    tx.del(`connection:info:${connectionId}`);
+    tx.del(`chat:hidden:${connectionId}`);
+    await tx.exec();
   }
 }
