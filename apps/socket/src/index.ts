@@ -7,6 +7,7 @@ import { redisManager } from './services/redis';
 import { createId } from '@paralleldrive/cuid2';
 import { logger } from '@matcha/logger';
 import { JwtPayload, UserSession, EventType } from "@matcha/shared"
+import { socketMessageSchema } from '@matcha/zod';
 
 interface AuthenticatedWebSocket extends WebSocket {
   isAlive: boolean;
@@ -115,19 +116,26 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
       logger.warn({ profileId, socketId }, "WebSocket rate limit exceeded.");
       return;
     }
-    let parsedData;
+    let parsedJson;
     try {
-      parsedData = JSON.parse(rawMessage.toString());
+      parsedJson = JSON.parse(rawMessage.toString());
     } catch (err: any) {
       logger.warn({ err, profileId }, "Malformed JSON received");
       return;
     }
+    const validation = socketMessageSchema.safeParse(parsedJson);
+    if (!validation.success){
+      logger.warn({ 
+        profileId, 
+        errors: validation.error.issues.map(err=>err.message)
+      }, "Invalid socket payload");
+      return;
+    }
+    const parsedData = validation.data;
     try {
       switch (parsedData.type) {
         case 'CHAT_MESSAGE': {
           const { connectionId, receiverId, content } = parsedData.payload;
-          const trimmedContent = content?.trim();
-          if (!trimmedContent) return;
           const [matchInfo, connInfo] = await Promise.all([
             redisManager.match.getMatchInfo(connectionId),
             redisManager.userConnection.getConnectionInfo(connectionId)
@@ -143,7 +151,7 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
           const message: CachedMessage = {
             id: createId(),
             connectionId,
-            content: trimmedContent,
+            content,
             senderId: profileId,
             createdAt: new Date().toISOString(),
             type: MessageType.TEXT

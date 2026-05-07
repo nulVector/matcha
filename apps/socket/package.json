@@ -21,6 +21,7 @@
   "dependencies": {
     "@matcha/logger": "workspace:*",
     "@matcha/redis": "workspace:*",
+    "@matcha/zod": "workspace:*",
     "@paralleldrive/cuid2": "^3.3.0",
     "jsonwebtoken": "^9.0.3",
     "ws": "^8.19.0"
