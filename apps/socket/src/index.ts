@@ -107,6 +107,11 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
     }
   });
   authWs.on('message', async (rawMessage: Buffer) => {
+    const isRateLimited = await redisManager.auth.checkRateLimit(`ws:msg:${socketId}`, 100, 5);
+    if (isRateLimited) {
+      logger.warn({ profileId, socketId }, "WebSocket rate limit exceeded.");
+      return;
+    }
     let parsedData;
     try {
       parsedData = JSON.parse(rawMessage.toString());
@@ -145,6 +150,14 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
             receiverId, 
             message, 
             EventType.CHAT_MESSAGE
+          );
+          await redisManager.chat.publish(
+            'chat_router',
+            JSON.stringify({
+              receiverId: profileId, 
+              eventType: EventType.CHAT_MESSAGE,
+              eventData: message
+            })
           );
           const wasHidden = await redisManager.chat.checkAndUnhideChat(connectionId);
           if (wasHidden){
