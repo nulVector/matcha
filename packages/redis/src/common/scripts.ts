@@ -15,3 +15,11 @@ export const REMOVE_SOCKET_SCRIPT = `
   redis.call('DEL', KEYS[1])
   return redis.call('SCARD', 'user:sockets:' .. userId)
 `;
+
+export const VALIDATE_AND_UPDATE_PRESENCE_SCRIPT = `
+  if redis.call('EXISTS', KEYS[1]) == 1 then
+    redis.call('SET', KEYS[2], ARGV[1], 'EX', ARGV[2])
+    return 1
+  end
+  return 0
+`;

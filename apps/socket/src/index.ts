@@ -96,12 +96,15 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
       return authWs.close(4001, "Token Expired");
     }
     try {
-      const isValidSession = await redisManager.auth.checkSessionExists(authWs.userId, authWs.sessionId);
+      const isValidSession = await redisManager.userConnection.validateAndUpdatePresence(
+        authWs.userId, 
+        authWs.sessionId,
+        profileId
+      );
       if (!isValidSession) {
         logger.warn({profileId},"Session revoked. Forcing disconnect.")
         return authWs.close(4001, "Session Revoked");  
       }
-      await redisManager.userConnection.setUserStatus(profileId);
     } catch (err: any) {
       logger.error({ err, profileId }, "Heartbeat update failed/validation failed");
     }

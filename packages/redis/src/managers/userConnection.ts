@@ -1,5 +1,5 @@
 import Redis from "ioredis";
-import { ConnectionListType, REMOVE_SOCKET_SCRIPT } from "../common";
+import { ConnectionListType, REMOVE_SOCKET_SCRIPT, VALIDATE_AND_UPDATE_PRESENCE_SCRIPT } from "../common";
 import { getDeterministicIds } from "@matcha/shared";
 
 export class UserConnectionManager {
@@ -9,7 +9,7 @@ export class UserConnectionManager {
     const tx = this.redis.multi();
     tx.sadd(`user:sockets:${userId}`,socketId);
     tx.set(`socket:${socketId}`,userId, "EX", 60 * 60 * 24);
-    tx.set(`user:status:${userId}`,"1", "EX", 60);
+    tx.set(`user:status:${userId}`,"1", "EX", 90);
     await tx.exec();
   }
   async getUserSockets(userId:string){
@@ -29,11 +29,24 @@ export class UserConnectionManager {
     return await this.redis.scard(`user:sockets:${userId}`);
   }
   async setUserStatus(userId: string) {
-    await this.redis.set(`user:status:${userId}`, Date.now().toString(), "EX", 60 * 2);
+    await this.redis.set(`user:status:${userId}`, Date.now().toString(), "EX", 90);
   }
   async checkUserStatus(userId: string): Promise<boolean> {
     const exists = await this.redis.exists(`user:status:${userId}`);
     return exists === 1;
+  }
+  async validateAndUpdatePresence(userId: string, sessionId: string, profileId:string){
+    const sessionKey = `session:${userId}:${sessionId}`;
+    const presenceKey = `user:status:${profileId}`;
+    const result = await this.redis.eval(
+      VALIDATE_AND_UPDATE_PRESENCE_SCRIPT,
+      2,
+      sessionKey,
+      presenceKey,
+      Date.now().toString(),
+      "90"
+    );
+    return result === 1; 
   }
   async setConnectionInfo(connectionId:string,id1:string,id2:string, status:ConnectionListType){
     const key = `connection:info:${connectionId}`;
