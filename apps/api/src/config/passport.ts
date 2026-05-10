@@ -18,7 +18,7 @@ export const configurePassport = (passport:PassportStatic) =>{
   passport.use(new GoogleStrategy({
     clientID,
     clientSecret,
-    callbackURL: '/api/auth/google/callback',
+    callbackURL: '/api/v1/auth/google/callback',
     scope: ['profile', 'email']
   }, async (accessToken, refreshToken, profile, done) => {
     try {

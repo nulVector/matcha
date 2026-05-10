@@ -9,6 +9,7 @@ import { COOKIE_OPTIONS } from "../constant/cookie";
 import { redisManager } from "../services/redis";
 import { createId } from '@paralleldrive/cuid2';
 import { EventType, JwtPayload } from "@matcha/shared";
+import { TaskProducer } from "@matcha/queue";
 
 const jwtSecret = process.env.JWT_SECRET;
 if (!jwtSecret){
@@ -42,6 +43,7 @@ export const signup = async (req:Request, res:Response,next:NextFunction) =>{
 }
 
 export const login = async (req:Request,res:Response,next:NextFunction)=>{
+  req.body = req.validatedData.body;
   passport.authenticate('local',{session:false},async (err:Error,user: Express.User | false,info:{message:string}|undefined)=>{
     if (err) {
       next(err);
@@ -100,7 +102,15 @@ export const requestResetPassword = async (req:Request,res:Response,next:NextFun
       await redisManager.auth.setResetToken(resetToken, user.id);
       const frontendUrl = process.env.CLIENT_URL || 'http://localhost:3000';
       const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
-      // TODO - send email to user via Nodemailer/Resend/SendGrid
+      await TaskProducer.dispatchSendEmail({
+        to:email,
+        subject: "Reset your password",
+        template: "PASSWORD_RESET",
+        context: {
+          resetUrl,
+          expiresIn: "10 minutes"
+        }
+      });
     }
     return res.json({ message: "If an account exists, a reset code has been sent." });
   } catch (err: any) {
