@@ -1,7 +1,7 @@
 import prisma, { ConnectionStatus, RequestOrigin, RequestStatus } from '@matcha/prisma';
 import { TaskProducer } from '@matcha/queue';
 import { ConnectionListType, NotificationCategory } from '@matcha/redis';
-import { connectionIdType, deactivatePasswordType, getConnectionsListType, getFriendRequestsType, initiateProfileType, requestHandleType, requestIdType, sendRequestType, updatePasswordType, updateProfileType, userIdType, usernameCheckType, vibeCheckType } from '@matcha/zod';
+import { connectionIdType, deactivatePasswordType, getConnectionsListType, getFriendListType, getFriendRequestsType, initiateProfileType, requestHandleType, requestIdType, sendRequestType, updatePasswordType, updateProfileType, userIdType, usernameCheckType, vibeCheckType } from '@matcha/zod';
 import bcrypt from "bcrypt";
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
@@ -348,6 +348,55 @@ export const updatePassword = async (req:Request,res:Response, next:NextFunction
   }catch(err: any){
     err.context = { location: "userController.updatePassword", userId: req.user!.id };
     next(err)
+  }
+}
+
+export const getFriendList = async (req:Request, res:Response, next: NextFunction) =>{
+  try {
+    const profileId = req.user!.profile!.id;
+    const { cursor, limit }: getFriendListType = req.validatedData.query;
+    const friends = await prisma.connection.findMany({
+      take: limit + 1,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      orderBy: { updatedAt: 'desc' },
+      where: {
+        status: ConnectionStatus.FRIEND,
+        OR: [
+          { user1Id: profileId },
+          { user2Id: profileId }
+        ]
+      },
+      select: {
+        id: true,
+        updatedAt: true,
+        user1: { select: { id: true, username: true, avatarUrl: true, isActive: true } },
+        user2: { select: { id: true, username: true, avatarUrl: true, isActive: true } }
+      }
+    });
+    let nextCursor: string | undefined = undefined;
+    if (friends.length > limit) {
+      const nextItem = friends.pop();
+      nextCursor = nextItem!.id;
+    }
+    const formattedFriends = friends.map(conn => {
+      const friendProfile = conn.user1.id === profileId ? conn.user2 : conn.user1;
+      return {
+        connectionId: conn.id,
+        id: friendProfile.id,
+        username: friendProfile.username,
+        avatarUrl: friendProfile.avatarUrl,
+        isActive: friendProfile.isActive,
+        timestamp: conn.updatedAt.getTime()
+      };
+    });
+    return res.json({
+      success: true,
+      data: formattedFriends,
+      nextCursor
+    });
+  } catch (err: any) {
+    err.context = { location: "userController.getFriendList", profileId: req.user!.profile!.id };
+    next(err);
   }
 }
 

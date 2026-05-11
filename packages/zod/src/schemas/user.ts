@@ -71,42 +71,30 @@ export const initiateProfileSchema = z.object({
 })
 export type initiateProfileType = z.infer<typeof initiateProfileSchema>;
 
-export const updateProfileSchema = z.object({
-  avatarUrl:avatarUrlSchema.optional(),
-  aboutMe: aboutMeSchema.optional(),
-  openingQues: openingQuesSchema.optional(),
-  location: locationNameSchema.optional(),
-  locationLatitude: latitudeSchema.optional(),
-  locationLongitude: longitudeSchema.optional(),
-  interest: interestsSchema.optional(),
-  allowDiscovery: z.boolean().optional()
-})
+export const updateProfileSchema = initiateProfileSchema.partial()
 export type updateProfileType = z.infer<typeof updateProfileSchema>
 
-export const getConnectionsListSchema = z.object({
-  status: z.enum(["FRIEND" , "ARCHIVED"],{
-    error:"Must be either 'FRIEND' or 'ARCHIVED'"
-  }),
+const paginationSchema = z.object({
   cursor: cuidId.optional(),
   limit: z.coerce.number().min(1).max(50).default(20)
+})
+
+export const getFriendListSchema = paginationSchema
+export type getFriendListType = z.infer<typeof getFriendListSchema>
+
+export const getConnectionsListSchema = paginationSchema.extend({
+  status: z.enum(["FRIEND" , "ARCHIVED"],{
+    error:"Must be either 'FRIEND' or 'ARCHIVED'"
+  })
 })
 export type getConnectionsListType = z.infer<typeof getConnectionsListSchema>
 
-export const getFriendRequestsSchema = z.object({
-  type: z.enum(["incoming","outgoing"],{
-    error:"Must be either 'incoming' or 'outgoing'"
-  }),
-  cursor: cuidId.optional(),
-  limit: z.coerce.number().min(1).max(50).default(20)
-})
-export type getFriendRequestsType = z.infer<typeof getFriendRequestsSchema>
-
-export const getUserProfileSchema = z.object({
+export const getFriendRequestsSchema = paginationSchema.extend({
   type: z.enum(["incoming","outgoing"],{
     error:"Must be either 'incoming' or 'outgoing'"
   })
 })
-export type getUserProfileType = z.infer<typeof getUserProfileSchema>
+export type getFriendRequestsType = z.infer<typeof getFriendRequestsSchema>
 
 export const userIdSchema = z.object({
   userId:cuidId
