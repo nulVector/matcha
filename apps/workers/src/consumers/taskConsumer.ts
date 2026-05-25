@@ -2,6 +2,9 @@ import { JobName, QueueName, TaskQueueJob } from "@matcha/queue";
 import { Job, Worker } from "bullmq";
 import { redisManager, workerConnection } from "../config/redis";
 import { logger } from "@matcha/logger";
+import { Resend } from "resend";
+import { renderPasswordResetEmail } from "@matcha/emails";
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const taskWorker = new Worker(
   QueueName.TASK, 
@@ -27,7 +30,25 @@ export const taskWorker = new Worker(
       }
       case JobName.SEND_EMAIL:{
         const { to, subject, template, context } = task.data;
-        //TODO - integrate email service
+        let html = '';
+        if (template === "PASSWORD_RESET") {
+          html = await renderPasswordResetEmail({
+            resetUrl: context.resetUrl!,
+            expiresIn: context.expiresIn!
+          });
+        }
+        try {
+          await resend.emails.send({
+            from: 'Matcha <noreply@mail.trymatcha.in>',
+            to: [to],
+            subject: subject,
+            html: html,
+          });
+          logger.info({ to, subject }, "Email sent successfully");
+        } catch (err) {
+          logger.error({ err, to }, "Failed to send email via Resend");
+          throw err; 
+        }
         break;
       }
       default:

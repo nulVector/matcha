@@ -11,13 +11,15 @@
     "clean": "rimraf dist .turbo"
   },
   "dependencies": {
+    "@matcha/emails": "workspace:*",
     "@matcha/logger": "workspace:*",
     "@matcha/prisma": "workspace:*",
     "@matcha/queue": "workspace:*",
     "@matcha/redis": "workspace:*",
     "@paralleldrive/cuid2": "^3.3.0",
     "bullmq": "^5.70.1",
-    "ioredis": "^5.9.2"
+    "ioredis": "^5.9.2",
+    "resend": "^6.12.3"
   },
   "devDependencies": {
     "@matcha/shared": "workspace:*",
