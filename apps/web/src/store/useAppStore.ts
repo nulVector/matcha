@@ -1,19 +1,13 @@
 import { create } from 'zustand';
 
+export type SidebarTab = 'chat' | 'requests' | 'search' | 'settings';
+
 interface AppState {
-  isSettingsOpen: boolean;
-  isSearchOpen: boolean;
-  isRequestsOpen: boolean;
-  setSettingsOpen: (isOpen: boolean) => void;
-  setSearchOpen: (isOpen: boolean) => void;
-  setRequestsOpen: (isOpen: boolean) => void;
+  activeTab: SidebarTab;
+  setActiveTab: (tab: SidebarTab) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
-  isSettingsOpen: false,
-  isSearchOpen: false,
-  isRequestsOpen: false,
-  setSettingsOpen: (isOpen) => set({ isSettingsOpen: isOpen }),
-  setSearchOpen: (isOpen) => set({ isSearchOpen: isOpen }),
-  setRequestsOpen: (isOpen) => set({ isRequestsOpen: isOpen }),
+  activeTab: 'chat',
+  setActiveTab: (tab) => set({ activeTab: tab })
 }));
