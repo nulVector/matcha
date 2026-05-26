@@ -35,6 +35,7 @@ import {
 } from "@tanstack/react-query";
 import {
   Archive,
+  Edit,
   MessageSquare,
   MoreVertical,
   Search,
@@ -43,6 +44,7 @@ import {
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
+import { NewChatPanel } from "./newChatPanel";
 
 export function ChatPane() {
   const params = useParams();
@@ -52,6 +54,7 @@ export function ChatPane() {
   const [view, setView] = useState<"FRIEND" | "ARCHIVED">("FRIEND");
   const [searchQuery, setSearchQuery] = useState("");
   const [connectionToDelete, setConnectionToDelete] = useState<any>(null);
+  const [isNewChatOpen, setIsNewChatOpen] = useState(false);
   const { key: deleteKey, resetKey: resetDeleteKey } = useIdempotency();
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
@@ -101,9 +104,20 @@ export function ChatPane() {
   );
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative overflow-hidden">
       <div className="p-4 space-y-4 border-b border-border/50 pb-4 shrink-0">
-        <h2 className="text-2xl font-semibold tracking-tight">Messages</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-semibold tracking-tight">Messages</h2>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsNewChatOpen(true)}
+            className="size-9 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-all duration-200 active:scale-[0.98]"
+            aria-label="New Chat"
+          >
+            <Edit className="size-4.5" />
+          </Button>
+        </div>
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
@@ -294,6 +308,10 @@ export function ChatPane() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <NewChatPanel
+        isOpen={isNewChatOpen}
+        onClose={() => setIsNewChatOpen(false)}
+      />
     </div>
   );
 }
