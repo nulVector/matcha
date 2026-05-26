@@ -2,7 +2,7 @@
 
 import { useUser } from "@/hooks/queries/useUser";
 import { useIdempotency } from "@/hooks/useIdempotency";
-import { api } from "@/lib/axios";
+import { api, getServerTime } from "@/lib/axios";
 import {
   Avatar,
   AvatarFallback,
@@ -88,22 +88,11 @@ export function ChatHeader({
     if (!isMatched || !matchData?.expiresAt) return;
 
     const interval = setInterval(() => {
-      const rawDiff = new Date(matchData.expiresAt).getTime() - Date.now();
+      const rawDiff = new Date(matchData.expiresAt).getTime() - getServerTime();
       const diff = Math.max(0, rawDiff);
-
       if (diff === 0) {
         clearInterval(interval);
         setTimeLeft("00:00");
-        api
-          .post("/connections/queue/leave")
-          .catch(() => {})
-          .finally(() => {
-            queryClient.invalidateQueries({
-              queryKey: ["messages", connectionId],
-            });
-            queryClient.invalidateQueries({ queryKey: ["connections"] });
-            router.push("/home/match");
-          });
       } else {
         const m = Math.floor((diff / 1000 / 60) % 60)
           .toString()
@@ -115,7 +104,7 @@ export function ChatHeader({
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [matchData?.expiresAt, isMatched, router, connectionId, queryClient]);
+  }, [matchData?.expiresAt, isMatched]);
 
   const { data: fullProfile, isLoading: isLoadingProfile } = useUser(
     targetUser?.username,

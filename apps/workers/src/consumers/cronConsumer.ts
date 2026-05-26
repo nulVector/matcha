@@ -62,6 +62,8 @@ export const cronWorker = new Worker(
             redisManager.match.clearMatchInfo(conn.id),
             redisManager.match.clearMatchVotes(conn.id),
             redisManager.match.clearMatchTimer(conn.id),
+            redisManager.match.leaveQueue(conn.user1Id, UserState.IDLE),
+            redisManager.match.leaveQueue(conn.user2Id, UserState.IDLE),
             redisManager.userConnection.setConnectionInfo(conn.id, conn.user1Id, conn.user2Id, ConnectionListType.ARCHIVED)
           );
         }

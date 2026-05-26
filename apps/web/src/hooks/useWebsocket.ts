@@ -78,6 +78,8 @@ export function useWebsocket() {
 
           case EventType.MATCH_EXPIRED:
             if (window.location.pathname.includes(`/home/chat/${payload.connectionId}`)) {
+              queryClient.invalidateQueries({ queryKey: ["messages", payload.connectionId] });
+              queryClient.invalidateQueries({ queryKey: ["connections"] });
               router.push("/home/match");
             }
             break;

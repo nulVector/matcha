@@ -1,8 +1,13 @@
 import axios from 'axios';
+
 const api_url = process.env.NEXT_PUBLIC_API_URL;
 if(!api_url) {
   throw new Error("Environment variable not found")
 }
+
+export let serverTimeOffset = 0;
+export const getServerTime = () => Date.now() + serverTimeOffset;
+
 export const api = axios.create({
   baseURL: api_url,
   withCredentials: true, 
@@ -23,7 +28,14 @@ api.interceptors.request.use((config) => {
   return config;
 });
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (response.headers.date) {
+      const serverTimer = new Date(response.headers.date).getTime();
+      const localTime = Date.now();
+      serverTimeOffset = serverTimer - localTime;
+    }
+    return response
+  },
   (error) => {
     if (error.response?.status === 401) {
       if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
