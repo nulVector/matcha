@@ -7,28 +7,27 @@ import { Textarea } from "@matcha/ui/components/textarea";
 import { Button } from "@matcha/ui/components/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@matcha/ui/components/popover";
 import { Send, HelpCircle, ArchiveX } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useOutboxStore } from "@/store/useOutboxStore";
 
 export function MessageInput({ 
   connectionId, 
   receiverId, 
   targetUser, 
-  myId, 
   isMatched, 
   isArchived 
 }: { 
   connectionId: string, 
   receiverId: string, 
   targetUser: any, 
-  myId: string, 
   isMatched: boolean, 
   isArchived?: boolean 
 }) {
   const [content, setContent] = useState("");
   const { sendMessage } = useWS();
-  const queryClient = useQueryClient();
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const addMessageToOutbox = useOutboxStore((state) => state.addMessage);
+  const markMessageFailed = useOutboxStore((state) => state.markFailed);
 
   useEffect(() => {
     return () => {
@@ -59,6 +58,12 @@ export function MessageInput({
     if (e) e.preventDefault();
     if (!content.trim() || isArchived) return;
     const messageText = content.trim();
+    setContent("");
+    const localId = addMessageToOutbox({
+      connectionId,
+      receiverId,
+      content: messageText
+    })
     sendMessage(EventType.CHAT_MESSAGE, {
       connectionId,
       receiverId,
@@ -69,25 +74,9 @@ export function MessageInput({
     setIsTyping(false);
     sendMessage(EventType.STOPPED_TYPING, { connectionId, receiverId });
 
-    queryClient.setQueryData(["messages", connectionId], (old: any) => {
-      if (!old || !old.pages || old.pages.length === 0) return old;
-      const optimisticMessage = {
-        id: `temp-${Date.now()}`,
-        connectionId,
-        content: messageText,
-        senderId: myId,
-        createdAt: new Date().toISOString(),
-        type: "TEXT"
-      };
-      const newPages = [...old.pages];
-      newPages[0] = {
-        ...newPages[0],
-        data: [...(newPages[0].data || []), optimisticMessage] 
-      };
-      return { ...old, pages: newPages };
-    });
-
-    setContent("");
+    setTimeout(() => {
+      markMessageFailed(localId);
+    }, 5000);
   };
 
   return (

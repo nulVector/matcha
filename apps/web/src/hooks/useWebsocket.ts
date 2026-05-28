@@ -3,6 +3,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { EventType, SystemAction } from "@matcha/shared";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
+import { useOutboxStore } from "@/store/useOutboxStore";
+import { useMe } from "./queries/useMe";
 
 export function useWebsocket() {
   const queryClient = useQueryClient();
@@ -12,6 +14,10 @@ export function useWebsocket() {
   useEffect(() => {
     pathnameRef.current = pathname;
   }, [pathname]);
+  
+  const acknowledgeMessage = useOutboxStore((state) => state.acknowledgeMessage);
+  const { data: profile } = useMe();
+  const myId = profile?.id;
 
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -38,13 +44,17 @@ export function useWebsocket() {
 
         switch (type) {
           case EventType.CHAT_MESSAGE:
+            if (payload.senderId === myId) {
+              acknowledgeMessage(payload.connectionId, payload.content);
+            }
             const oldData: any = queryClient.getQueryData(["messages", payload.connectionId]);
             if (!oldData || !oldData.pages || oldData.pages.length === 0) {
               queryClient.invalidateQueries({ queryKey: ["messages", payload.connectionId] });
             } else {
               queryClient.setQueryData(["messages", payload.connectionId], (old: any) => {
                 const newPages = [...old.pages];
-                const updatedData = [...(newPages[0].data || []), payload];
+                const serverMsg = { ...payload, isRead: false }; 
+                const updatedData = [...(newPages[0].data || []), serverMsg];
                 if (updatedData.length > 200) updatedData.shift(); 
                 newPages[0] = { ...newPages[0], data: updatedData };
                 return { ...old, pages: newPages };
@@ -59,7 +69,7 @@ export function useWebsocket() {
                 };
               });
             } else {
-              if (socketRef.current?.readyState === WebSocket.OPEN) {
+              if (payload.senderId !== myId && socketRef.current?.readyState === WebSocket.OPEN) {
                 socketRef.current.send(JSON.stringify({
                   type: "VIEWING_CHAT",
                   payload: {

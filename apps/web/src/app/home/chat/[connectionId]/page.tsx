@@ -7,6 +7,7 @@ import { useMe } from "@/hooks/queries/useMe";
 import { useChatScroll } from "@/hooks/useChatScroll";
 import { api } from "@/lib/axios";
 import { useWS } from "@/providers/wsProvider";
+import { useOutboxStore } from "@/store/useOutboxStore";
 import { EventType } from "@matcha/shared";
 import { Button } from "@matcha/ui/components/button";
 import { Loader } from "@matcha/ui/components/loader";
@@ -15,7 +16,13 @@ import {
   useInfiniteQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { ArrowDown, CheckCheck } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowDown,
+  Check,
+  CheckCheck,
+  Trash2,
+} from "lucide-react";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useRef } from "react";
 
@@ -27,6 +34,11 @@ export default function ActiveChatPage() {
 
   const { data: profile, isLoading: isMeLoading } = useMe();
   const myId = profile?.id;
+
+  const allOutboxMessages = useOutboxStore((state) => state.messages);
+  const retryOutboxMessage = useOutboxStore((state) => state.retryMessage);
+  const removeOutboxMessage = useOutboxStore((state) => state.removeMessage);
+  const markMessageFailed = useOutboxStore((state) => state.markFailed);
 
   const { 
     data: history, 
@@ -47,14 +59,35 @@ export default function ActiveChatPage() {
   });
 
   const messages = useMemo(() => {
-    if (!history?.pages) return [];
-    return [...history.pages].reverse().flatMap((page) => page.data);
-  }, [history?.pages]);
+    const serverMessages = history?.pages
+      ? [...history.pages].reverse().flatMap((page) => page.data)
+      : [];
+    const activeOutbox = allOutboxMessages.filter(
+      (m) => m.connectionId === connectionId,
+    );
+
+    const mappedOutbox = activeOutbox.map((m) => ({
+      id: m.localId,
+      content: m.content,
+      senderId: myId,
+      createdAt: new Date(m.createdAt).toISOString(),
+      type: "TEXT",
+      isOutbox: true,
+      status: m.status,
+    }));
+
+    return [...serverMessages, ...mappedOutbox];
+  }, [history?.pages, allOutboxMessages, myId, connectionId]);
 
   const firstFetchedPage = history?.pages.find((page) => page.meta);
   const chatPartner = firstFetchedPage?.meta || null;
   const matchData = firstFetchedPage?.matchData || null;
-  const lastMessageId = messages.length > 0 ? messages[messages.length - 1].id : undefined;
+
+  const serverMessagesOnly = messages.filter((m) => !m.isOutbox);
+  const lastMessageId =
+    serverMessagesOnly.length > 0
+      ? serverMessagesOnly[serverMessagesOnly.length - 1].id
+      : undefined;
 
   const {
     bottomRef,
@@ -165,10 +198,11 @@ export default function ActiveChatPage() {
                 >
                   <div
                     className={cn(
-                      "max-w-[85%] md:max-w-[70%] px-4 py-2 text-[15px] shadow-sm flex items-end gap-3",
+                      "max-w-[85%] md:max-w-[70%] px-4 py-2 text-[15px] shadow-sm flex items-end gap-2.5",
                       isMe
                         ? "bg-primary text-primary-foreground rounded-2xl rounded-br-sm"
                         : "bg-card text-card-foreground border border-border/50 rounded-2xl rounded-bl-sm",
+                      msg.status === "failed" && "opacity-80",
                     )}
                   >
                     <span className="wrap-break-word whitespace-pre-wrap leading-relaxed">
@@ -176,13 +210,48 @@ export default function ActiveChatPage() {
                     </span>
 
                     {isMe && (
-                      <div className="shrink-0 -mb-0.5 -mr-1">
-                        <CheckCheck
-                          className={cn(
-                            "size-4 transition-opacity duration-300",
-                            msg.isRead ? "opacity-100" : "opacity-40",
-                          )}
-                        />
+                      <div className="shrink-0 -mb-0.5 -mr-1 flex items-center gap-1">
+                        {msg.isOutbox ? (
+                          msg.status === "pending" ? (
+                            <Check className="size-3.5 opacity-60" />
+                          ) : (
+                            <div className="flex items-center gap-1.5 ml-1">
+                              <button
+                                onClick={() => {
+                                  retryOutboxMessage(msg.id);
+                                  sendMessage(EventType.CHAT_MESSAGE, {
+                                    connectionId,
+                                    receiverId: chatPartner?.id || "",
+                                    content: msg.content,
+                                  });
+                                  setTimeout(
+                                    () => markMessageFailed(msg.id),
+                                    5000,
+                                  );
+                                }}
+                                className="text-destructive hover:text-red-400 transition-colors active:scale-90 outline-none"
+                                title="Failed to send. Click to retry."
+                              >
+                                <AlertCircle className="size-4 drop-shadow-sm" />
+                              </button>
+
+                              <button
+                                onClick={() => removeOutboxMessage(msg.id)}
+                                className="text-primary-foreground/50 hover:text-primary-foreground transition-colors active:scale-90 outline-none"
+                                title="Delete message"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            </div>
+                          )
+                        ) : (
+                          <CheckCheck
+                            className={cn(
+                              "size-4 transition-all duration-300",
+                              msg.isRead ? "opacity-100" : "opacity-40",
+                            )}
+                          />
+                        )}
                       </div>
                     )}
                   </div>
@@ -219,7 +288,6 @@ export default function ActiveChatPage() {
         connectionId={connectionId}
         receiverId={chatPartner?.id || "unknown"}
         targetUser={chatPartner}
-        myId={myId}
         isMatched={matchData?.status === "MATCHED"}
         isArchived={
           matchData?.status === "ARCHIVED" || matchData?.status === "ENDED"
