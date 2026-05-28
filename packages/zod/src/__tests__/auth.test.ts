@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  deactivatePasswordSchema,
   loginSchema,
   requestPasswordResetSchema,
   resetPasswordSchema,
@@ -129,13 +128,6 @@ describe('Auth Zod Schemas', () => {
       const invalid = requestPasswordResetSchema.safeParse({ email: 'not-an-email' });
       expect(valid.success).toBe(true);
       expect(invalid.success).toBe(false);
-    });
-
-    it('deactivatePasswordSchema should allow optional passwords', () => {
-      const withPass = deactivatePasswordSchema.safeParse({ password: 'mypassword' });
-      const withoutPass = deactivatePasswordSchema.safeParse({});
-      expect(withPass.success).toBe(true);
-      expect(withoutPass.success).toBe(true);
     });
   });
 });

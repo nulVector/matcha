@@ -66,8 +66,3 @@ export const updatePasswordSchema = z
     path: ["newPassword"]
   });
 export type updatePasswordType = z.infer<typeof updatePasswordSchema>;
-
-export const deactivatePasswordSchema = z.object({
-  password:z.string().trim().optional()
-})
-export type deactivatePasswordType = z.infer<typeof deactivatePasswordSchema>;

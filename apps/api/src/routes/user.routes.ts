@@ -1,4 +1,4 @@
-import { connectionIdSchema, deactivatePasswordSchema, getConnectionsListSchema, getFriendListSchema, getFriendRequestsSchema, initiateProfileSchema, requestHandleSchema, requestIdSchema, sendRequestSchema, updatePasswordSchema, updateProfileSchema, userIdSchema, usernameCheckSchema, vibeCheck } from "@matcha/zod";
+import { connectionIdSchema, getConnectionsListSchema, getFriendListSchema, getFriendRequestsSchema, initiateProfileSchema, requestHandleSchema, requestIdSchema, sendRequestSchema, updatePasswordSchema, updateProfileSchema, userIdSchema, usernameCheckSchema, vibeCheck } from "@matcha/zod";
 import { Router } from "express";
 import { cancelRequest, checkUsername, deactivateProfile, deleteConnection, generateUsername, getConnectionsList, getFriendList, getFriendRequests, getMetadata, getProfile, getUserProfile, handleRequest, handleUnfriendRequest, initiateProfile, searchUser, sendRequest, updatePassword, updateProfile } from "../controllers/user.controller";
 import { idempotencyGuard } from "../middleware/idempotency";
@@ -51,7 +51,6 @@ userRouter.delete(
   "/me/deactivate-profile",
   rateLimiter('deactivate-profile', 'user', 3, 15 * 60),
   idempotencyGuard('deactivate-profile', 15),
-  validate(deactivatePasswordSchema),
   deactivateProfile
 );
 userRouter.get(

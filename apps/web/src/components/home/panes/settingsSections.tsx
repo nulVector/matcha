@@ -365,14 +365,13 @@ export function PasswordSetting() {
 export function DeactivateAccountAction() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [disablePassword, setDisablePassword] = useState("");
+  const [confirmText, setConfirmText] = useState("");
   const [disableError, setDisableError] = useState("");
   const { key: deactivateKey, resetKey: resetDeactivateKey } = useIdempotency();
 
   const { mutate: deactivateProfile, isPending: isDeactivating } = useMutation({
     mutationFn: async () =>
       await api.delete("/users/me/deactivate-profile", {
-        data: { password: disablePassword },
         headers: { "x-idempotency-key": deactivateKey },
       }),
     onSuccess: () => {
@@ -380,13 +379,18 @@ export function DeactivateAccountAction() {
       router.push("/login");
     },
     onError: (err: any) => {
-      setDisableError(err.response?.data?.message || "Incorrect password.");
+      setDisableError(err.response?.data?.message || "Failed to deactivate account.");
     },
     onSettled: () => resetDeactivateKey(),
   });
 
   return (
-    <Dialog onOpenChange={(open) => !open && setDisableError("")}>
+    <Dialog onOpenChange={(open) => {
+      if (!open) {
+        setDisableError("");
+        setConfirmText("");
+      }
+    }}>
       <DialogTrigger asChild>
         <Button
           variant="outline"
@@ -397,30 +401,31 @@ export function DeactivateAccountAction() {
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-sm p-6">
-        <DialogHeader className="mb-2">
-          <DialogTitle className="text-center text-sm font-medium text-destructive uppercase tracking-wider">
+        <DialogHeader>
+          <DialogTitle className=" text-center text-sm font-medium text-destructive uppercase tracking-wider">
             Disable Account
           </DialogTitle>
           <DialogDescription className="sr-only">
-            Confirm your password to disable your account.
+            Type DEACTIVATE to disable your account.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-5">
-          <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive font-medium text-center text-balance">
+        <div className="space-y-4">
+          <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive font-medium">
             Warning: Disabling your account will hide your profile from all
             users.
           </div>
-          <div className="space-y-2">
+          <div className="flex flex-col gap-3">
             <label className="text-sm font-medium text-foreground">
-              Confirm your password:
+              Type <span className="font-bold select-all">DEACTIVATE</span> to confirm:
             </label>
-            <PasswordInput
-              value={disablePassword}
+            <Input
+              value={confirmText}
               onChange={(e) => {
-                setDisablePassword(e.target.value);
+                setConfirmText(e.target.value);
                 if (disableError) setDisableError("");
               }}
-              placeholder="Enter password"
+              placeholder="DEACTIVATE"
+              className="text-center"
             />
           </div>
 
@@ -435,7 +440,7 @@ export function DeactivateAccountAction() {
               variant="destructive"
               className="w-full transition-all duration-200 active:scale-[0.98]"
               onClick={() => deactivateProfile()}
-              disabled={!disablePassword || isDeactivating}
+              disabled={confirmText !== "DEACTIVATE" || isDeactivating}
             >
               {isDeactivating && (
                 <Loader

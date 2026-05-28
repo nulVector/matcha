@@ -1,7 +1,7 @@
 import prisma, { ConnectionStatus, RequestOrigin, RequestStatus } from '@matcha/prisma';
 import { TaskProducer } from '@matcha/queue';
 import { ConnectionListType, NotificationCategory } from '@matcha/redis';
-import { connectionIdType, deactivatePasswordType, getConnectionsListType, getFriendListType, getFriendRequestsType, initiateProfileType, requestHandleType, requestIdType, sendRequestType, updatePasswordType, updateProfileType, userIdType, usernameCheckType, vibeCheckType } from '@matcha/zod';
+import { connectionIdType, getConnectionsListType, getFriendListType, getFriendRequestsType, initiateProfileType, requestHandleType, requestIdType, sendRequestType, updatePasswordType, updateProfileType, userIdType, usernameCheckType, vibeCheckType } from '@matcha/zod';
 import bcrypt from "bcrypt";
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
@@ -928,17 +928,13 @@ export const handleUnfriendRequest = async (req:Request,res:Response,next:NextFu
 
 export const deactivateProfile = async (req:Request,res:Response,next:NextFunction) => {
   try {
-    const {password}:deactivatePasswordType = req.validatedData.body;
     const userId = req.user!.id;
     const profileId = req.user!.profile!.id;
     const now = new Date();
     const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
     const userDetails = await prisma.user.findUnique({
       where:{ id:userId },
-      select:{
-        password:true,
-        reactivatedAt:true
-      }
+      select:{ reactivatedAt:true }
     });
     if (!userDetails) {
       return res.status(404).json({
@@ -951,21 +947,6 @@ export const deactivateProfile = async (req:Request,res:Response,next:NextFuncti
         success:false,
         message:"You can only deactivate your account once every 7 days"
       })
-    }
-    if (userDetails.password) {
-      if (!password) {
-        return res.status(400).json({
-          success: false,
-          message: "Password is required to deactivate your account."
-        });
-      }
-      const isMatch = await bcrypt.compare(password, userDetails.password);
-      if (!isMatch) {
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid password'
-        });
-      }
     }
     await prisma.user.update({
       where:{ id:userId },
