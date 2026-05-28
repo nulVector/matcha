@@ -53,7 +53,9 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
         status: true,
         expiresAt: true, 
         user1HistoryClearedAt: true, 
-        user2HistoryClearedAt: true 
+        user2HistoryClearedAt: true,
+        user1LastReadAt: true, 
+        user2LastReadAt: true 
       }
     });
     const isParticipant = connection && (connection.user1Id === profileId || connection.user2Id === profileId);
@@ -64,9 +66,11 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
         message: "Forbidden: You can not access this chat."
       });
     }
-    const [ partnerId, historyClearedAt] = connection.user1Id === profileId 
-      ? [connection.user2Id, connection.user1HistoryClearedAt]
-      : [connection.user1Id, connection.user2HistoryClearedAt]
+    const [ partnerId, historyClearedAt, partnerLastReadAt ] = connection.user1Id === profileId 
+      ? [connection.user2Id, connection.user1HistoryClearedAt, connection.user2LastReadAt]
+      : [connection.user1Id, connection.user2HistoryClearedAt, connection.user1LastReadAt]
+    
+    const partnerLastReadTime = partnerLastReadAt ? new Date(partnerLastReadAt).getTime() : 0;
     
     const connectionStatus = connection.status;
     const connectionExpiresAt = connection.expiresAt ? connection.expiresAt.toISOString() : null;
@@ -161,10 +165,14 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
         (msg) => new Date(msg.createdAt).getTime() >= historyClearedTime
       );
     }
+    const finalMessages = orderedMessages.map(msg => ({
+      ...msg,
+      isRead: partnerLastReadAt ? new Date(msg.createdAt).getTime() <= partnerLastReadTime : false
+    }));
 
     return res.json({
       success: true,
-      data: orderedMessages,
+      data: finalMessages,
       nextCursor,
       meta: chatPartnerMeta,
       matchData: {
