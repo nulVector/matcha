@@ -1,11 +1,7 @@
 "use client";
 
+import { UserAvatar } from "@/components/shared/userAvatar";
 import { api } from "@/lib/axios";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@matcha/ui/components/avatar";
 import { Button } from "@matcha/ui/components/button";
 import { EmptyState } from "@matcha/ui/components/emptyState";
 import { Input } from "@matcha/ui/components/input";
@@ -96,17 +92,14 @@ export function SearchPane() {
             aria-label={`View ${searchResult.username}'s profile`}
             className="flex items-center gap-4 p-3 border rounded-xl hover:bg-muted/50 transition-all duration-200 active:scale-[0.98] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:ring-offset-2 w-full text-left"
           >
-            <Avatar className="size-12 shadow-sm border border-border/50">
-              <AvatarImage
-                src={searchResult.avatarUrl}
-                alt={`${searchResult.username}'s avatar`}
-              />
-              <AvatarFallback className="bg-primary/10 text-primary font-medium">
-                {(searchResult.username || "?").charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
+            <UserAvatar
+              avatarUrl={searchResult.avatar}
+              username={searchResult.username}
+              className="size-12"
+            />
             <h3 className="font-medium text-foreground">
               {searchResult.username}
+              {console.log(searchResult)}
             </h3>
           </button>
         )}

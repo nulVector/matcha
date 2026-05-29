@@ -1,13 +1,9 @@
 "use client";
 
+import { UserAvatar } from "@/components/shared/userAvatar";
 import { useUser } from "@/hooks/queries/useUser";
 import { useIdempotency } from "@/hooks/useIdempotency";
 import { api, getServerTime } from "@/lib/axios";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@matcha/ui/components/avatar";
 import { Badge } from "@matcha/ui/components/badge";
 import { Button } from "@matcha/ui/components/button";
 import {
@@ -266,15 +262,11 @@ export function ChatHeader({
 
           <Popover>
             <PopoverTrigger className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-all duration-200 active:scale-[0.98] text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 rounded-md p-1 -ml-1">
-              <Avatar className="size-10 shadow-sm border border-border/50">
-                <AvatarImage
-                  src={targetUser?.avatarUrl}
-                  alt={`${targetUser?.username}'s avatar`}
-                />
-                <AvatarFallback className="bg-primary/10 text-primary font-medium">
-                  {(targetUser?.username || "?").charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+              <UserAvatar
+                avatarUrl={targetUser?.avatarUrl}
+                username={targetUser?.username}
+                className="size-10"
+              />
               <div className="hidden flex-col justify-center sm:flex">
                 <span className="font-semibold text-base leading-none text-foreground">
                   {targetUser?.username}

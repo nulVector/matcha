@@ -1,11 +1,7 @@
 "use client";
 
+import { UserAvatar } from "@/components/shared/userAvatar";
 import { api } from "@/lib/axios";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@matcha/ui/components/avatar";
 import { Button } from "@matcha/ui/components/button";
 import { EmptyState } from "@matcha/ui/components/emptyState";
 import { Input } from "@matcha/ui/components/input";
@@ -116,15 +112,11 @@ export function NewChatPanel({ isOpen, onClose }: NewChatPanelProps) {
             onClick={() => handleSelectFriend(friend.connectionId)}
             className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-muted/50 transition-all duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 text-left group active:scale-[0.98] cursor-pointer"
           >
-            <Avatar className="size-12 shadow-sm border border-border/50 group-hover:border-primary/30 transition-colors">
-              <AvatarImage
-                src={friend.avatarUrl}
-                alt={`${friend.username}'s avatar`}
-              />
-              <AvatarFallback className="bg-primary/10 text-primary font-medium">
-                {(friend.username || "?").charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
+            <UserAvatar
+              avatarUrl={friend.avatarUrl}
+              username={friend.username}
+              className="size-12"
+            />
             <div className="flex-1 overflow-hidden flex items-center justify-between">
               <h3 className="font-semibold text-sm text-foreground truncate">
                 {friend.username}

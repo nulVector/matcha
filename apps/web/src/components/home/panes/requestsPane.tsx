@@ -1,11 +1,7 @@
 "use client";
 
+import { UserAvatar } from "@/components/shared/userAvatar";
 import { api } from "@/lib/axios";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@matcha/ui/components/avatar";
 import { Badge } from "@matcha/ui/components/badge";
 import { Button } from "@matcha/ui/components/button";
 import { EmptyState } from "@matcha/ui/components/emptyState";
@@ -145,15 +141,11 @@ export function RequestsPane() {
               aria-label={`View request from ${req.user.username}`}
               className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-muted/50 transition-all duration-200 active:scale-[0.98] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 text-left"
             >
-              <Avatar className="size-12 shrink-0 shadow-sm border border-border/50">
-                <AvatarImage
-                  src={req.user.avatarUrl}
-                  alt={`${req.user.username}'s avatar`}
-                />
-                <AvatarFallback className="bg-primary/10 text-primary font-medium">
-                  {req.user.username.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+              <UserAvatar
+                avatarUrl={req.user.avatarUrl}
+                username={req.user.username}
+                className="size-12"
+              />
               <div className="flex-1 overflow-hidden">
                 <p className="font-semibold text-sm truncate text-foreground">
                   {req.user.username}

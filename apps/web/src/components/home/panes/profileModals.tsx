@@ -1,13 +1,9 @@
 "use client";
 
+import { UserAvatar } from "@/components/shared/userAvatar";
 import { useUser } from "@/hooks/queries/useUser";
 import { useIdempotency } from "@/hooks/useIdempotency";
 import { api } from "@/lib/axios";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@matcha/ui/components/avatar";
 import { Badge } from "@matcha/ui/components/badge";
 import { Button } from "@matcha/ui/components/button";
 import {
@@ -40,15 +36,11 @@ function SharedProfileInfo({
   return (
     <>
       <div className="flex flex-col items-center gap-3 pt-2">
-        <Avatar className="size-24 border-2 border-border shadow-sm">
-          <AvatarImage
-            src={profile.avatarUrl}
-            alt={`${profile.username}'s avatar`}
-          />
-          <AvatarFallback className="bg-primary/10 text-primary text-xl font-medium">
-            {(profile.username || "?").charAt(0).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
+        <UserAvatar
+          avatarUrl={profile.avatarUrl}
+          username={profile.username}
+          className="size-24"
+        />
         <div className="text-center space-y-1.5">
           <h3 className="text-xl font-semibold">{profile.username}</h3>
           {extraBadge}

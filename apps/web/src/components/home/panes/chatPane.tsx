@@ -1,12 +1,8 @@
 "use client";
 
+import { UserAvatar } from "@/components/shared/userAvatar";
 import { useIdempotency } from "@/hooks/useIdempotency";
 import { api } from "@/lib/axios";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@matcha/ui/components/avatar";
 import { Badge } from "@matcha/ui/components/badge";
 import { Button } from "@matcha/ui/components/button";
 import {
@@ -195,16 +191,11 @@ export function ChatPane() {
                 href={`/home/chat/${conn.connectionId}`}
                 className="flex items-center gap-3 flex-1 overflow-hidden p-1.5 rounded-lg outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
-                <Avatar className="size-10 shrink-0 shadow-sm border border-border/50">
-                  <AvatarImage
-                    src={conn.avatarUrl}
-                    alt={`${conn.username}'s avatar`}
-                  />
-                  <AvatarFallback className="bg-primary/10 text-primary font-medium">
-                    {conn.username.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-
+                <UserAvatar
+                  avatarUrl={conn.avatarUrl}
+                  username={conn.username}
+                  className="size-12"
+                />
                 <div className="flex-1 overflow-hidden">
                   <p
                     className={cn(
