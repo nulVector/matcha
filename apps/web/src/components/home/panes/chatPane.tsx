@@ -177,37 +177,51 @@ export function ChatPane() {
 
         {filteredConnections.map((conn: any) => {
           const unreadCount = unreadMap?.[conn.connectionId] || 0;
-          const isActive = activeConnectionId === conn.connectionId;
+          const isActiveChat = activeConnectionId === conn.connectionId;
 
           return (
             <div
               key={conn.connectionId}
               className={cn(
                 "relative flex items-center gap-2 p-1.5 rounded-xl transition-all duration-200 active:scale-[0.98] group",
-                isActive ? "bg-accent" : "hover:bg-muted/50",
+                isActiveChat ? "bg-accent" : "hover:bg-muted/50",
               )}
             >
               <Link
                 href={`/home/chat/${conn.connectionId}`}
                 className="flex items-center gap-3 flex-1 overflow-hidden p-1.5 rounded-lg outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
-                <UserAvatar
-                  avatarUrl={conn.avatarUrl}
-                  username={conn.username}
-                  className="size-12"
-                />
-                <div className="flex-1 overflow-hidden">
-                  <p
+                <div className="relative shrink-0">
+                  <UserAvatar
+                    avatarUrl={conn.avatarUrl}
+                    username={conn.username}
                     className={cn(
-                      "text-sm truncate transition-colors",
-                      unreadCount > 0
-                        ? "font-semibold text-foreground"
-                        : "font-medium text-muted-foreground",
-                      isActive && "text-foreground font-semibold",
+                      "size-12 transition-all duration-300",
+                      !conn.isActive && "grayscale opacity-50 border-dashed"
                     )}
-                  >
-                    {conn.username}
-                  </p>
+                  />
+                </div>
+                <div className="flex-1 overflow-hidden flex flex-col justify-center">
+                  <div className="flex items-center gap-2">
+                    <p
+                      className={cn(
+                        "text-sm truncate transition-colors",
+                        !conn.isActive 
+                          ? "italic text-muted-foreground/70"
+                          : unreadCount > 0
+                            ? "font-semibold text-foreground"
+                            : "font-medium text-muted-foreground",
+                        isActiveChat && conn.isActive && "text-foreground font-semibold",
+                      )}
+                    >
+                      {conn.username}
+                    </p>
+                    {!conn.isActive && (
+                      <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded-sm bg-muted/80 text-muted-foreground shrink-0 border border-border/40">
+                        Deactivated
+                      </span>
+                    )}
+                  </div>
                 </div>
               </Link>
 

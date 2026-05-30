@@ -362,8 +362,8 @@ export const getFriendList = async (req:Request, res:Response, next: NextFunctio
       where: {
         status: ConnectionStatus.FRIEND,
         OR: [
-          { user1Id: profileId },
-          { user2Id: profileId }
+          { user1Id: profileId, user2: { isActive : true } },
+          { user2Id: profileId, user1: { isActive : true } }
         ]
       },
       select: {
@@ -959,6 +959,7 @@ export const deactivateProfile = async (req:Request,res:Response,next:NextFuncti
     })
     await Promise.all([
       redisManager.match.leaveQueue(profileId),
+      redisManager.userDetail.invalidateProfile(profileId),
       redisManager.auth.invalidateAllUserSessions(userId),
       redisManager.chat.publish(
         'chat_router',

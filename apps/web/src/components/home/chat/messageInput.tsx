@@ -6,7 +6,7 @@ import { EventType } from "@matcha/shared";
 import { Textarea } from "@matcha/ui/components/textarea"; 
 import { Button } from "@matcha/ui/components/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@matcha/ui/components/popover";
-import { Send, HelpCircle, ArchiveX } from "lucide-react";
+import { Send, HelpCircle, ArchiveX, UserX } from "lucide-react";
 import { useOutboxStore } from "@/store/useOutboxStore";
 
 export function MessageInput({ 
@@ -28,6 +28,7 @@ export function MessageInput({
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const addMessageToOutbox = useOutboxStore((state) => state.addMessage);
   const markMessageFailed = useOutboxStore((state) => state.markFailed);
+  const isDeactivated = targetUser?.isActive === false;
 
   useEffect(() => {
     return () => {
@@ -56,14 +57,14 @@ export function MessageInput({
 
   const handleSend = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!content.trim() || isArchived) return;
+    if (!content.trim() || isArchived || isDeactivated) return;
     const messageText = content.trim();
     setContent("");
     const localId = addMessageToOutbox({
       connectionId,
       receiverId,
       content: messageText
-    })
+    });
     sendMessage(EventType.CHAT_MESSAGE, {
       connectionId,
       receiverId,
@@ -81,11 +82,20 @@ export function MessageInput({
 
   return (
     <div className="p-4 bg-background/95 backdrop-blur-md border-t border-border/50 shrink-0">
-      {isArchived ? (
+      {isArchived || isDeactivated ? (
         <div className="flex justify-center">
           <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted text-muted-foreground text-sm font-medium">
-            <ArchiveX className="size-4" />
-            This chat is archived. You can no longer reply.
+            {isDeactivated ? (
+              <>
+                <UserX className="size-4" />
+                You cannot reply to a deactivated account.
+              </>
+            ) : (
+              <>
+                <ArchiveX className="size-4" />
+                This chat is archived. You can no longer reply.
+              </>
+            )}
           </div>
         </div>
       ) : (

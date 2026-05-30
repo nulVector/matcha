@@ -25,6 +25,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@matcha/ui/components/tooltip";
+import { cn } from "@matcha/ui/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlarmClock,
@@ -76,6 +77,7 @@ export function ChatHeader({
   });
 
   const isMatched = matchData?.status === "MATCHED";
+  const isDeactivated = targetUser?.isActive === false;
   const [timeLeft, setTimeLeft] = useState<string>("00:00");
   const [iRequestedExtend, setIRequestedExtend] = useState(false);
   const [iRequestedAdd, setIRequestedAdd] = useState(false);
@@ -261,17 +263,34 @@ export function ChatHeader({
           </Button>
 
           <Popover>
-            <PopoverTrigger className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-all duration-200 active:scale-[0.98] text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 rounded-md p-1 -ml-1">
+            <PopoverTrigger className="group flex items-center gap-3 cursor-pointer hover:opacity-80 transition-all duration-200 active:scale-[0.98] text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 rounded-md p-1 -ml-1">
               <UserAvatar
                 avatarUrl={targetUser?.avatarUrl}
                 username={targetUser?.username}
-                className="size-10"
+                className={cn(
+                  "size-10 transition-all duration-300",
+                  isDeactivated && "grayscale opacity-50 border-dashed"
+                )}
               />
               <div className="hidden flex-col justify-center sm:flex">
-                <span className="font-semibold text-base leading-none text-foreground">
-                  {targetUser?.username}
-                </span>
-                {isTyping && (
+                <div className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      "font-semibold text-base leading-none transition-colors",
+                      isDeactivated
+                        ? "text-muted-foreground/70 italic"
+                        : "text-foreground group-hover:text-primary"
+                    )}
+                  >
+                    {targetUser?.username}
+                  </span>
+                  {isDeactivated && (
+                    <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded-sm bg-muted/80 text-muted-foreground shrink-0 border border-border/40 mt-0.5">
+                      Deactivated
+                    </span>
+                  )}
+                </div>
+                {isTyping && !isDeactivated && (
                   <span className="text-xs font-medium text-primary animate-pulse mt-1">
                     typing...
                   </span>
