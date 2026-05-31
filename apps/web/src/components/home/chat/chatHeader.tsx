@@ -118,6 +118,9 @@ export function ChatHeader({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["connections"] });
+      if (targetUser?.username) {
+        queryClient.invalidateQueries({ queryKey: ["userProfile", targetUser.username] });
+      }
       router.push("/home");
     },
     onSettled: () => resetUnfriendKey(),

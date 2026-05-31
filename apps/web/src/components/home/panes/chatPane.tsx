@@ -85,10 +85,6 @@ export function ChatPane() {
     },
     onSuccess: () => {
       resetDeleteKey();
-      queryClient.invalidateQueries({ queryKey: ["connections"] });
-      if (activeConnectionId === connectionToDelete?.connectionId) {
-        router.push("/home");
-      }
       setConnectionToDelete(null);
     },
   });

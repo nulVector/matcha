@@ -126,7 +126,7 @@ export function useWebsocket() {
               });
               queryClient.invalidateQueries({ queryKey: ["connections"] });
             }
-           else if (payload.event === SystemAction.CHAT_ENDED) {
+            else if (payload.event === SystemAction.CHAT_ENDED) {
               if (window.location.pathname.includes(`/home/chat/${payload.connectionId}`)) {
                 queryClient.setQueryData(["messages", payload.connectionId], (old: any) => {
                   if (!old || !old.pages || !old.pages[0]) return old;
@@ -138,6 +138,27 @@ export function useWebsocket() {
                   return { ...old, pages: newPages };
                 });
                 queryClient.setQueryData(["chat_ended_alert", payload.connectionId], true);
+              }
+            }
+            else if (
+              payload.event === SystemAction.REQUEST_ACCEPTED || 
+              payload.event === SystemAction.REQUEST_DECLINED || 
+              payload.event === SystemAction.REQUEST_CANCELLED
+            ) {
+              if (payload.event === SystemAction.REQUEST_ACCEPTED) {
+                queryClient.invalidateQueries({ queryKey: ["connections"] });
+                queryClient.invalidateQueries({ queryKey: ["messages"] }); 
+              }
+              queryClient.invalidateQueries({ queryKey: ["requests"] });
+              queryClient.invalidateQueries({ queryKey: ["userProfile"] });
+            }
+            else if (
+              payload.event === SystemAction.UNFRIENDED || 
+              payload.event === SystemAction.CHAT_DELETED
+            ) {
+              queryClient.invalidateQueries({ queryKey: ["connections"] });
+              if (payload.connectionId && window.location.pathname.includes(`/home/chat/${payload.connectionId}`)) {
+                router.push("/home");
               }
             }
             break;
@@ -176,12 +197,6 @@ export function useWebsocket() {
                 return { ...old, has_new_requests: true };
               });
               queryClient.invalidateQueries({ queryKey: ["requests"] });
-            } 
-            else if (category === "FRIEND_REQUEST_ACCEPTED") {
-              queryClient.invalidateQueries({ queryKey: ["connections"] });
-              queryClient.invalidateQueries({ queryKey: ["requests"] });
-              queryClient.invalidateQueries({ queryKey: ["messages"] }); 
-              queryClient.invalidateQueries({ queryKey: ["userProfile"] });
             }
             break;
 

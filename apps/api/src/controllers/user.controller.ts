@@ -9,7 +9,7 @@ import { COOKIE_OPTIONS } from '../constant/cookie';
 import { USERNAME_VIBES } from '../constant/usernameList';
 import { redisManager } from '../services/redis';
 import { logger } from '@matcha/logger';
-import { getDeterministicIds, EventType } from '@matcha/shared';
+import { getDeterministicIds, EventType, SystemAction } from '@matcha/shared';
 
 type LocationMetadata = { id: string; name: string; latitude: number; longitude: number };
 type InterestMetadata = { id: string; name: string };
@@ -478,6 +478,17 @@ export const deleteConnection = async (req: Request, res: Response, next: NextFu
         : { user2ChatVisible: false, user2HistoryClearedAt: now }
     });
     await redisManager.chat.hideChat(connectionId);
+    await redisManager.chat.publish(
+      'chat_router',
+      JSON.stringify({
+        receiverId: profileId, 
+        eventType: EventType.SYSTEM_EVENT,
+        eventData: {
+          event: SystemAction.CHAT_DELETED,
+          connectionId
+        }
+      })
+    );
     res.json({
       success:true
     })
@@ -754,20 +765,35 @@ export const cancelRequest = async (req:Request,res:Response,next:NextFunction) 
   try {
     const {requestId}:requestIdType = req.validatedData.params;
     const userId = req.user!.profile!.id;
-    const deleteRequest = await prisma.friendRequest.deleteMany({
+    const requestToCancel = await prisma.friendRequest.findFirst({
       where: {
         id: requestId,
         senderId: userId,
         status: 'PENDING'
-      }
+      },
+      select: { receiverId: true }
     });
-    if (deleteRequest.count === 0) {
+    if (!requestToCancel) {
       res.status(404).json({ 
         success: false,
         message: "Request not found, already processed, or you are not the sender." 
       });
       return;
     }
+    await prisma.friendRequest.delete({
+      where: { id: requestId }
+    });
+    await redisManager.chat.publish(
+      'chat_router',
+      JSON.stringify({
+        receiverId: requestToCancel.receiverId,
+        eventType: EventType.SYSTEM_EVENT,
+        eventData: {
+          event: SystemAction.REQUEST_CANCELLED,
+          requestId
+        }
+      })
+    );
     res.json({
       success: true,
       message: "Friend Request canceled successfully."
@@ -805,6 +831,17 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
     }
     if (action === "REJECT") {
       await prisma.friendRequest.delete({ where: { id: requestId } });
+      await redisManager.chat.publish(
+        'chat_router',
+        JSON.stringify({
+          receiverId: friendRequest.senderId,
+          eventType: EventType.SYSTEM_EVENT,
+          eventData: {
+            event: SystemAction.REQUEST_DECLINED,
+            requestId
+          }
+        })
+      );
       return res.status(200).json({
         success: true,
         message: "Request rejected."
@@ -864,9 +901,9 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
           'chat_router',
           JSON.stringify({
             receiverId: friendRequest.senderId,
-            eventType: EventType.NOTIFICATION_UPDATE, 
+            eventType: EventType.SYSTEM_EVENT, 
             eventData: {
-              category: "FRIEND_REQUEST_ACCEPTED",
+              event: SystemAction.REQUEST_ACCEPTED, 
               connectionId: resolvedConnectionId
             }
           })
@@ -914,7 +951,18 @@ export const handleUnfriendRequest = async (req:Request,res:Response,next:NextFu
         user2ChatVisible: false
       }
     });
-    await redisManager.userConnection.clearConnectionInfo(connection.id)
+    await redisManager.userConnection.clearConnectionInfo(connection.id);
+    await redisManager.chat.publish(
+      'chat_router',
+      JSON.stringify({
+        receiverId: targetUserId,
+        eventType: EventType.SYSTEM_EVENT,
+        eventData: {
+          event: SystemAction.UNFRIENDED,
+          connectionId: connection.id
+        }
+      })
+    );
     res.json({
       success: true,
       status: 'UNFRIENDED',

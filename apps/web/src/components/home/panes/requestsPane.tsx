@@ -76,7 +76,17 @@ export function RequestsPane() {
     });
 
   const requestsList = data?.pages.flatMap((page) => page.data) || [];
-
+  useEffect(() => {
+    if (selectedRequest) {
+      const requestStillExists = requestsList.some(
+        (req: any) => req.requestId === selectedRequest.requestId
+      );
+      if (!requestStillExists) {
+        setSelectedRequest(null);
+      }
+    }
+  }, [requestsList, selectedRequest]);
+  
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 space-y-4 border-b border-border/50 pb-4 shrink-0">

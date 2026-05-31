@@ -112,6 +112,7 @@ export function SearchProfileModal({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["userProfile", username] });
+      queryClient.invalidateQueries({ queryKey: ["requests"] });
     },
     onSettled: () => resetRequestKey(),
   });
@@ -214,8 +215,9 @@ export function RequestDetailsModal({
   const queryClient = useQueryClient();
   const { key: handleKey, resetKey: resetHandleKey } = useIdempotency();
   const { key: cancelKey, resetKey: resetCancelKey } = useIdempotency();
+  const targetUsername = request?.user?.username;
   const { data: fullProfile, isLoading: isLoadingProfile } = useUser(
-    request?.user?.username,
+    targetUsername,
     !!request,
   );
 
@@ -237,7 +239,9 @@ export function RequestDetailsModal({
       queryClient.invalidateQueries({ queryKey: ["requests"] });
       queryClient.invalidateQueries({ queryKey: ["connections"] });
       queryClient.invalidateQueries({ queryKey: ["messages"] });
-      queryClient.invalidateQueries({ queryKey: ["userProfile"] });
+      if (targetUsername) {
+        queryClient.invalidateQueries({ queryKey: ["userProfile", targetUsername] });
+      }
       onClose();
     },
     onSettled: () => resetHandleKey(),
@@ -251,6 +255,9 @@ export function RequestDetailsModal({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["requests"] });
+      if (targetUsername) {
+        queryClient.invalidateQueries({ queryKey: ["userProfile", targetUsername] });
+      }
       onClose();
     },
     onSettled: () => resetCancelKey(),
