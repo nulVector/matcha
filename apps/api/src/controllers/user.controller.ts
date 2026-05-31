@@ -851,9 +851,8 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
       let resolvedConnectionId = friendRequest.connectionId;
       const [user1Id,user2Id] = getDeterministicIds(userId,friendRequest.senderId);
       await prisma.$transaction(async (tx) => {
-        await tx.friendRequest.update({
-          where: { id: requestId },
-          data: { status: RequestStatus.ACCEPTED }
+        await tx.friendRequest.delete({
+          where: { id: requestId }
         });
         if (friendRequest.origin === RequestOrigin.SEARCH || !friendRequest.connectionId) {
           const newConn = await tx.connection.create({
