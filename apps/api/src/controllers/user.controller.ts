@@ -906,7 +906,8 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
               connectionId: resolvedConnectionId
             }
           })
-        )
+        ),
+        redisManager.bloom.addPair('bf:matches', user1Id, user2Id)
       ])
       return res.status(200).json({
         success: true,
