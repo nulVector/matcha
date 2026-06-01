@@ -6,6 +6,88 @@ import { useRouter } from "next/navigation";
 import { useOutboxStore } from "@/store/useOutboxStore";
 import { useMe } from "./queries/useMe";
 
+const updateMessagesCache = (queryClient: any, payload: any) => {
+  const oldData: any = queryClient.getQueryData(["messages", payload.connectionId]);
+  if (!oldData || !oldData.pages || oldData.pages.length === 0) {
+    queryClient.invalidateQueries({ queryKey: ["messages", payload.connectionId] });
+    return;
+  } 
+  queryClient.setQueryData(["messages", payload.connectionId], (old: any) => {
+    const newPages = [...old.pages];
+    const serverMsg = { ...payload, isRead: false }; 
+    const updatedData = [...(newPages[0].data || []), serverMsg];
+    if (updatedData.length > 200) updatedData.shift(); 
+    newPages[0] = { ...newPages[0], data: updatedData };
+    return { ...old, pages: newPages };
+  });
+};
+
+const handleUnreadOrReceipt = (
+  queryClient: any, 
+  payload: any, 
+  myId: string, 
+  pathname: string, 
+  socketRef: React.RefObject<WebSocket | null>
+) => {
+  if (!pathname.includes(`/home/chat/${payload.connectionId}`)) {
+    queryClient.setQueryData(["unreadCounts"], (oldCounts: Record<string, number> | undefined) => ({
+      ...(oldCounts || {}),
+      [payload.connectionId]: ((oldCounts || {})[payload.connectionId] || 0) + 1
+    }));
+  } else {
+    if (payload.senderId !== myId && socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({
+        type: "VIEWING_CHAT",
+        payload: {
+          connectionId: payload.connectionId,
+          receiverId: payload.senderId,
+          lastMessageId: payload.id
+        }
+      }));
+    }
+  }
+};
+
+const updateConnectionsCache = (queryClient: any, payload: any) => {
+  let connectionExists = false;
+  queryClient.setQueriesData({ queryKey: ["connections"] }, (oldConnData: any) => {
+    if (!oldConnData || !oldConnData.pages) return oldConnData;
+    let targetConn = null;
+    let foundPageIndex = -1;
+    let foundItemIndex = -1;
+
+    for (let p = 0; p < oldConnData.pages.length; p++) {
+      const page = oldConnData.pages[p];
+      foundItemIndex = page.data.findIndex((c: any) => c.connectionId === payload.connectionId);
+      if (foundItemIndex !== -1) {
+        foundPageIndex = p;
+        targetConn = { ...page.data[foundItemIndex], timestamp: Date.now() };
+        connectionExists = true;
+        break;
+      }
+    }
+
+    if (!targetConn) return oldConnData;
+    const newPages = [...oldConnData.pages];
+    const sourcePageData = [...newPages[foundPageIndex].data];
+    sourcePageData.splice(foundItemIndex, 1);
+    
+    if (foundPageIndex === 0) {
+      sourcePageData.unshift(targetConn);
+      newPages[0] = { ...newPages[0], data: sourcePageData };
+    } else {
+      newPages[foundPageIndex] = { ...newPages[foundPageIndex], data: sourcePageData };
+      const firstPageData = [...newPages[0].data];
+      firstPageData.unshift(targetConn);
+      newPages[0] = { ...newPages[0], data: firstPageData };
+    }
+    return { ...oldConnData, pages: newPages };
+  });
+  if (!connectionExists) {
+    queryClient.invalidateQueries({ queryKey: ["connections"] });
+  }
+};
+
 export function useWebsocket() {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -47,63 +129,9 @@ export function useWebsocket() {
             if (payload.senderId === myId) {
               acknowledgeMessage(payload.connectionId, payload.content);
             }
-            const oldData: any = queryClient.getQueryData(["messages", payload.connectionId]);
-            if (!oldData || !oldData.pages || oldData.pages.length === 0) {
-              queryClient.invalidateQueries({ queryKey: ["messages", payload.connectionId] });
-            } else {
-              queryClient.setQueryData(["messages", payload.connectionId], (old: any) => {
-                const newPages = [...old.pages];
-                const serverMsg = { ...payload, isRead: false }; 
-                const updatedData = [...(newPages[0].data || []), serverMsg];
-                if (updatedData.length > 200) updatedData.shift(); 
-                newPages[0] = { ...newPages[0], data: updatedData };
-                return { ...old, pages: newPages };
-              });
-            }
-            if (!pathnameRef.current?.includes(`/home/chat/${payload.connectionId}`)) {
-              queryClient.setQueryData(["unreadCounts"], (oldCounts: Record<string, number> | undefined) => {
-                const counts = oldCounts || {};
-                return {
-                  ...counts,
-                  [payload.connectionId]: (counts[payload.connectionId] || 0) + 1
-                };
-              });
-            } else {
-              if (payload.senderId !== myId && socketRef.current?.readyState === WebSocket.OPEN) {
-                socketRef.current.send(JSON.stringify({
-                  type: "VIEWING_CHAT",
-                  payload: {
-                    connectionId: payload.connectionId,
-                    receiverId: payload.senderId,
-                    lastMessageId: payload.id
-                  }
-                }));
-              }
-            }
-            let connectionExists = false;
-            queryClient.setQueriesData({ queryKey: ["connections"] }, (oldConnData: any) => {
-              if (!oldConnData || !oldConnData.pages) return oldConnData;
-              let targetConnection = null;
-              const newPages = oldConnData.pages.map((page: any) => {
-                const filteredData = page.data.filter((conn: any) => {
-                  if (conn.connectionId === payload.connectionId) {
-                    targetConnection = { ...conn, timestamp: Date.now() }; 
-                    connectionExists = true;
-                    return false; 
-                  }
-                  return true;
-                });
-                return { ...page, data: filteredData };
-              });
-              if (targetConnection) {
-                newPages[0].data.unshift(targetConnection);
-                return { ...oldConnData, pages: newPages };
-              }
-              return oldConnData;
-            });
-            if (!connectionExists) {
-              queryClient.invalidateQueries({ queryKey: ["connections"] });
-            }
+            updateMessagesCache(queryClient, payload);
+            handleUnreadOrReceipt(queryClient, payload, myId, pathnameRef.current || "", socketRef);
+            updateConnectionsCache(queryClient, payload);
             break;
 
           case EventType.MATCH_FOUND:
