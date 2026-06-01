@@ -72,9 +72,9 @@ scenarios:
           target: "{{ target }}"
           function: "setupUser"
       - loop:
-          - send: '{"type": "VIEWING_CHAT", "payload": {"connectionId": "{{ connectionId }}", "receiverId": "{{ receiverId }}", "lastMessageId": "{{ messageId }}"}}'
+          - send: '{"type": "VIEW_CHAT", "payload": {"connectionId": "{{ connectionId }}", "receiverId": "{{ receiverId }}", "lastMessageId": "{{ messageId }}"}}'
           - think: "{{ thinkTime }}"
         count: 5
-      - send: '{"type": "LEAVING_CHAT", "payload": {"connectionId": "{{ connectionId }}"}}'
+      - send: '{"type": "LEAVE_CHAT", "payload": {"connectionId": "{{ connectionId }}"}}'
       - think: 10
       - function: "cleanupSession"

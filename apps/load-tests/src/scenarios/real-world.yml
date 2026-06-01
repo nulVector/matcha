@@ -81,16 +81,16 @@ scenarios:
           function: "setupUser"
       - think: 2
       - loop:
-          - send: '{"type": "TYPING_INDICATOR", "payload": {"connectionId": "{{ connectionId }}", "receiverId": "{{ receiverId }}"}}'
+          - send: '{"type": "START_TYPING", "payload": {"connectionId": "{{ connectionId }}", "receiverId": "{{ receiverId }}"}}'
           - think: 1
           - function: "generateMessagePayload"
-          - send: '{"type": "CHAT_MESSAGE", "payload": {"connectionId": "{{ connectionId }}", "receiverId": "{{ receiverId }}", "content": "{{ chatMessage }}"}}'
-          - send: '{"type": "STOPPED_TYPING", "payload": {"connectionId": "{{ connectionId }}", "receiverId": "{{ receiverId }}"}}'
+          - send: '{"type": "SEND_MESSAGE", "payload": {"connectionId": "{{ connectionId }}", "receiverId": "{{ receiverId }}", "content": "{{ chatMessage }}"}}'
+          - send: '{"type": "STOP_TYPING", "payload": {"connectionId": "{{ connectionId }}", "receiverId": "{{ receiverId }}"}}'
           - think: 2
-          - send: '{"type": "VIEWING_CHAT", "payload": {"connectionId": "{{ connectionId }}", "receiverId": "{{ receiverId }}", "lastMessageId": "{{ messageId }}"}}'
+          - send: '{"type": "VIEW_CHAT", "payload": {"connectionId": "{{ connectionId }}", "receiverId": "{{ receiverId }}", "lastMessageId": "{{ messageId }}"}}'
           - think: 3
         count: 3
-      - send: '{"type": "LEAVING_CHAT", "payload": {"connectionId": "{{ connectionId }}"}}'
+      - send: '{"type": "LEAVE_CHAT", "payload": {"connectionId": "{{ connectionId }}"}}'
       - think: 10
       - function: "cleanupSession"
 

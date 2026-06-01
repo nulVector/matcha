@@ -1,10 +1,11 @@
+import { EventType } from "@matcha/shared";
 import { z } from "zod";
 
 const cuidId = z.cuid2({ message: "Invalid ID format" });
 
 export const socketMessageSchema = z.discriminatedUnion("type", [
   z.object({
-    type: z.literal("CHAT_MESSAGE"),
+    type: z.literal(EventType.SEND_MESSAGE),
     payload: z.object({
       connectionId: cuidId,
       receiverId: cuidId,
@@ -12,21 +13,21 @@ export const socketMessageSchema = z.discriminatedUnion("type", [
     })
   }),
   z.object({
-    type: z.literal("TYPING_INDICATOR"),
+    type: z.literal(EventType.START_TYPING),
     payload: z.object({
       connectionId: cuidId,
       receiverId: cuidId,
     })
   }),
   z.object({
-    type: z.literal("STOPPED_TYPING"),
+    type: z.literal(EventType.STOP_TYPING),
     payload: z.object({
       connectionId: cuidId,
       receiverId: cuidId,
     })
   }),
   z.object({
-    type: z.literal("VIEWING_CHAT"),
+    type: z.literal(EventType.VIEW_CHAT),
     payload: z.object({
       connectionId: cuidId,
       receiverId: cuidId,
@@ -34,7 +35,7 @@ export const socketMessageSchema = z.discriminatedUnion("type", [
     })
   }),
   z.object({
-    type: z.literal("LEAVING_CHAT"),
+    type: z.literal(EventType.LEAVE_CHAT),
     payload: z.object({
       connectionId: cuidId,
     })

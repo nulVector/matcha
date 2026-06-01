@@ -10,12 +10,18 @@ export interface UserSession {
   hasPassword: boolean
 }
 export enum EventType {
-  // Chat events
-  CHAT_MESSAGE = "CHAT_MESSAGE",
+  // Commands
+  SEND_MESSAGE = "SEND_MESSAGE",
+  START_TYPING = "START_TYPING",
+  STOP_TYPING = "STOP_TYPING",
+  VIEW_CHAT = "VIEW_CHAT",
+  LEAVE_CHAT = "LEAVE_CHAT",
+  // Server Events
+  NEW_MESSAGE = "NEW_MESSAGE",
   USER_TYPING = "USER_TYPING",
-  STOPPED_TYPING = "STOPPED_TYPING",
+  USER_STOPPED_TYPING = "USER_STOPPED_TYPING",
   MESSAGE_READ = "MESSAGE_READ",
-  // System events
+  // Global Events
   SYSTEM_EVENT = "SYSTEM_EVENT",
   MATCH_FOUND = "MATCH_FOUND",
   MATCH_EXPIRED = "MATCH_EXPIRED",

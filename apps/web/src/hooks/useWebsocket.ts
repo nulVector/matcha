@@ -37,7 +37,7 @@ const handleUnreadOrReceipt = (
   } else {
     if (payload.senderId !== myId && socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify({
-        type: "VIEWING_CHAT",
+        type: EventType.VIEW_CHAT,
         payload: {
           connectionId: payload.connectionId,
           receiverId: payload.senderId,
@@ -125,7 +125,7 @@ export function useWebsocket() {
         const { type, payload } = JSON.parse(event.data);
 
         switch (type) {
-          case EventType.CHAT_MESSAGE:
+          case EventType.NEW_MESSAGE:
             if (payload.senderId === myId) {
               acknowledgeMessage(payload.connectionId, payload.content);
             }
@@ -216,7 +216,7 @@ export function useWebsocket() {
             break;
 
           case EventType.USER_TYPING:
-          case EventType.STOPPED_TYPING:
+          case EventType.USER_STOPPED_TYPING:
             queryClient.setQueryData(["typing", payload.connectionId], type === EventType.USER_TYPING);
             break;
             

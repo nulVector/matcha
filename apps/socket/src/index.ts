@@ -134,7 +134,7 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
     const parsedData = validation.data;
     try {
       switch (parsedData.type) {
-        case 'CHAT_MESSAGE': {
+        case EventType.SEND_MESSAGE: {
           const { connectionId, receiverId, content } = parsedData.payload;
           const [matchInfo, connInfo] = await Promise.all([
             redisManager.match.getMatchInfo(connectionId),
@@ -172,19 +172,19 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
             connectionId, 
             receiverId, 
             message, 
-            EventType.CHAT_MESSAGE
+            EventType.NEW_MESSAGE
           );
           await redisManager.chat.publish(
             'chat_router',
             JSON.stringify({
               receiverId: profileId, 
-              eventType: EventType.CHAT_MESSAGE,
+              eventType: EventType.NEW_MESSAGE,
               eventData: message
             })
           );
           break;
         }
-        case 'TYPING_INDICATOR': {
+        case EventType.START_TYPING: {
           const { connectionId, receiverId} = parsedData.payload;
           await redisManager.chat.publish(
             'chat_router',
@@ -199,13 +199,13 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
           )
           break;
         }
-        case 'STOPPED_TYPING': {
+        case EventType.STOP_TYPING: {
           const { connectionId, receiverId } = parsedData.payload;
           await redisManager.chat.publish(
             'chat_router',
             JSON.stringify({
               receiverId,
-              eventType: EventType.STOPPED_TYPING,
+              eventType: EventType.USER_STOPPED_TYPING,
               eventData: {
                 senderId: profileId,
                 connectionId
@@ -214,7 +214,7 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
           );
           break;
         }
-        case 'VIEWING_CHAT': {
+        case EventType.VIEW_CHAT: {
           const { connectionId, receiverId, lastMessageId } = parsedData.payload;
           await Promise.all([
             redisManager.chat.setActiveChat(profileId,connectionId),
@@ -233,7 +233,7 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
           )
           break;
         }
-        case 'LEAVING_CHAT': {
+        case EventType.LEAVE_CHAT: {
           await redisManager.chat.removeActiveChat(profileId);
           break;
         }

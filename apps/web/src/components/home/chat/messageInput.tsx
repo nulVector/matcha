@@ -34,7 +34,7 @@ export function MessageInput({
     return () => {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       if (isTyping) {
-        sendMessage(EventType.STOPPED_TYPING, { connectionId, receiverId });
+        sendMessage(EventType.STOP_TYPING, { connectionId, receiverId });
       }
     };
   }, [isTyping, connectionId, receiverId, sendMessage]);
@@ -43,7 +43,7 @@ export function MessageInput({
     setContent(e.target.value);
     if (!isTyping) {
       setIsTyping(true);
-      sendMessage("TYPING_INDICATOR" as EventType, {
+      sendMessage(EventType.START_TYPING, {
         connectionId,
         receiverId,
       });
@@ -51,7 +51,7 @@ export function MessageInput({
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
       setIsTyping(false);
-      sendMessage(EventType.STOPPED_TYPING, { connectionId, receiverId });
+      sendMessage(EventType.STOP_TYPING, { connectionId, receiverId });
     }, 2000);
   };
 
@@ -65,7 +65,7 @@ export function MessageInput({
       receiverId,
       content: messageText
     });
-    sendMessage(EventType.CHAT_MESSAGE, {
+    sendMessage(EventType.SEND_MESSAGE, {
       connectionId,
       receiverId,
       content: messageText
@@ -73,7 +73,7 @@ export function MessageInput({
     
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     setIsTyping(false);
-    sendMessage(EventType.STOPPED_TYPING, { connectionId, receiverId });
+    sendMessage(EventType.STOP_TYPING, { connectionId, receiverId });
 
     setTimeout(() => {
       markMessageFailed(localId);

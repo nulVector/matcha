@@ -113,7 +113,7 @@ export default function ActiveChatPage() {
   useEffect(() => {
     if (!chatPartner?.id || !connectionId) return;
     
-    sendMessage("VIEWING_CHAT" as EventType, {
+    sendMessage(EventType.VIEW_CHAT, {
       connectionId,
       receiverId: chatPartner.id,
       lastMessageId,
@@ -130,7 +130,7 @@ export default function ActiveChatPage() {
       if (matchStatusRef.current === "MATCHED") {
         api.delete(`/connections/${connectionId}`).catch(() => {});
       }
-      sendMessage("LEAVING_CHAT" as EventType, { connectionId });
+      sendMessage(EventType.LEAVE_CHAT, { connectionId });
       queryClient.invalidateQueries({ queryKey: ["messages", connectionId] });
       queryClient.invalidateQueries({ queryKey: ["connections"] });
     };
@@ -219,7 +219,7 @@ export default function ActiveChatPage() {
                               <button
                                 onClick={() => {
                                   retryOutboxMessage(msg.id);
-                                  sendMessage(EventType.CHAT_MESSAGE, {
+                                  sendMessage(EventType.SEND_MESSAGE, {
                                     connectionId,
                                     receiverId: chatPartner?.id || "",
                                     content: msg.content,

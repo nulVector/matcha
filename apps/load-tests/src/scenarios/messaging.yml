@@ -82,7 +82,7 @@ scenarios:
       - loop:
           - function: "generateMessagePayload"
           - send:
-              type: "CHAT_MESSAGE"
+              type: "SEND_MESSAGE"
               payload:
                 connectionId: "{{ connectionId }}"
                 receiverId: "{{ receiverId }}"
