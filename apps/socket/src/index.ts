@@ -156,6 +156,18 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
             createdAt: new Date().toISOString(),
             type: MessageType.TEXT
           };
+          const wasHidden = await redisManager.chat.checkAndUnhideChat(connectionId);
+          if (wasHidden){
+            await prisma.connection.update({
+              where:{
+                id:connectionId
+              }, data: {
+                user1ChatVisible: true,
+                user2ChatVisible: true,
+                updatedAt: new Date()
+              }
+            })
+          }
           await redisManager.chat.processNewMessage(
             connectionId, 
             receiverId, 
@@ -170,18 +182,6 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
               eventData: message
             })
           );
-          const wasHidden = await redisManager.chat.checkAndUnhideChat(connectionId);
-          if (wasHidden){
-            prisma.connection.update({
-              where:{
-                id:connectionId
-              }, data: {
-                user1ChatVisible: true,
-                user2ChatVisible: true,
-                updatedAt: new Date()
-              }
-            }).catch(err => logger.error({err, connectionId}, "Failed to unhide the chat."))
-          }
           break;
         }
         case 'TYPING_INDICATOR': {

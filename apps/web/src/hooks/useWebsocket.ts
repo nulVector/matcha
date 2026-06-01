@@ -80,6 +80,30 @@ export function useWebsocket() {
                 }));
               }
             }
+            let connectionExists = false;
+            queryClient.setQueriesData({ queryKey: ["connections"] }, (oldConnData: any) => {
+              if (!oldConnData || !oldConnData.pages) return oldConnData;
+              let targetConnection = null;
+              const newPages = oldConnData.pages.map((page: any) => {
+                const filteredData = page.data.filter((conn: any) => {
+                  if (conn.connectionId === payload.connectionId) {
+                    targetConnection = { ...conn, timestamp: Date.now() }; 
+                    connectionExists = true;
+                    return false; 
+                  }
+                  return true;
+                });
+                return { ...page, data: filteredData };
+              });
+              if (targetConnection) {
+                newPages[0].data.unshift(targetConnection);
+                return { ...oldConnData, pages: newPages };
+              }
+              return oldConnData;
+            });
+            if (!connectionExists) {
+              queryClient.invalidateQueries({ queryKey: ["connections"] });
+            }
             break;
 
           case EventType.MATCH_FOUND:
