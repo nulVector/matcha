@@ -109,7 +109,8 @@ export function useWebsocket() {
   const intentionalDisconnectRef = useRef(false);
 
   const connect = useCallback(() => {
-    if (socketRef.current?.readyState === WebSocket.OPEN) return;
+    if (socketRef.current?.readyState === WebSocket.OPEN 
+      || socketRef.current?.readyState === WebSocket.CONNECTING ) return;
     intentionalDisconnectRef.current = false;
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}/api/ws`;
@@ -191,6 +192,11 @@ export function useWebsocket() {
                 });
                 queryClient.setQueryData(["chat_ended_alert", payload.connectionId], true);
               }
+            } else if (payload.event === SystemAction.PARTNER_OFFLINE) {
+              queryClient.setQueryData(["partner_status", payload.connectionId], "OFFLINE");
+            }
+            else if (payload.event === SystemAction.PARTNER_ONLINE) {
+              queryClient.setQueryData(["partner_status", payload.connectionId], "ONLINE");
             }
             else if (
               payload.event === SystemAction.REQUEST_ACCEPTED || 
@@ -302,10 +308,17 @@ export function useWebsocket() {
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
-      if (socketRef.current) {
-        socketRef.current.onclose = null; 
-        socketRef.current.onmessage = null;
-        socketRef.current.close(1000, "Component unmounting");
+      const ws = socketRef.current;
+      if (ws) {
+        ws.onclose = null; 
+        ws.onmessage = null;
+        if (ws.readyState === WebSocket.CONNECTING) {
+          ws.onopen = () => {
+            ws.close(1000, "Component unmounting (Aborted connection)");
+          };
+        } else if (ws.readyState === WebSocket.OPEN) {
+          ws.close(1000, "Component unmounting");
+        }
         socketRef.current = null;
       }
     };

@@ -1,12 +1,13 @@
+import { TaskProducer } from '@matcha/queue';
 import { CachedMessage, MessageType, UserState, ConnectionListType } from '@matcha/redis';
 import { createServer, IncomingMessage } from 'http';
 import jwt from 'jsonwebtoken';
-import prisma from '@matcha/prisma';
+import prisma, { ConnectionStatus } from '@matcha/prisma';
 import { WebSocket, WebSocketServer } from 'ws';
 import { redisManager } from './services/redis';
 import { createId } from '@paralleldrive/cuid2';
 import { logger } from '@matcha/logger';
-import { JwtPayload, UserSession, EventType } from "@matcha/shared"
+import { JwtPayload, UserSession, EventType, SystemAction } from "@matcha/shared"
 import { socketMessageSchema } from '@matcha/zod';
 
 interface AuthenticatedWebSocket extends WebSocket {
@@ -84,6 +85,30 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
   localSockets.get(profileId)!.add(authWs);
   try {
     await redisManager.userConnection.mapSocket(profileId,socketId);
+    const profileData = await redisManager.userDetail.getProfileFields(profileId, ["queueStatus"]);
+    if (profileData.queueStatus === UserState.MATCHED) {
+      const activeConnection = await prisma.connection.findFirst({
+        where: {
+          status: "MATCHED",
+          OR: [{ user1Id: profileId }, { user2Id: profileId }]
+        },
+        select: { id: true, user1Id: true, user2Id: true }
+      });
+      if (activeConnection) {
+        const partnerId = activeConnection.user1Id === profileId ? activeConnection.user2Id : activeConnection.user1Id;
+        await redisManager.chat.publish(
+          'chat_router',
+          JSON.stringify({
+            receiverId: partnerId,
+            eventType: EventType.SYSTEM_EVENT,
+            eventData: { 
+              event: SystemAction.PARTNER_ONLINE, 
+              connectionId: activeConnection.id 
+            }
+          })
+        );
+      }
+    }
   } catch (err: any) {
     logger.error({ err, profileId }, "Failed to initialize connection");
     ws.close();
@@ -257,7 +282,37 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
       }
       const count = await redisManager.userConnection.removeSocket(socketId);
       if (count === 0) {
-        await redisManager.match.leaveQueue(profileId, UserState.IDLE);
+        const profile = await redisManager.userDetail.getProfileFields(profileId, ["queueStatus"]);
+        if (profile.queueStatus === UserState.MATCHED) {
+          const activeConnection = await prisma.connection.findFirst({
+            where: {
+              status: ConnectionStatus.MATCHED,
+              OR: [{ user1Id: profileId }, { user2Id: profileId }]
+            },
+            select: { id: true, user1Id: true, user2Id: true }
+          });
+          if (activeConnection) {
+            const partnerId = activeConnection.user1Id === profileId ? activeConnection.user2Id : activeConnection.user1Id;
+            await redisManager.chat.publish(
+              'chat_router',
+              JSON.stringify({
+                receiverId: partnerId,
+                eventType: EventType.SYSTEM_EVENT,
+                eventData: { 
+                  event: SystemAction.PARTNER_OFFLINE, 
+                  connectionId: activeConnection.id 
+                }
+              })
+            );
+            await TaskProducer.dispatchHandleDroppedMatch({
+              userId: profileId,
+              connectionId: activeConnection.id,
+              partnerId
+            });
+          }
+        } else {
+          await redisManager.match.leaveQueue(profileId, UserState.IDLE);
+        }
       }
     } catch (err: any) {
       logger.error({ err, profileId }, "Error cleaning up socket");

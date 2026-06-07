@@ -14,6 +14,11 @@ export interface SendEmailPayload {
   template: "PASSWORD_RESET" | "WELCOME";
   context: Record<string, string>;
 }
+export interface HandleDroppedMatchPayload {
+  userId: string;
+  connectionId: string;
+  partnerId: string;
+}
 
 // DB BUFFER QUEUE PAYLOADS
 export interface ProcessMessageBatchPayload {
@@ -33,7 +38,8 @@ export interface ArchiveExpiredMatchesPayload {
  
 export type TaskQueueJob = 
   | { name: JobName.PROFILE_INIT; data: ProfileInitPayload }
-  | { name: JobName.SEND_EMAIL; data: SendEmailPayload };
+  | { name: JobName.SEND_EMAIL; data: SendEmailPayload }
+  | { name: JobName.HANDLE_DROPPED_MATCH; data: HandleDroppedMatchPayload };
 
 export type DbBufferQueueJob = 
   | { name: JobName.PROCESS_MESSAGE_BATCH; data: ProcessMessageBatchPayload }

@@ -7,6 +7,7 @@ export enum QueueName {
 export enum JobName {
   PROFILE_INIT = "profile_init",
   SEND_EMAIL = "send_email",
+  HANDLE_DROPPED_MATCH = "handle_dropped_match",
 
   PROCESS_MESSAGE_BATCH = "process_message_batch",
   PROCESS_READ_BATCH = "process_read_batch",

@@ -14,6 +14,7 @@ import { Loader } from "@matcha/ui/components/loader";
 import { cn } from "@matcha/ui/lib/utils";
 import {
   useInfiniteQuery,
+  useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 import {
@@ -109,6 +110,12 @@ export default function ActiveChatPage() {
   useEffect(() => {
     matchStatusRef.current = matchData?.status;
   }, [matchData?.status]);
+
+  const { data: partnerStatus } = useQuery({
+    queryKey: ["partner_status", connectionId],
+    queryFn: () => "ONLINE",
+    initialData: "ONLINE",
+  });
 
   useEffect(() => {
     if (!chatPartner?.id || !connectionId) return;
@@ -283,7 +290,12 @@ export default function ActiveChatPage() {
           </div>
         )}
       </div>
-
+      {partnerStatus === "OFFLINE" && matchData?.status === "MATCHED" && (
+        <div className="bg-destructive/10 border-t border-destructive/20 px-4 py-2 flex items-center justify-center gap-2 text-sm text-destructive font-medium shrink-0 animate-in slide-in-from-bottom-2">
+          <Loader inline className="size-4 text-destructive" />
+          Partner lost connection. Waiting for them to return...
+        </div>
+      )}
       <MessageInput
         connectionId={connectionId}
         receiverId={chatPartner?.id || "unknown"}

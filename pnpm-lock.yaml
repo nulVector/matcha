@@ -178,6 +178,9 @@ importers:
       '@matcha/logger':
         specifier: workspace:*
         version: link:../../packages/logger
+      '@matcha/queue':
+        specifier: workspace:*
+        version: link:../../packages/queue
       '@matcha/redis':
         specifier: workspace:*
         version: link:../../packages/redis
