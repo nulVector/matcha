@@ -226,6 +226,20 @@ export class MatchManager {
     if (!result || !result[2]) return 0;
     return result[2][1] as number;
   }
+  async getMatchVotes(connectionId: string) {
+    const tx = this.redis.multi();
+    tx.hkeys(`match:votes:${connectionId}:EXTEND`);
+    tx.hkeys(`match:votes:${connectionId}:CONVERT`);
+    const results = await tx.exec();
+    if (!results) return { extend: [], convert: [] };
+    return {
+      extend: (results[0]?.[1] as string[]) || [],
+      convert: (results[1]?.[1] as string[]) || []
+    };
+  }
+  async clearSpecificVote(connectionId: string, action:MatchAction) {
+    await this.redis.del(`match:votes:${connectionId}:${action}`);
+  }
   async clearMatchVotes(connectionId: string) {
     const tx = this.redis.multi();
     tx.del(`match:votes:${connectionId}:EXTEND`);

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { convertConnection, extendTimer, joinQueue, leaveQueue, skipConnection } from "../controllers/connection.controller";
 import { validate } from "../middleware/validate";
-import { connectionIdSchema } from "@matcha/zod";
+import { connectionIdSchema, requestHandleSchema } from "@matcha/zod";
 import { rateLimiter } from "../middleware/rateLimiter";
 import { idempotencyGuard } from "../middleware/idempotency";
 const connectionRouter: Router = Router();
@@ -23,6 +23,7 @@ connectionRouter.patch(
   rateLimiter("extend_timer", "user", 3, 10),
   idempotencyGuard("extend_timer", 30),
   validate(connectionIdSchema,"params"),
+  validate(requestHandleSchema),
   extendTimer
 );
 connectionRouter.patch(
@@ -30,6 +31,7 @@ connectionRouter.patch(
   rateLimiter("convert_connection", "user", 3, 10),
   idempotencyGuard("convert_connection", 30),
   validate(connectionIdSchema,"params"),
+  validate(requestHandleSchema),
   convertConnection
 );
 connectionRouter.delete(

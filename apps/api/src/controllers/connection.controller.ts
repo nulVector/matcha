@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { redisManager } from "../services/redis";
 import { ConnectionListType, MatchAction, UserState } from "@matcha/redis";
-import { connectionIdType } from "@matcha/zod";
+import { connectionIdType, requestHandleType } from "@matcha/zod";
 import prisma, { ConnectionStatus } from "@matcha/prisma";
 import { EventType, SystemAction } from "@matcha/shared";
 
@@ -60,12 +60,20 @@ export const extendTimer = async (req:Request,res:Response,next:NextFunction) =>
   try {
     const profileId = req.user!.profile!.id;
     const {connectionId}:connectionIdType = req.validatedData.params;
+    const {action}:requestHandleType = req.validatedData.body;
     const matchInfo = await getSafeMatchInfo(connectionId);
     if (!matchInfo) {
       return res.status(400).json({
         success:false,
         message:"Chat ended."
       })
+    }
+    if (action === 'REJECT') {
+      await redisManager.match.clearSpecificVote(connectionId, MatchAction.EXTEND);
+      return res.json({
+        success: true,
+        message: "Extension declined."
+      });
     }
     const receiverId = matchInfo.user1Id === profileId ? matchInfo.user2Id : matchInfo.user1Id;
     const voteCount = await redisManager.match.recordMatchVotes(connectionId,profileId,MatchAction.EXTEND);
@@ -96,7 +104,7 @@ export const extendTimer = async (req:Request,res:Response,next:NextFunction) =>
           data:{ expiresAt:newExpiresAt }
         }),
         redisManager.match.setMatchTimer(connectionId, 60 * 30),
-        redisManager.match.clearMatchVotes(connectionId),
+        redisManager.match.clearSpecificVote(connectionId, MatchAction.EXTEND),
         redisManager.match.setMatchInfo(connectionId, profileId, receiverId, newExpiresAt.toISOString())
       ]);
       const successEvent = {
@@ -129,12 +137,20 @@ export const convertConnection = async (req:Request,res:Response,next:NextFuncti
   try {
     const profileId = req.user!.profile!.id;
     const {connectionId} : connectionIdType = req.validatedData.params;
+    const {action}:requestHandleType = req.validatedData.body;
     const matchInfo = await getSafeMatchInfo(connectionId);
     if(!matchInfo){
       return res.status(400).json({
         success:false,
         message:"Chat ended."
       })
+    }
+    if (action === 'REJECT') {
+      await redisManager.match.clearSpecificVote(connectionId, MatchAction.CONVERT);
+      return res.json({
+        success: true,
+        message: "Friend request declined."
+      });
     }
     const receiverId = matchInfo.user1Id === profileId ? matchInfo.user2Id : matchInfo.user1Id;
     const voteCount = await redisManager.match.recordMatchVotes(connectionId,profileId,MatchAction.CONVERT);

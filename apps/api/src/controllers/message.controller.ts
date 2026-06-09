@@ -104,6 +104,18 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
         await redisManager.userConnection.setConnectionInfo(connectionId, connection.user1Id, connection.user2Id, connectionStatus as ConnectionListType);
       }
     }
+
+    let partnerRequested = null;
+    let iRequestedExtend = false;
+    let iRequestedConvert = false;
+    if (connectionStatus === "MATCHED") {
+      const votes = await redisManager.match.getMatchVotes(connectionId);
+      iRequestedExtend = votes.extend.includes(profileId);
+      iRequestedConvert = votes.convert.includes(profileId);
+      if (votes.extend.includes(partnerId)) partnerRequested = "EXTEND";
+      else if (votes.convert.includes(partnerId)) partnerRequested = "CONVERT";
+    }
+
     let orderedMessages: CachedMessage[] = [];
     let nextCursor: string | undefined = undefined;
     if (cursor) {
@@ -178,7 +190,10 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
       matchData: {
         id: connectionId,
         status: connectionStatus,
-        expiresAt: connectionExpiresAt
+        expiresAt: connectionExpiresAt,
+        partnerRequested,
+        iRequestedExtend,
+        iRequestedConvert
       }
     });
   } catch (err: any) {

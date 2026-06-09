@@ -104,6 +104,18 @@ export function ChatHeader({
     return () => clearInterval(interval);
   }, [matchData?.expiresAt, isMatched]);
 
+  useEffect(() => {
+    if (!isMatched || !matchData) return;
+    if (matchData.iRequestedExtend) setIRequestedExtend(true);
+    if (matchData.iRequestedConvert) setIRequestedAdd(true);
+    if (matchData.partnerRequested) {
+      const currentReq = queryClient.getQueryData(["pending_request", connectionId]);
+      if (currentReq !== matchData.partnerRequested) {
+        queryClient.setQueryData(["pending_request", connectionId], matchData.partnerRequested);
+      }
+    }
+  }, [matchData, connectionId, isMatched, queryClient]);
+
   const { data: fullProfile, isLoading: isLoadingProfile } = useUser(
     targetUser?.username,
   );
@@ -147,28 +159,32 @@ export function ChatHeader({
   });
 
   const { mutate: extendChat, isPending: isExtending } = useMutation({
-    mutationFn: async () =>
+    mutationFn: async ( { action }: { action: "ACCEPT" | "REJECT" }) =>
       await api.patch(
         `/connections/${connectionId}/extend`,
-        {},
+        { action },
         { headers: { "x-idempotency-key": extendKey } },
       ),
-    onSuccess: () => {
-      setIRequestedExtend(true);
+    onSuccess: (_, variables) => {
+      if (variables.action === "ACCEPT") {
+        setIRequestedExtend(true);
+      }
       queryClient.setQueryData(["pending_request", connectionId], null);
     },
     onSettled: () => resetExtendKey(),
   });
 
   const { mutate: convertChat, isPending: isConverting } = useMutation({
-    mutationFn: async () =>
+    mutationFn: async ({ action } : { action: "ACCEPT" | "REJECT" }) =>
       await api.patch(
         `/connections/${connectionId}/convert`,
-        {},
+        { action },
         { headers: { "x-idempotency-key": convertKey } },
       ),
-    onSuccess: () => {
-      setIRequestedAdd(true);
+    onSuccess: (_, variables) => {
+      if (variables.action === "ACCEPT") {
+        setIRequestedAdd(true);
+      }
       queryClient.setQueryData(["pending_request", connectionId], null);
     },
     onSettled: () => resetConvertKey(),
@@ -358,7 +374,7 @@ export function ChatHeader({
                 disabled={
                   iRequestedExtend || pendingRequest === "EXTEND" || isExtending
                 }
-                onClick={() => extendChat()}
+                onClick={() => extendChat({ action: "ACCEPT" })}
                 aria-label="Extend Chat"
               >
                 {isExtending ? (
@@ -382,7 +398,7 @@ export function ChatHeader({
                 disabled={
                   iRequestedAdd || pendingRequest === "CONVERT" || isConverting
                 }
-                onClick={() => convertChat()}
+                onClick={() => convertChat({ action: "ACCEPT" })}
                 aria-label="Send Friend Request"
               >
                 {isConverting ? (
@@ -415,7 +431,11 @@ export function ChatHeader({
             queryClient.setQueryData(["pending_request", connectionId], null);
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent 
+          className="sm:max-w-md [&>button]:hidden"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle>Time Extension Requested</DialogTitle>
             <DialogDescription className="mt-2 text-balance">
@@ -429,18 +449,14 @@ export function ChatHeader({
             <Button
               variant="outline"
               className="w-full sm:w-auto min-w-35"
-              onClick={() =>
-                queryClient.setQueryData(
-                  ["pending_request", connectionId],
-                  null,
-                )
-              }
+              disabled={isExtending}
+              onClick={() => extendChat({ action: "REJECT" })}
             >
               Decline
             </Button>
             <Button
               className="w-full sm:w-auto min-w-35"
-              onClick={() => extendChat()}
+              onClick={() => extendChat({ action: "ACCEPT" })}
               disabled={isExtending}
             >
               {isExtending ? (
@@ -464,7 +480,11 @@ export function ChatHeader({
             queryClient.setQueryData(["pending_request", connectionId], null);
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent 
+          className="sm:max-w-md [&>button]:hidden"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle>Friend Request</DialogTitle>
             <DialogDescription className="mt-2 text-balance">
@@ -479,18 +499,14 @@ export function ChatHeader({
             <Button
               variant="outline"
               className="w-full sm:w-auto min-w-35"
-              onClick={() =>
-                queryClient.setQueryData(
-                  ["pending_request", connectionId],
-                  null,
-                )
-              }
+              disabled={isConverting}
+              onClick={() => convertChat({ action: "REJECT" })}
             >
               Decline
             </Button>
             <Button
               className="w-full sm:w-auto min-w-35"
-              onClick={() => convertChat()}
+              onClick={() => convertChat({ action: "ACCEPT" })}
               disabled={isConverting}
             >
               {isConverting ? (
