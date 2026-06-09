@@ -6,7 +6,7 @@ import { Button } from "@matcha/ui/components/button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, Radar, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface MatchState {
   connectionId: string;
@@ -19,13 +19,30 @@ export default function MatchmakingPage() {
   const { key: joinKey, resetKey: resetJoinKey } = useIdempotency();
   const { key: leaveKey, resetKey: resetLeaveKey } = useIdempotency();
   const [isQueued, setIsQueued] = useState(false);
+  const isQueuedRef = useRef(isQueued);
 
+  useEffect(() => {
+    isQueuedRef.current = isQueued;
+  }, [isQueued]);
+  
   useEffect(() => {
     const shouldAutoQueue = queryClient.getQueryData(["auto_queue"]);
     if (shouldAutoQueue) {
       queryClient.setQueryData(["auto_queue"], null);
       joinQueue();
     }
+  }, []);
+  
+  useEffect(() => {
+    return () => {
+      if (isQueuedRef.current) {
+        api.post(
+          "/connections/queue/leave", 
+          {},
+          { headers: { "x-idempotency-key": leaveKey } }
+        ).catch(console.error);
+      }
+    };
   }, []);
 
   const { data: match } = useQuery<MatchState | null>({
@@ -39,6 +56,7 @@ export default function MatchmakingPage() {
 
   useEffect(() => {
     if (match?.connectionId) {
+      isQueuedRef.current = false;
       queryClient.setQueryData(["currentMatch"], null);
       router.push(`/home/chat/${match.connectionId}`);
     }
