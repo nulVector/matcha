@@ -8,6 +8,8 @@ declare global {
         id:string;
       } | null;
       hasPassword:boolean;
+      sessionId?: string;
+      exp?: number;
     }
     interface Request {
       validatedData: {

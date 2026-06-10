@@ -53,7 +53,7 @@ server.on('upgrade',async (request,socket,head)=>{
       socket.destroy();
       return;
     }
-    const jwt_payload = jwt.verify(token,jwtSecret) as (JwtPayload & { exp:number });
+    const jwt_payload = jwt.verify(token,jwtSecret) as JwtPayload;
     const userSession = await redisManager.auth.getSession(jwt_payload.id, jwt_payload.sessionId);
     if (!userSession){
       socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
@@ -69,7 +69,7 @@ server.on('upgrade',async (request,socket,head)=>{
     return;
   }
 })
-wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:UserSession, jwtPayload:(JwtPayload & { exp:number }))=>{
+wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:UserSession, jwtPayload: JwtPayload)=>{
   const profileId = userSession.userProfileId;
   if (!profileId) {
     ws.close(1008, "Profile required to connect");

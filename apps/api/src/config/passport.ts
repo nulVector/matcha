@@ -171,7 +171,9 @@ export const configurePassport = (passport:PassportStatic) =>{
         const user: Express.User = {
           id: session.userId,
           profile: session.userProfileId ? { id: session.userProfileId } : null,
-          hasPassword: session.hasPassword
+          hasPassword: session.hasPassword,
+          sessionId: jwt_payload.sessionId,
+          exp: jwt_payload.exp
         };
         return done(null, user);
       }catch(err: any){

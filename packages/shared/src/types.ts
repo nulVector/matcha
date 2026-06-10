@@ -2,7 +2,8 @@ import { VIBE_OPTIONS } from "./constants";
 
 export interface JwtPayload {
   id:string,
-  sessionId: string
+  sessionId: string,
+  exp: number;
 }
 export interface UserSession {
   userId: string;

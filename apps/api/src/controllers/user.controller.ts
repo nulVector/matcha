@@ -81,9 +81,7 @@ export const initiateProfile = async (req:Request, res:Response,next:NextFunctio
     }:initiateProfileType = req.validatedData.body;
     const userId = req.user!.id;
     const hasPassword = req.user!.hasPassword;
-    const token = req.cookies['token'];
-    const decoded = jwt.decode(token) as any; 
-    const sessionId = decoded.sessionId;
+    const sessionId = req.user!.sessionId!;
     const userProfile = await prisma.userProfile.create({
       data: {
         userId,
@@ -287,9 +285,7 @@ export const updatePassword = async (req:Request,res:Response, next:NextFunction
     const {currentPassword,newPassword}:updatePasswordType = req.validatedData.body;
     const userId = req.user!.id;
     const profileId = req.user!.profile!.id;
-    const currentToken = req.cookies['token'];
-    const decoded = jwt.decode(currentToken) as any;
-    const sessionId = decoded.sessionId;
+    const sessionId = req.user!.sessionId!;
     const existingUser = await prisma.user.findUnique({
       where:{ id:userId },
       select:{ password:true }

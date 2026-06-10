@@ -8,7 +8,7 @@ import passport from 'passport';
 import { COOKIE_OPTIONS } from "../constant/cookie";
 import { redisManager } from "../services/redis";
 import { createId } from '@paralleldrive/cuid2';
-import { EventType, JwtPayload } from "@matcha/shared";
+import { EventType} from "@matcha/shared";
 import { TaskProducer } from "@matcha/queue";
 
 const jwtSecret = process.env.JWT_SECRET;
@@ -163,10 +163,8 @@ export const logout = async (req:Request,res:Response,next:NextFunction)=>{
   try {
     const userId = req.user!.id;
     const userProfileId = req.user!.profile!.id;
-    //TODO - extract this out 
-    const token = req.cookies['token'];
-    const decoded = jwt.decode(token) as JwtPayload; 
-    await redisManager.auth.invalidateSession(userId, decoded.sessionId);
+    const sessionId = req.user!.sessionId!;
+    await redisManager.auth.invalidateSession(userId, sessionId);
     res.clearCookie("token", COOKIE_OPTIONS);
     await redisManager.chat.publish(
       'chat_router',
@@ -174,7 +172,7 @@ export const logout = async (req:Request,res:Response,next:NextFunction)=>{
         receiverId: userProfileId,
         eventType: EventType.FORCE_DISCONNECT,
         eventData: {
-          sessionId: decoded.sessionId,
+          sessionId,
           reason: "Logged out of device."
         }
       })
