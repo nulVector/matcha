@@ -23,21 +23,32 @@ export const dbBufferWorker = new Worker(
           type: msg.type,
           createdAt: new Date(msg.createdAt),
         }));
-        await prisma.message.createMany({
-          data: messagesToInsert,
-          skipDuplicates: true,
-        });
-        const uniqueConnectionIds = [...new Set(messages.map(msg => msg.connectionId))];
-        if (uniqueConnectionIds.length > 0) {
-          await prisma.connection.updateMany({
-            where: { id: { in: uniqueConnectionIds } },
-            data: { 
-              updatedAt: new Date(),
-              user1ChatVisible: true,
-              user2ChatVisible: true 
-            }
-          });
+        const latestMessagePerConnection = new Map<string, Date>();
+        for (const msg of messagesToInsert) {
+          const currentLatest = latestMessagePerConnection.get(msg.connectionId);
+          if (!currentLatest || msg.createdAt > currentLatest) {
+            latestMessagePerConnection.set(msg.connectionId, msg.createdAt);
+          }
         }
+        await prisma.$transaction(async (tx) => {
+          await tx.message.createMany({
+            data: messagesToInsert,
+            skipDuplicates: true,
+          });
+          for (const [connectionId, latestCreatedAt] of latestMessagePerConnection.entries()) {
+            await tx.connection.updateMany({
+              where: { 
+                id: connectionId,
+                updatedAt: { lte: latestCreatedAt } 
+              },
+              data: { 
+                updatedAt: latestCreatedAt,
+                user1ChatVisible: true,
+                user2ChatVisible: true 
+              }
+            });
+          }
+        });
         await redisManager.chat.trimMessageBufferBatch(messages.length);
         break;
       }
