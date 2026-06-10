@@ -119,6 +119,30 @@ export function useWebsocket() {
     ws.onopen = () => {
       setIsConnected(true);
       reconnectAttempts.current = 0;
+      try {
+        const outboxStore = useOutboxStore.getState();
+        const pendingMessages = outboxStore.messages.filter((m) => m.status === 'pending');
+
+        if (pendingMessages.length > 0) {
+          pendingMessages.forEach((msg) => {
+            ws.send(
+              JSON.stringify({
+                type: EventType.SEND_MESSAGE,
+                payload: {
+                  connectionId: msg.connectionId,
+                  receiverId: msg.receiverId,
+                  content: msg.content,
+                },
+              })
+            );
+            setTimeout(() => {
+              useOutboxStore.getState().markFailed(msg.localId);
+            }, 5000);
+          });
+        }
+      } catch (err) {
+        console.error("Failed to sync outbox:", err);
+      }
     };
 
     ws.onmessage = (event) => {
