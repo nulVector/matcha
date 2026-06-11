@@ -7,6 +7,7 @@ import prisma from "@matcha/prisma";
 import { logger } from "@matcha/logger";
 import http from "http";
 import { CronProducer, DbBufferProducer } from "@matcha/queue";
+import { startDlqMonitor, stopDlqMonitor } from "./consumers/dlqMonitor";
 
 const healthServer = http.createServer(async (req, res) => {
   if (req.url === '/health') {
@@ -41,6 +42,9 @@ async function bootstrap() {
   logger.info(`Task Worker listening on ${taskWorker.name}`);
   logger.info(`DB Buffer Worker listening on ${dbBufferWorker.name}`);
   logger.info(`Cron Worker listening on ${cronWorker.name}`);
+
+  startDlqMonitor();
+
   try {
     logger.info("Initializing Recurring Jobs");
     await CronProducer.initializeSchedules();
@@ -63,7 +67,10 @@ async function gracefulShutdown(signal: string) {
   if (isShuttingDown) return;
   isShuttingDown = true;
   logger.info(`Received ${signal}, shutting down workers gracefully...`);
+
   stopMatchmakingLoop();
+  await stopDlqMonitor();
+  
   try {
     await Promise.all([
       taskWorker.close(),

@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node ./dist/index.js",
     "dev": "tsc & nodemon ./dist/index.js",
-    "clean": "rimraf dist .turbo"
+    "clean": "rimraf dist .turbo",
+    "queue:clean-dlq": "ts-node src/scripts/cleanDlq.ts"
   },
   "dependencies": {
     "@matcha/emails": "workspace:*",
@@ -19,7 +20,8 @@
     "@paralleldrive/cuid2": "^3.3.0",
     "bullmq": "^5.70.1",
     "ioredis": "^5.9.2",
-    "resend": "^6.12.3"
+    "resend": "^6.12.3",
+    "ts-node": "^10.9.2"
   },
   "devDependencies": {
     "@matcha/shared": "workspace:*",

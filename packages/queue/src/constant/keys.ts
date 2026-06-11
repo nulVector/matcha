@@ -1,7 +1,8 @@
 export enum QueueName {
   TASK = "task_queue",
   DB_BUFFER = "db_buffer_queue",
-  CRON = "cron_queue"
+  CRON = "cron_queue",
+  DLQ = "dead_letter_queue"
 }
 
 export enum JobName {

@@ -16,6 +16,8 @@ let ConnectionStatus: typeof ConnectionStatusEnum;
 let redisManager: RedisManager;
 let dbBufferQueue: Queue;
 let cronQueue: Queue;
+let taskQueue: Queue;
+let dlqQueue: Queue;
 let QueueName: typeof QueueNameEnum;
 let JobName: typeof JobNameEnum;
 let CronProducer: typeof CronProducerType;
@@ -28,6 +30,7 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 describe('Worker Integration Tests', () => {
   let queueEvents: QueueEvents;
   let cronQueueEvents: QueueEvents;
+  let dlqEvents: QueueEvents;
   let testSubscriber: any;
 
   beforeAll(async () => {
@@ -42,6 +45,9 @@ describe('Worker Integration Tests', () => {
     const queuePackage = await import('@matcha/queue');
     dbBufferQueue = queuePackage.dbBufferQueue;
     cronQueue = queuePackage.cronQueue;
+    taskQueue = queuePackage.taskQueue;
+    dlqQueue = queuePackage.dlqQueue;
+
     QueueName = queuePackage.QueueName;
     JobName = queuePackage.JobName;
     CronProducer = queuePackage.CronProducer;
@@ -50,11 +56,15 @@ describe('Worker Integration Tests', () => {
     startMatchmakingLoop = matchConsumer.startMatchmakingLoop;
     stopMatchmakingLoop = matchConsumer.stopMatchmakingLoop;
     
+    const { startDlqMonitor } = await import('../consumers/dlqMonitor.js');
+    startDlqMonitor();
+
     await import('../consumers/dbBufferConsumer.js');
     await import('../consumers/cronConsumer.js'); 
     
     queueEvents = new QueueEvents(QueueName.DB_BUFFER, { connection: queueConnection });
     cronQueueEvents = new QueueEvents(QueueName.CRON, { connection: queueConnection }); 
+    dlqEvents = new QueueEvents(QueueName.DLQ, { connection: queueConnection });
     
     testSubscriber = queueConnection.duplicate();
     await testSubscriber.subscribe('chat_router');
@@ -62,6 +72,8 @@ describe('Worker Integration Tests', () => {
 
   afterAll(async () => {
     stopMatchmakingLoop();
+    const { stopDlqMonitor } = await import('../consumers/dlqMonitor.js');
+    await stopDlqMonitor();
     await queueEvents.close();
     await cronQueueEvents.close();
     await testSubscriber.quit();
@@ -232,6 +244,40 @@ describe('Worker Integration Tests', () => {
       await job.waitUntilFinished(cronQueueEvents);
       const state = await job.getState();
       expect(state).toBe('completed');
+    });
+  });
+
+  describe('The Dead-Letter Queue (DLQ) Monitor', () => {
+    it('should catch a job that exhausts all retries and move it to the DLQ', async () => {
+      return new Promise<void>(async (resolve, reject) => {
+        const { Worker } = await import('bullmq');
+        let executionCount = 0;
+        
+        const doomedWorker = new Worker(QueueName.TASK, async () => {
+          executionCount++;
+          throw new Error('This job is doomed to fail');
+        }, { connection: queueConnection });
+
+        dlqEvents.on('added', async ({ jobId }) => {
+          try {
+            expect(executionCount).toBe(2); 
+            const deadJob = await dlqQueue.getJob(jobId);
+            expect(deadJob).toBeDefined();
+            expect(deadJob?.data.originalQueue).toBe(QueueName.TASK);
+            expect(deadJob?.data.error).toContain('This job is doomed to fail');
+
+            await doomedWorker.close();
+            resolve();
+          } catch (err) {
+            await doomedWorker.close();
+            reject(err);
+          }
+        });
+        await taskQueue.add('test_doomed_job', { foo: 'bar' }, { 
+          attempts: 2,
+          backoff: { type: 'fixed', delay: 0 } 
+        });
+      });
     });
   });
 });

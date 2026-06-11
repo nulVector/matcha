@@ -2,7 +2,7 @@ import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
 import basicAuth from 'express-basic-auth';
-import { taskQueue, dbBufferQueue, cronQueue } from '@matcha/queue';
+import { taskQueue, dbBufferQueue, cronQueue, dlqQueue } from '@matcha/queue';
 import { RequestHandler } from 'express';
 
 export const serverAdapter = new ExpressAdapter();
@@ -12,6 +12,7 @@ createBullBoard({
     new BullMQAdapter(taskQueue),
     new BullMQAdapter(dbBufferQueue),
     new BullMQAdapter(cronQueue),
+    new BullMQAdapter(dlqQueue),
   ],
   serverAdapter: serverAdapter,
 });

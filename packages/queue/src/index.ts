@@ -7,3 +7,4 @@ export { queueConnection } from "./config/connection";
 export { taskQueue } from "./queues/taskQueue";
 export { dbBufferQueue } from "./queues/dbBufferQueue";
 export { cronQueue } from "./queues/cronQueue";
+export { dlqQueue } from "./queues/dlqQueue";

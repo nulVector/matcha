@@ -20,7 +20,8 @@
     "db:test:seed": "dotenv -e .env.test -- turbo run db:seed --filter=@matcha/prisma",
     "docker:test:setup": "pnpm docker:test:up && timeout 3 && pnpm db:test:push && pnpm db:test:seed",
     "db:test:studio": "dotenv -e .env.test -- turbo run db:studio --filter=@matcha/prisma",
-    "loadtest": "dotenv -e .env.test -- pnpm --filter=load-tests run"
+    "loadtest": "dotenv -e .env.test -- pnpm --filter=load-tests run",
+    "queue:clean-dlq": "dotenv -e .env -- pnpm --filter=workers run queue:clean-dlq"
   },
   "devDependencies": {
     "dotenv-cli": "^11.0.0",
