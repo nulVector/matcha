@@ -148,6 +148,7 @@ describe('API Integration Tests', () => {
           .patch(`/api/v1/connections/${connectionId}/extend`)
           .set('Cookie', [`token=${user1.token}`])
           .set('x-idempotency-key', idempotencyKey)
+          .send({ action: 'ACCEPT' })
       );
       const responses = await Promise.all(requestPromises);
       const statusCodes = responses.map(r => r.status).sort();

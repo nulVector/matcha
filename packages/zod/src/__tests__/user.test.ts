@@ -61,7 +61,8 @@ describe('User Zod Schemas', () => {
       location: 'Bengaluru',
       locationLatitude: 12.9716,
       locationLongitude: 77.5946,
-      interest: ['coding', 'pc gaming', 'gym']
+      interest: ['coding', 'pc gaming', 'gym'],
+      allowDiscovery: true
     };
 
     it('should pass with a complete, valid profile', () => {
