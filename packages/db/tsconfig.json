@@ -1,7 +1,9 @@
 {
   "extends":"@matcha/typescript-config/base.json",
   "compilerOptions": {
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
   },
   "include": ["src/**/*", "prisma.config.ts"],
   "exclude": ["node_modules", "dist", ".turbo"]
