@@ -12,19 +12,28 @@ export const getUnreadCounts = async (req:Request,res:Response,next:NextFunction
     if (!isHydrated) {
       const unreadData = await prisma.$queryRaw<{ connectionId: string, count: number }[]>`
         SELECT 
-          m."connectionId", 
-          CAST(COUNT(m.id) AS INTEGER) as count
-        FROM "Message" m
-        JOIN "Connection" c ON m."connectionId" = c.id
-        WHERE m."senderId" != ${profileId}
-          AND m.type::text = 'TEXT' 
+          c.id AS "connectionId", CAST(COUNT(m.id) AS INTEGER) as count
+        FROM "Connection" c
+        INNER JOIN "Message" m ON m."connectionId" = c.id
+        WHERE c."user1Id" = ${profileId}
           AND c.status::text IN ('FRIEND', 'ARCHIVED')
-          AND (
-            (c."user1Id" = ${profileId} AND (c."user1LastReadAt" IS NULL OR m."createdAt" > c."user1LastReadAt"))
-            OR
-            (c."user2Id" = ${profileId} AND (c."user2LastReadAt" IS NULL OR m."createdAt" > c."user2LastReadAt"))
-          )
-        GROUP BY m."connectionId"
+          AND m."senderId" != ${profileId}
+          AND m.type::text = 'TEXT' 
+          AND (c."user1LastReadAt" IS NULL OR m."createdAt" > c."user1LastReadAt")
+        GROUP BY c.id
+        
+        UNION ALL
+        
+        SELECT 
+          c.id AS "connectionId", CAST(COUNT(m.id) AS INTEGER) as count
+        FROM "Connection" c
+        INNER JOIN "Message" m ON m."connectionId" = c.id
+        WHERE c."user2Id" = ${profileId}
+          AND c.status::text IN ('FRIEND', 'ARCHIVED')
+          AND m."senderId" != ${profileId}
+          AND m.type::text = 'TEXT' 
+          AND (c."user2LastReadAt" IS NULL OR m."createdAt" > c."user2LastReadAt")
+        GROUP BY c.id
       `;
       await redisManager.chat.seedUnreadCount(profileId,unreadData)
       await redisManager.chat.setUnreadHydrateflag(profileId);
