@@ -18,6 +18,13 @@ import {
   PasswordSetting,
   UsernameSetting,
 } from "./settingsSections";
+import type { updateProfileType } from "@matcha/zod";
+import type { Metadata, UserSettingsProfile } from "@/types/models";
+
+interface SettingsFormProps {
+  profile: UserSettingsProfile;
+  metadata: Metadata;
+}
 
 export function SettingsPane() {
   const { data: metadata, isLoading: isMetadataLoading } = useMetadata();
@@ -41,10 +48,10 @@ export function SettingsPane() {
   );
 }
 
-function SettingsForm({ profile, metadata }: { profile: any; metadata: any }) {
+function SettingsForm({ profile, metadata }: SettingsFormProps) {
   const queryClient = useQueryClient();
   const { mutate: updateProfile, isPending: isUpdating } = useMutation({
-    mutationFn: async (data: any) => await api.patch("/users/me/profile", data),
+    mutationFn: async (data: updateProfileType) => await api.patch("/users/me/profile", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["me"] });
     },

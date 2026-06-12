@@ -191,7 +191,7 @@ export const updateProfile = async (req:Request,res:Response,next:NextFunction) 
       allowDiscovery
     }:updateProfileType = req.validatedData.body;
     const profileId = req.user!.profile!.id;
-    const updateData: any = {};
+    const updateData: updateProfileType = {};
     if (aboutMe !== undefined) updateData.aboutMe = aboutMe;
     if (openingQues !== undefined) updateData.openingQues = openingQues;
     if (location !== undefined) updateData.location = location;
@@ -530,7 +530,7 @@ export const getFriendRequests = async (req: Request, res: Response, next: NextF
       const nextItem = requestList.pop();
       nextCursor = nextItem!.id;
     }
-    const formattedData = requestList.map((request: any) => ({
+    const formattedData = requestList.map((request) => ({
       requestId: request.id,
       origin: request.origin,
       connectionId: request.connectionId,

@@ -1,8 +1,9 @@
 import prisma from "@matcha/prisma";
-import { CachedMessage, ConnectionListType } from "@matcha/redis";
+import { ConnectionListType } from "@matcha/redis";
 import { connectionIdType, getChatHistoryType } from "@matcha/zod";
 import { NextFunction, Request, Response } from "express";
 import { redisManager } from "../services/redis";
+import { CachedMessage } from "@matcha/shared";
 
 export const getUnreadCounts = async (req:Request,res:Response,next:NextFunction) => {
   try {

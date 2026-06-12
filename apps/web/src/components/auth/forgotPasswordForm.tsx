@@ -15,6 +15,7 @@ import { useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { EmailField } from "./AuthFields";
 import { AuthError, AuthFooterLink, AuthHeader } from "./AuthUI";
+import { AxiosError } from "axios";
 
 export function ForgotPasswordForm() {
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -70,7 +71,7 @@ export function ForgotPasswordForm() {
   }
 
   const errorMessage =
-    (error as any)?.response?.data?.message ||
+    (error as AxiosError<{ message: string }>)?.response?.data?.message ||
     (error ? "Something went wrong. Please try again." : null);
 
   return (

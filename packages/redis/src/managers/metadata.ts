@@ -3,7 +3,7 @@ import Redis from "ioredis";
 export class MetadataManager {
   constructor (private redis:Redis) {}
 
-  async cacheMetadata(key:string,data:any[]) {
+  async cacheMetadata<T>(key:string,data:T[]) {
     await this.redis.set(`metadata:${key}`, JSON.stringify(data),"EX",60*60*24)
   }
   async getMetadata<T>(key: string): Promise<T[] | null> {

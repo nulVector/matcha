@@ -1,6 +1,6 @@
 "use client";
 
-import { InterestMetadata } from "@/hooks/queries/useMetadata";
+import { InterestMetadata } from "@/types/models";
 import {
   closestCenter,
   DndContext,
@@ -9,6 +9,7 @@ import {
   TouchSensor,
   useSensor,
   useSensors,
+  DragEndEvent,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -129,11 +130,11 @@ export function InterestManager({
     );
   }, [metadataInterests]);
 
-  function handleDragEnd(event: any) {
+  function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (over && active.id !== over.id) {
-      const oldIndex = value.indexOf(active.id);
-      const newIndex = value.indexOf(over.id);
+      const oldIndex = value.indexOf(active.id as string);
+      const newIndex = value.indexOf(over.id as string);
       onChange(arrayMove(value, oldIndex, newIndex));
     }
   }

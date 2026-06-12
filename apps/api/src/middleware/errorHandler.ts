@@ -1,7 +1,13 @@
 import { Request, Response, NextFunction } from "express";
 import { logger } from "@matcha/logger";
 
-export const globalErrorHandler = (err: any,req: Request,res: Response,next: NextFunction) => {
+export interface AppError extends Error {
+  context?: Record<string, unknown>;
+  code?: string;
+  statusCode?: number;
+  meta?: { target?: string[] };
+}
+export const globalErrorHandler = (err: AppError ,req: Request,res: Response,next: NextFunction) => {
   logger.error(
     { err, ...err.context }, 
     err.message || "An internal server error occurred"

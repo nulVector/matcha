@@ -5,8 +5,9 @@ import jwt from 'jsonwebtoken';
 import type { PrismaClient, ConnectionStatus as ConnectionStatusEnum } from '@matcha/prisma';
 import type { RedisManager } from '@matcha/redis';
 import { getDeterministicIds } from '@matcha/shared';
+import type { Express, Router } from 'express';
 
-let app: any;
+let app: Express;
 let redisManager: RedisManager;
 let prisma: PrismaClient;
 let ConnectionStatus: typeof ConnectionStatusEnum;
@@ -27,7 +28,7 @@ describe('API Integration Tests', () => {
     const cookieParser = (await import('cookie-parser')).default;
     const passport = (await import('passport')).default;
     const { configurePassport } = await import('../config/passport.js');
-    const mainRouter = (await import('../routes/index.js')).default;
+    const mainRouter = (await import('../routes/index.js')).default as unknown as Router;
     app = express();
     app.use(express.json());
     app.use(cookieParser());

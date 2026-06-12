@@ -16,6 +16,7 @@ import {
   AuthSuccess,
   OAuthSection,
 } from "./AuthUI";
+import { AxiosError } from "axios";
 
 export function LoginForm() {
   const router = useRouter();
@@ -52,7 +53,7 @@ export function LoginForm() {
   const errorMessage =
     googleError === "GoogleAuthFailed"
       ? "Authentication failed. Please try again."
-      : (error as any)?.response?.data?.message;
+      : (error as AxiosError<{ message: string }>)?.response?.data?.message;
 
   return (
     <div className="flex flex-col gap-6">

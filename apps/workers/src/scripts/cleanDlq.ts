@@ -1,7 +1,8 @@
 import { dlqQueue, taskQueue, dbBufferQueue, cronQueue, QueueName } from "@matcha/queue";
 import * as readline from "readline";
+import type { Queue } from "bullmq";
 
-const queues: Record<string, any> = {
+const queues: Record<string, Queue> = {
   [QueueName.TASK]: taskQueue,
   [QueueName.DB_BUFFER]: dbBufferQueue,
   [QueueName.CRON]: cronQueue,

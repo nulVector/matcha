@@ -1,19 +1,34 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { EventType, SystemAction } from "@matcha/shared";
+import { QueryClient, useQueryClient } from "@tanstack/react-query";
+import { CachedMessage, EventType, SystemAction } from "@matcha/shared";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { useOutboxStore } from "@/store/useOutboxStore";
 import { useMe } from "./queries/useMe";
+import { SocketMessage } from "@matcha/zod";
 
-const updateMessagesCache = (queryClient: any, payload: any) => {
-  const oldData: any = queryClient.getQueryData(["messages", payload.connectionId]);
+interface MessagesQueryData {
+  pages: {
+    data: CachedMessage[];
+    matchData?: { status: string; expiresAt?: string | null };
+  }[];
+}
+interface ConnectionsQueryData {
+  pages: {
+    data: { connectionId: string; timestamp: number; [key: string]: unknown }[];
+  }[];
+}
+
+const updateMessagesCache = (queryClient: QueryClient, payload: CachedMessage) => {
+  const oldData= queryClient.getQueryData<MessagesQueryData>(["messages", payload.connectionId]);
   if (!oldData || !oldData.pages || oldData.pages.length === 0) {
     queryClient.invalidateQueries({ queryKey: ["messages", payload.connectionId] });
     return;
   } 
-  queryClient.setQueryData(["messages", payload.connectionId], (old: any) => {
+  queryClient.setQueryData(["messages", payload.connectionId], (old: MessagesQueryData | undefined) => {
+    if (!old) return old;
     const newPages = [...old.pages];
+    if (!newPages[0]) return old;
     const serverMsg = { ...payload, isRead: false }; 
     const updatedData = [...(newPages[0].data || []), serverMsg];
     if (updatedData.length > 200) updatedData.shift(); 
@@ -23,8 +38,8 @@ const updateMessagesCache = (queryClient: any, payload: any) => {
 };
 
 const handleUnreadOrReceipt = (
-  queryClient: any, 
-  payload: any, 
+  queryClient: QueryClient, 
+  payload: CachedMessage, 
   myId: string, 
   pathname: string, 
   socketRef: React.RefObject<WebSocket | null>
@@ -48,9 +63,9 @@ const handleUnreadOrReceipt = (
   }
 };
 
-const updateConnectionsCache = (queryClient: any, payload: any) => {
+const updateConnectionsCache = (queryClient: QueryClient, payload: CachedMessage) => {
   let connectionExists = false;
-  queryClient.setQueriesData({ queryKey: ["connections"] }, (oldConnData: any) => {
+  queryClient.setQueriesData({ queryKey: ["connections"] }, (oldConnData: ConnectionsQueryData | undefined) => {
     if (!oldConnData || !oldConnData.pages) return oldConnData;
     let targetConn = null;
     let foundPageIndex = -1;
@@ -58,28 +73,37 @@ const updateConnectionsCache = (queryClient: any, payload: any) => {
 
     for (let p = 0; p < oldConnData.pages.length; p++) {
       const page = oldConnData.pages[p];
-      foundItemIndex = page.data.findIndex((c: any) => c.connectionId === payload.connectionId);
+      if (!page) continue;
+      foundItemIndex = page.data.findIndex((c) => c.connectionId === payload.connectionId);
       if (foundItemIndex !== -1) {
         foundPageIndex = p;
-        targetConn = { ...page.data[foundItemIndex], timestamp: Date.now() };
+        targetConn = { 
+          ...page.data[foundItemIndex], 
+          connectionId: page.data[foundItemIndex]!.connectionId!, 
+          timestamp: Date.now() 
+        };
         connectionExists = true;
         break;
       }
     }
 
-    if (!targetConn) return oldConnData;
+    if (!targetConn || foundPageIndex === -1) return oldConnData;
     const newPages = [...oldConnData.pages];
-    const sourcePageData = [...newPages[foundPageIndex].data];
+    const sourcePage = newPages[foundPageIndex];
+    if (!sourcePage) return oldConnData;
+    const sourcePageData = [...sourcePage.data];
     sourcePageData.splice(foundItemIndex, 1);
     
     if (foundPageIndex === 0) {
       sourcePageData.unshift(targetConn);
       newPages[0] = { ...newPages[0], data: sourcePageData };
     } else {
-      newPages[foundPageIndex] = { ...newPages[foundPageIndex], data: sourcePageData };
-      const firstPageData = [...newPages[0].data];
-      firstPageData.unshift(targetConn);
-      newPages[0] = { ...newPages[0], data: firstPageData };
+      newPages[foundPageIndex] = { ...sourcePage, data: sourcePageData };
+      if (newPages[0]) {
+        const firstPageData = [...newPages[0].data];
+        firstPageData.unshift(targetConn);
+        newPages[0] = { ...newPages[0], data: firstPageData };
+      }
     }
     return { ...oldConnData, pages: newPages };
   });
@@ -180,24 +204,28 @@ export function useWebsocket() {
             } 
             else if (payload.event === SystemAction.EXTEND_ACCEPTED) {
               queryClient.setQueryData(["pending_request", payload.connectionId], null);
-              queryClient.setQueryData(["messages", payload.connectionId], (old: any) => {
+              queryClient.setQueryData(["messages", payload.connectionId], (old: MessagesQueryData | undefined) => {
                 if (!old || !old.pages || !old.pages[0]) return old;
                 const newPages = [...old.pages];
+                if (!newPages[0]) return old;
+                const oldMatchData = newPages[0].matchData || { status: 'UNKNOWN' };
                 newPages[0] = {
                   ...newPages[0],
-                  matchData: { ...newPages[0].matchData, expiresAt: payload.expiresAt }
+                  matchData: { ...oldMatchData, expiresAt: payload.expiresAt }
                 };
                 return { ...old, pages: newPages };
               });
             }
             else if (payload.event === SystemAction.CONVERT_ACCEPTED) {
               queryClient.setQueryData(["pending_request", payload.connectionId], null);
-              queryClient.setQueryData(["messages", payload.connectionId], (old: any) => {
+              queryClient.setQueryData(["messages", payload.connectionId], (old: MessagesQueryData | undefined) => {
                 if (!old || !old.pages || !old.pages[0]) return old;
                 const newPages = [...old.pages];
+                if (!newPages[0]) return old;
+                const oldMatchData = newPages[0].matchData || { status: 'UNKNOWN' };
                 newPages[0] = {
                   ...newPages[0],
-                  matchData: { ...newPages[0].matchData, status: "FRIEND", expiresAt: null }
+                  matchData: { ...oldMatchData, status: "FRIEND", expiresAt: null }
                 };
                 return { ...old, pages: newPages };
               });
@@ -205,12 +233,14 @@ export function useWebsocket() {
             }
             else if (payload.event === SystemAction.CHAT_ENDED) {
               if (window.location.pathname.includes(`/home/chat/${payload.connectionId}`)) {
-                queryClient.setQueryData(["messages", payload.connectionId], (old: any) => {
+                queryClient.setQueryData(["messages", payload.connectionId], (old: MessagesQueryData | undefined) => {
                   if (!old || !old.pages || !old.pages[0]) return old;
                   const newPages = [...old.pages];
+                  if (!newPages[0]) return old;
+                  const oldMatchData = newPages[0].matchData || { status: 'UNKNOWN' };
                   newPages[0] = {
                     ...newPages[0],
-                    matchData: { ...newPages[0].matchData, status: "ARCHIVED", expiresAt: null }
+                    matchData: { ...oldMatchData, status: "ARCHIVED", expiresAt: null }
                   };
                   return { ...old, pages: newPages };
                 });
@@ -258,11 +288,11 @@ export function useWebsocket() {
                 [payload.connectionId]: 0
               };
             });
-            queryClient.setQueryData(["messages", payload.connectionId], (old: any) => {
+            queryClient.setQueryData(["messages", payload.connectionId], (old: MessagesQueryData | undefined) => {
               if (!old || !old.pages || old.pages.length === 0) return old;
-              const newPages = old.pages.map((page: any) => ({
+              const newPages = old.pages.map((page) => ({
                 ...page,
-                data: page.data.map((msg: any) => ({
+                data: page.data.map((msg) => ({
                   ...msg,
                   isRead: true
                 }))
@@ -274,7 +304,7 @@ export function useWebsocket() {
           case EventType.NOTIFICATION_UPDATE:
             const category = payload.category?.toUpperCase();
             if (category === "NEW_FRIEND_REQUEST") {
-              queryClient.setQueryData(["notifications"], (old: any) => {
+              queryClient.setQueryData(["notifications"], (old: { has_new_requests: boolean } | undefined) => {
                 if (!old) return { has_new_requests: true };
                 return { ...old, has_new_requests: true };
               });
@@ -348,7 +378,10 @@ export function useWebsocket() {
     };
   }, [connect]);
 
-  const sendMessage = useCallback((type: EventType, payload: any) => {
+  const sendMessage = useCallback(<T extends SocketMessage["type"]>(
+    type: T, 
+    payload: Extract<SocketMessage, { type: T }>["payload"]
+  ) => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify({ type, payload }));
     } else {

@@ -1,13 +1,16 @@
+import type Redis from 'ioredis';
+import type { TaskProducer as TaskProducerType } from '../producers/taskProducer';
+import type { JobName as JobNameEnum, QueueName as QueueNameEnum } from '../constant/keys';
 import { Worker, QueueEvents, Queue } from 'bullmq';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 describe('BullMQ Queue Integration Tests', () => {
   let queueEvents: QueueEvents;
-  let queueConnection: any;
+  let queueConnection: Redis;
   let taskQueue: Queue;
-  let TaskProducer: any;
-  let JobName: any;
-  let QueueName: any;
+  let TaskProducer: typeof TaskProducerType;
+  let JobName: typeof JobNameEnum;
+  let QueueName: typeof QueueNameEnum;
 
   beforeAll(async () => {
     const queueModule = await import('../index.js');

@@ -9,11 +9,6 @@ export enum ConnectionListType {
   ARCHIVED = "ARCHIVED"
 }
 
-export enum MessageType {
-  TEXT = "TEXT",
-  SYSTEM = "SYSTEM"
-}
-
 export enum NotificationCategory {
   NEW_FRIEND_REQUEST = 'new_friend_request'
 }
@@ -46,15 +41,6 @@ export interface UserProfile {
 export interface ConnectionListItem { 
   otherUserId: string, 
   timestamp: number 
-}
-
-export interface CachedMessage {
-  id: string;
-  connectionId: string;
-  content: string;
-  senderId: string;
-  createdAt: string;     
-  type: MessageType; 
 }
 
 export interface UnreadCountData {

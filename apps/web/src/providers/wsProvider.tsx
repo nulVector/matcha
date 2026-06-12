@@ -3,20 +3,24 @@
 import React, { createContext, useContext, ReactNode, useMemo } from "react";
 import { useWebsocket } from "@/hooks/useWebsocket";
 import { EventType } from "@matcha/shared";
+import type { SocketMessage } from "@matcha/zod";
 
 interface WsContextType {
   isConnected: boolean;
-  sendMessage: (type: EventType, payload: any) => void;
+  sendMessage: <T extends EventType>(
+    type: T, 
+    payload: Extract<SocketMessage, { type: T }>["payload"]
+  ) => void;
 }
 
 const WsContext = createContext<WsContextType | undefined>(undefined);
 
 export function WsProvider({ children }: { children: ReactNode }) {
   const { isConnected, sendMessage } = useWebsocket();
-  const contextValue = useMemo(()=>({
+  const contextValue = useMemo<WsContextType>(() => ({
     isConnected,
-    sendMessage
-  }), [isConnected,sendMessage]);
+    sendMessage: sendMessage as WsContextType["sendMessage"]
+  }), [isConnected, sendMessage]);
   return (
     <WsContext.Provider value={contextValue}>
       {children}

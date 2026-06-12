@@ -1,6 +1,7 @@
 import { createId } from '@paralleldrive/cuid2';
+import type { ArtilleryContext, DoneCallback } from './auth-hooks';
 
-export function generateMessagePayload(context: any, events: any, done: Function) {
+export function generateMessagePayload(context: ArtilleryContext, events: unknown, done: DoneCallback) {
   try {
     if (!context.vars) context.vars = {};
     const sender = context.vars.userProfileId || "Unknown";

@@ -5,7 +5,7 @@ export class UserDetailManager {
   constructor (private redis:Redis) {}
 
   private deserializeProfile(data: Record<string, string>): Partial<UserProfile> {
-    const result: any = { ...data };
+    const result: Record<string, unknown> = { ...data };
     delete result.embedding;
     if (data.isActive !== undefined) result.isActive = data.isActive === "true";
     if (data.allowDiscovery !== undefined) result.allowDiscovery = data.allowDiscovery === "true";
@@ -14,7 +14,7 @@ export class UserDetailManager {
     if (data.interest !== undefined) {
       result.interest = data.interest === "" ? [] : data.interest.split(",");
     }
-    return result;
+    return result as Partial<UserProfile>;
   }
   async cacheProfile(userId:string,profile:Partial<UserProfile>){
     const key = `user:profile:${userId}`;

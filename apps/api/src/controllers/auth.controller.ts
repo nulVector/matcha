@@ -133,7 +133,7 @@ export const confirmResetPassword = async (req: Request, res: Response,next:Next
       select: { profile: { select: { id: true }}}
     });
     await redisManager.auth.consumeResetToken(token);
-    const killPromises: Promise<any>[] = [
+    const killPromises: Promise<unknown>[] = [
       redisManager.auth.invalidateAllUserSessions(userId)
     ];
     if (updatedUser.profile) {

@@ -41,6 +41,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { NewChatPanel } from "./newChatPanel";
+import { ConnectionItem } from "@/types/models";
 
 export function ChatPane() {
   const params = useParams();
@@ -49,7 +50,7 @@ export function ChatPane() {
   const queryClient = useQueryClient();
   const [view, setView] = useState<"FRIEND" | "ARCHIVED">("FRIEND");
   const [searchQuery, setSearchQuery] = useState("");
-  const [connectionToDelete, setConnectionToDelete] = useState<any>(null);
+  const [connectionToDelete, setConnectionToDelete] = useState<ConnectionItem | null>(null);
   const [isNewChatOpen, setIsNewChatOpen] = useState(false);
   const { key: deleteKey, resetKey: resetDeleteKey } = useIdempotency();
 
@@ -91,7 +92,7 @@ export function ChatPane() {
 
   const connections = data?.pages.flatMap((page) => page.data) || [];
 
-  const filteredConnections = connections.filter((conn: any) =>
+  const filteredConnections = connections.filter((conn: ConnectionItem) =>
     conn.username.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
@@ -171,7 +172,7 @@ export function ChatPane() {
             </div>
           )}
 
-        {filteredConnections.map((conn: any) => {
+        {filteredConnections.map((conn: ConnectionItem) => {
           const unreadCount = unreadMap?.[conn.connectionId] || 0;
           const isActiveChat = activeConnectionId === conn.connectionId;
 
@@ -293,7 +294,9 @@ export function ChatPane() {
             </Button>
             <Button
               variant="destructive"
-              onClick={() => deleteChat(connectionToDelete.connectionId)}
+              onClick={() => {
+                if (connectionToDelete) deleteChat(connectionToDelete.connectionId);
+              }}
               disabled={isDeleting}
             >
               {isDeleting ? (

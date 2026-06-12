@@ -5,17 +5,17 @@ import { getDeterministicIds, MASTER_INTERESTS_LIST } from "@matcha/shared";
 
 export class MatchManager {
   constructor (private redis:Redis) {}
-  private parseRedisSearchResults(results: any[]) {
+  private parseRedisSearchResults(results: (string | string[])[]) {
     const parsedMatches = [];
     for (let i = 1; i < results.length; i += 2) {
       const rawKey = results[i] as string;
       const rawProps = results[i + 1] as string[];
       const id = rawKey.replace("user:profile:", "");
-      const propsMap: Record<string, any> = {};
+      const propsMap: Record<string, string> = {};
       for (let j = 0; j < rawProps.length; j += 2) {
         const key = rawProps[j];
         const value = rawProps[j + 1];
-        if (typeof key === 'string') {
+        if (typeof key === 'string' && typeof value === 'string') {
           propsMap[key] = value;
         }
       }
@@ -142,7 +142,7 @@ export class MatchManager {
         "SORTBY", "score", "ASC",
         "RETURN", "3", "id", "username", "avatarUrl", 
         "DIALECT", "2"
-      ) as any[];
+      ) as (string | string[])[];
       return this.parseRedisSearchResults(results);
     } catch (error: any) {
       logger.error({ err: error, lat, long, radiusKm }, "Matchmaking FT.SEARCH failed");

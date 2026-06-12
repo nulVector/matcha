@@ -2,6 +2,7 @@
 
 import { useMe } from "@/hooks/queries/useMe";
 import { Loader } from "@matcha/ui/components/loader";
+import { AxiosError } from "axios";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
@@ -22,7 +23,7 @@ export default function AuthProvider({
 
   useEffect(() => {
     if (!isLoading && isProtectedRoute) {
-      const isMissingProfile = error && (error as any).response?.status === 403;
+      const isMissingProfile = error && (error as AxiosError).response?.status === 403;
       const hasProfile = data?.success;
       if (isMissingProfile && pathname !== "/onboarding") {
         router.push("/onboarding");

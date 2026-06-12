@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState, useCallback, useLayoutEffect } from "react";
 
-export function useChatScroll<T>(
+interface ScrollableMessage {
+  id: string;
+  senderId?: string | null;
+}
+
+export function useChatScroll<T extends ScrollableMessage>(
   messages: T[], 
   myUserId?: string,
   onLoadMore?: () => void,
@@ -30,7 +35,8 @@ export function useChatScroll<T>(
   useLayoutEffect(() => {
     const container = scrollContainerRef.current;
     if (!container || !messages.length) return;
-    const currentOldest = messages[0] as any;
+    const currentOldest = messages[0];
+    if (!currentOldest) return;
     const didLoadOlderMessages = oldestMessageIdRef.current !== currentOldest.id;
     if (prevScrollHeightRef.current > 0 && prevScrollHeightRef.current !== container.scrollHeight && didLoadOlderMessages) {
       const heightDifference = container.scrollHeight - prevScrollHeightRef.current;
@@ -47,7 +53,8 @@ export function useChatScroll<T>(
 
   useEffect(() => {
     if (!messages || messages.length === 0) return;
-    const lastMessage = messages[messages.length - 1] as any;
+    const lastMessage = messages[messages.length - 1];
+    if (!lastMessage) return;
     const isNewMessageAtBottom = lastMessage.id !== prevLastMessageIdRef.current;
     prevLastMessageIdRef.current = lastMessage.id;
     if (isNewMessageAtBottom) {

@@ -4,6 +4,7 @@ import { AvatarPicker } from "@/components/shared/avatarPicker";
 import { InterestManager } from "@/components/shared/interestManager";
 import { LocationComboBox } from "@/components/shared/locationCombobox";
 import { api } from "@/lib/axios";
+import { AvatarMetadata, InterestMetadata, LocationMetadata } from "@/types/models";
 import { VIBE_OPTIONS, VibeType } from "@matcha/shared";
 import { Button } from "@matcha/ui/components/button";
 import { Field, FieldError, FieldLabel } from "@matcha/ui/components/field";
@@ -23,7 +24,7 @@ import { CheckCircle2, Search, Sparkles, XCircle } from "lucide-react";
 import { useState } from "react";
 import { Controller, useFormContext } from "react-hook-form";
 
-export function AvatarField({ avatars }: { avatars: any[] }) {
+export function AvatarField({ avatars }: { avatars: AvatarMetadata[] }) {
   const { control } = useFormContext<initiateProfileType>();
 
   return (
@@ -173,7 +174,7 @@ export function UsernameField({ status, setStatus }: UsernameFieldProps) {
   );
 }
 
-export function LocationField({ locations }: { locations: any[] }) {
+export function LocationField({ locations }: { locations: LocationMetadata[] }) {
   const { control, setValue, trigger } = useFormContext<initiateProfileType>();
 
   return (
@@ -202,7 +203,7 @@ export function LocationField({ locations }: { locations: any[] }) {
   );
 }
 
-export function InterestsField({ interests }: { interests: any[] }) {
+export function InterestsField({ interests }: { interests: InterestMetadata[] }) {
   const { control } = useFormContext<initiateProfileType>();
 
   return (

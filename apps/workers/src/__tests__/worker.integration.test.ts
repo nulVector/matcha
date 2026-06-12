@@ -10,6 +10,7 @@ import type {
   JobName as JobNameEnum,
   CronProducer as CronProducerType
 } from '@matcha/queue';
+import Redis from 'ioredis';
 
 let prisma: PrismaClient;
 let ConnectionStatus: typeof ConnectionStatusEnum;
@@ -23,7 +24,7 @@ let JobName: typeof JobNameEnum;
 let CronProducer: typeof CronProducerType;
 let startMatchmakingLoop: () => void;
 let stopMatchmakingLoop: () => void; 
-let queueConnection: any;
+let queueConnection: Redis;
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -31,7 +32,7 @@ describe('Worker Integration Tests', () => {
   let queueEvents: QueueEvents;
   let cronQueueEvents: QueueEvents;
   let dlqEvents: QueueEvents;
-  let testSubscriber: any;
+  let testSubscriber: Redis;
 
   beforeAll(async () => {
     const prismaModule = await import('@matcha/prisma');
@@ -163,7 +164,11 @@ describe('Worker Integration Tests', () => {
     it('should pair two users via HNSW vector search, lock them, and write to Postgres', async () => {
       interface MatchEvent {
         eventType: string;
-        eventData: { connectionId: string; [key: string]: any };
+        eventData: { 
+          connectionId: string;
+          expiresAt: string;
+          matchedUserId: string; 
+        };
       }
       const searcherId = createId();
       const candidateId = createId();

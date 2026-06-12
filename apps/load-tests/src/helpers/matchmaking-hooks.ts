@@ -1,12 +1,13 @@
 import { createId } from '@paralleldrive/cuid2';
 import { Agent, setGlobalDispatcher } from 'undici';
+import type { ArtilleryContext } from './auth-hooks';
 
 const agent = new Agent({
   connections: 200,
   pipelining: 10
 });
 setGlobalDispatcher(agent);
-export async function joinMatchmakingQueue(context: any, events: any) {
+export async function joinMatchmakingQueue(context: ArtilleryContext, events: unknown) {
   try {
     const { token } = context.vars;
     const API_URL = process.env.API_URL || 'http://127.0.0.1:8080';

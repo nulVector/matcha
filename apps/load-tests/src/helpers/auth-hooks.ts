@@ -9,7 +9,16 @@ if (!REDIS_URL || !JWT_SECRET) {
 }
 const redisClient = new Redis(REDIS_URL, { maxRetriesPerRequest: null });
 
-export function setupUser(params: any, context: any, done: Function) {
+export interface ArtilleryContext {
+  vars: Record<string, string | undefined>;
+}
+export interface RequestParams {
+  target: string;
+  [key: string]: unknown;
+}
+export type DoneCallback = (err?: Error | unknown) => void;
+
+export function setupUser(params: RequestParams, context: ArtilleryContext, done: DoneCallback) {
   Promise.resolve().then(async () => {
     const userData = await redisClient.lpop('artillery:users:queue');
     if (!userData) {
@@ -52,7 +61,7 @@ export function setupUser(params: any, context: any, done: Function) {
   });
 }
 
-export function cleanupSession(context: any, events: any, done: Function) {
+export function cleanupSession(context: ArtilleryContext, events: unknown, done: DoneCallback) {
   Promise.resolve().then(async () => {
     const { userId, sessionId } = context.vars;
     if (userId && sessionId) {

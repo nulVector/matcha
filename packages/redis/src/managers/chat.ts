@@ -1,5 +1,6 @@
 import Redis from "ioredis";
-import { CachedMessage, UnreadCountData } from "../common";
+import { UnreadCountData } from "../common";
+import { CachedMessage } from "@matcha/shared";
 
 export class ChatManager {
   constructor (private redis:Redis, private subRedis:Redis) {}

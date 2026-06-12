@@ -11,6 +11,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FormProvider, useForm } from "react-hook-form";
 import { EmailField, PasswordField } from "./AuthFields";
 import { AuthError, AuthFooterLink, AuthHeader, OAuthSection } from "./AuthUI";
+import { AxiosError } from "axios";
 
 export function SignupForm() {
   const router = useRouter();
@@ -54,7 +55,7 @@ export function SignupForm() {
   const errorMessage =
     googleError === "GoogleAuthFailed"
       ? "Authentication failed. Please try again."
-      : (error as any)?.response?.data?.message;
+      : (error as AxiosError<{ message: string }>)?.response?.data?.message;
 
   return (
     <div className="flex flex-col gap-6">

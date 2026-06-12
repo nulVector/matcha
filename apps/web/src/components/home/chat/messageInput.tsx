@@ -8,6 +8,7 @@ import { Button } from "@matcha/ui/components/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@matcha/ui/components/popover";
 import { Send, HelpCircle, ArchiveX, UserX } from "lucide-react";
 import { useOutboxStore } from "@/store/useOutboxStore";
+import { TargetUser } from "@/types/models";
 
 export function MessageInput({ 
   connectionId, 
@@ -18,7 +19,7 @@ export function MessageInput({
 }: { 
   connectionId: string, 
   receiverId: string, 
-  targetUser: any, 
+  targetUser: TargetUser | null, 
   isMatched: boolean, 
   isArchived?: boolean 
 }) {

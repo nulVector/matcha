@@ -5,6 +5,7 @@ import { InterestManager } from "@/components/shared/interestManager";
 import { LocationComboBox } from "@/components/shared/locationCombobox";
 import { useIdempotency } from "@/hooks/useIdempotency";
 import { api } from "@/lib/axios";
+import type { Metadata, UserSettingsProfile } from "@/types/models";
 import {
   AccordionContent,
   AccordionItem,
@@ -24,10 +25,19 @@ import { Loader } from "@matcha/ui/components/loader";
 import { PasswordInput } from "@matcha/ui/components/passwordInput";
 import { SegmentedControl } from "@matcha/ui/components/segmentedControl";
 import { Textarea } from "@matcha/ui/components/textarea";
+import type { updateProfileType } from "@matcha/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { AxiosError } from "axios";
 import { LogOut, Save, ShieldAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+
+export interface SettingsSectionProps {
+  profile: UserSettingsProfile;
+  metadata?: Metadata;
+  updateProfile: (data: updateProfileType) => void;
+  isUpdating: boolean;
+}
 
 export function UsernameSetting({ username }: { username: string }) {
   return (
@@ -56,7 +66,7 @@ export function AvatarSetting({
   metadata,
   updateProfile,
   isUpdating,
-}: any) {
+}: SettingsSectionProps) {
   const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl || "");
 
   return (
@@ -93,7 +103,7 @@ export function LocationSetting({
   metadata,
   updateProfile,
   isUpdating,
-}: any) {
+}: SettingsSectionProps) {
   const [locationData, setLocationData] = useState({
     name: profile.location || "",
     lat: profile.locationLatitude || 0,
@@ -140,7 +150,7 @@ export function InterestSetting({
   metadata,
   updateProfile,
   isUpdating,
-}: any) {
+}: SettingsSectionProps) {
   const [interest, setInterest] = useState<string[]>(profile.interest || []);
   const isInterestValid = interest.length >= 3 && interest.length <= 10;
 
@@ -173,7 +183,7 @@ export function InterestSetting({
   );
 }
 
-export function AboutMeSetting({ profile, updateProfile, isUpdating }: any) {
+export function AboutMeSetting({ profile, updateProfile, isUpdating }: Omit<SettingsSectionProps, 'metadata'>) {
   const [aboutMe, setAboutMe] = useState("");
 
   return (
@@ -211,7 +221,7 @@ export function OpeningQuesSetting({
   profile,
   updateProfile,
   isUpdating,
-}: any) {
+}: Omit<SettingsSectionProps, 'metadata'>) {
   const [openingQues, setOpeningQues] = useState("");
 
   return (
@@ -245,7 +255,7 @@ export function OpeningQuesSetting({
   );
 }
 
-export function DiscoverySetting({ profile, updateProfile, isUpdating }: any) {
+export function DiscoverySetting({ profile, updateProfile, isUpdating }: Omit<SettingsSectionProps, 'metadata'>) {
   return (
     <AccordionItem value="discovery">
       <AccordionTrigger className="text-sm font-medium">
@@ -288,7 +298,7 @@ export function PasswordSetting() {
         setPasswordSuccess(true);
         setTimeout(() => setPasswordSuccess(false), 3000);
       },
-      onError: (err: any) => {
+      onError: (err: AxiosError<{ message: string }>) => {
         setPasswordSuccess(false);
         setPasswordError(
           err.response?.data?.message || "Failed to update password.",
@@ -378,7 +388,7 @@ export function DeactivateAccountAction() {
       queryClient.clear();
       router.push("/login");
     },
-    onError: (err: any) => {
+    onError: (err: AxiosError<{ message: string }>) => {
       setDisableError(err.response?.data?.message || "Failed to deactivate account.");
     },
     onSettled: () => resetDeactivateKey(),

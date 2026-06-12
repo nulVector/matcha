@@ -12,6 +12,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FormProvider, useForm } from "react-hook-form";
 import { PasswordField } from "./AuthFields";
 import { AuthError, AuthHeader } from "./AuthUI";
+import { AxiosError } from "axios";
 
 export function ResetPasswordForm() {
   const searchParams = useSearchParams();
@@ -68,7 +69,7 @@ export function ResetPasswordForm() {
   }
 
   const errorMessage =
-    (error as any)?.response?.data?.message ||
+    (error as AxiosError<{ message: string }>)?.response?.data?.message ||
     (error ? "Failed to reset password. The link might be expired." : null);
 
   return (

@@ -4,6 +4,7 @@ import { UserAvatar } from "@/components/shared/userAvatar";
 import { useUser } from "@/hooks/queries/useUser";
 import { useIdempotency } from "@/hooks/useIdempotency";
 import { api } from "@/lib/axios";
+import { FriendRequestItem, UserSettingsProfile } from "@/types/models";
 import { Badge } from "@matcha/ui/components/badge";
 import { Button } from "@matcha/ui/components/button";
 import {
@@ -30,7 +31,7 @@ function SharedProfileInfo({
   profile,
   extraBadge,
 }: {
-  profile: any;
+ profile: Pick<UserSettingsProfile, "username" | "avatarUrl" | "aboutMe" | "interest">;
   extraBadge?: React.ReactNode;
 }) {
   return (
@@ -203,7 +204,7 @@ export function SearchProfileModal({
 }
 
 interface RequestDetailsModalProps {
-  request: any | null;
+  request: FriendRequestItem | null;
   onClose: () => void;
 }
 

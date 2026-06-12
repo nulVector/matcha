@@ -4,6 +4,7 @@ import helmet from "helmet";
 import express from "express";
 import passport from "passport";
 import pinoHttp from "pino-http";
+import type { Server } from 'http';
 import { logger } from "@matcha/logger";
 import { configurePassport } from "./config/passport";
 import mainRouter from "./routes/index";
@@ -54,7 +55,7 @@ app.use('/admin/queues/dashboard', adminAuth, serverAdapter.getRouter());
 app.get('/health', checkHealth);
 app.use("/api/v1",mainRouter);
 
-let server: any;
+let server: Server;
 async function bootstrap() {
   try {
     await redisManager.match.createIndex();

@@ -8,6 +8,7 @@ import { useChatScroll } from "@/hooks/useChatScroll";
 import { api } from "@/lib/axios";
 import { useWS } from "@/providers/wsProvider";
 import { useOutboxStore } from "@/store/useOutboxStore";
+import { ChatMessage } from "@/types/models";
 import { EventType } from "@matcha/shared";
 import { Button } from "@matcha/ui/components/button";
 import { Loader } from "@matcha/ui/components/loader";
@@ -189,7 +190,7 @@ export default function ActiveChatPage() {
               </div>
             )}
 
-            {messages.map((msg: any, index: number) => {
+            {messages.map((msg: ChatMessage, index: number) => {
               const isMe = msg.senderId === myId;
               const prevMsg = messages[index - 1];
               const isConsecutive = prevMsg && prevMsg.senderId === msg.senderId;

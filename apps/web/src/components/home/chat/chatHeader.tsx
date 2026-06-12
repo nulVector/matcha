@@ -4,6 +4,7 @@ import { UserAvatar } from "@/components/shared/userAvatar";
 import { useUser } from "@/hooks/queries/useUser";
 import { useIdempotency } from "@/hooks/useIdempotency";
 import { api, getServerTime } from "@/lib/axios";
+import { ChatMatchData, TargetUser } from "@/types/models";
 import { Badge } from "@matcha/ui/components/badge";
 import { Button } from "@matcha/ui/components/button";
 import {
@@ -47,8 +48,8 @@ export function ChatHeader({
   matchData,
 }: {
   connectionId: string;
-  targetUser: any;
-  matchData: any;
+  targetUser: TargetUser;
+  matchData: ChatMatchData;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -84,9 +85,9 @@ export function ChatHeader({
 
   useEffect(() => {
     if (!isMatched || !matchData?.expiresAt) return;
-
+    const expiresAt = matchData.expiresAt;
     const interval = setInterval(() => {
-      const rawDiff = new Date(matchData.expiresAt).getTime() - getServerTime();
+      const rawDiff = new Date(expiresAt).getTime() - getServerTime();
       const diff = Math.max(0, rawDiff);
       if (diff === 0) {
         clearInterval(interval);

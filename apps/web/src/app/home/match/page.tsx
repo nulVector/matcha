@@ -2,16 +2,12 @@
 
 import { useIdempotency } from "@/hooks/useIdempotency";
 import { api } from "@/lib/axios";
+import { MatchState } from "@/types/models";
 import { Button } from "@matcha/ui/components/button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, Radar, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-
-interface MatchState {
-  connectionId: string;
-  [key: string]: any;
-}
 
 export default function MatchmakingPage() {
   const router = useRouter();

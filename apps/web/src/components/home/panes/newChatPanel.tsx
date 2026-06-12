@@ -2,6 +2,7 @@
 
 import { UserAvatar } from "@/components/shared/userAvatar";
 import { api } from "@/lib/axios";
+import { ConnectionItem } from "@/types/models";
 import { Button } from "@matcha/ui/components/button";
 import { EmptyState } from "@matcha/ui/components/emptyState";
 import { Input } from "@matcha/ui/components/input";
@@ -36,7 +37,7 @@ export function NewChatPanel({ isOpen, onClose }: NewChatPanelProps) {
     });
 
   const friends = data?.pages.flatMap((page) => page.data) || [];
-  const filteredFriends = friends.filter((friend: any) =>
+  const filteredFriends = friends.filter((friend: ConnectionItem) =>
     friend.username.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
@@ -105,7 +106,7 @@ export function NewChatPanel({ isOpen, onClose }: NewChatPanelProps) {
           </div>
         )}
 
-        {filteredFriends.map((friend: any) => (
+        {filteredFriends.map((friend: ConnectionItem) => (
           <button
             key={friend.connectionId}
             type="button"

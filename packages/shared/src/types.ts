@@ -10,6 +10,18 @@ export interface UserSession {
   userProfileId: string | null;
   hasPassword: boolean
 }
+export enum MessageType {
+  TEXT = "TEXT",
+  SYSTEM = "SYSTEM"
+}
+export interface CachedMessage {
+  id: string;
+  connectionId: string;
+  content: string;
+  senderId: string;
+  createdAt: string;     
+  type: MessageType; 
+}
 export enum EventType {
   // Commands
   SEND_MESSAGE = "SEND_MESSAGE",

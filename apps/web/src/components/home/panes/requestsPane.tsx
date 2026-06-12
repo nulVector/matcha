@@ -16,11 +16,12 @@ import {
 import { Inbox, Send } from "lucide-react";
 import { useEffect, useState } from "react";
 import { RequestDetailsModal } from "./profileModals";
+import { FriendRequestItem } from "@/types/models";
 
 export function RequestsPane() {
   const queryClient = useQueryClient();
   const [view, setView] = useState<"incoming" | "outgoing">("incoming");
-  const [selectedRequest, setSelectedRequest] = useState<any>(null);
+  const [selectedRequest, setSelectedRequest] = useState<FriendRequestItem | null>(null);
 
   const { data: notifications } = useQuery({
     queryKey: ["notifications"],
@@ -37,7 +38,7 @@ export function RequestsPane() {
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: ["notifications"] });
       const previousNotifications = queryClient.getQueryData(["notifications"]);
-      queryClient.setQueryData(["notifications"], (old: any) => {
+      queryClient.setQueryData(["notifications"], (old: { has_new_requests: boolean } | undefined) => {
         if (!old) return old;
         return { ...old, has_new_requests: false };
       });
@@ -79,7 +80,7 @@ export function RequestsPane() {
   useEffect(() => {
     if (selectedRequest) {
       const requestStillExists = requestsList.some(
-        (req: any) => req.requestId === selectedRequest.requestId
+        (req: FriendRequestItem) => req.requestId === selectedRequest.requestId
       );
       if (!requestStillExists) {
         setSelectedRequest(null);
@@ -143,7 +144,7 @@ export function RequestsPane() {
         )}
 
         <div className="space-y-1">
-          {requestsList.map((req: any) => (
+          {requestsList.map((req: FriendRequestItem) => (
             <button
               key={req.requestId}
               type="button"

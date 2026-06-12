@@ -1,13 +1,13 @@
 import { TaskProducer } from '@matcha/queue';
-import { CachedMessage, MessageType, UserState, ConnectionListType } from '@matcha/redis';
-import { createServer, IncomingMessage } from 'http';
+import { UserState, ConnectionListType } from '@matcha/redis';
+import { createServer, IncomingMessage, Server } from 'http';
 import jwt from 'jsonwebtoken';
 import prisma, { ConnectionStatus } from '@matcha/prisma';
 import { WebSocket, WebSocketServer } from 'ws';
 import { redisManager } from './services/redis';
 import { createId } from '@paralleldrive/cuid2';
 import { logger } from '@matcha/logger';
-import { JwtPayload, UserSession, EventType, SystemAction } from "@matcha/shared"
+import { JwtPayload, UserSession, EventType, SystemAction, CachedMessage, MessageType } from "@matcha/shared"
 import { socketMessageSchema } from '@matcha/zod';
 
 interface AuthenticatedWebSocket extends WebSocket {
@@ -320,7 +320,7 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
   });
 });
 
-let httpServer: any;
+let httpServer: Server;
 async function bootstrap(){
   await redisManager.chat.subscribe('chat_router');
   redisManager.chat.onMessage((channel, payload) => {
@@ -362,11 +362,12 @@ async function bootstrap(){
 }
 
 const heartbeatInterval = setInterval(() => {
-  wss.clients.forEach((authWs) => {
-    if ((authWs as any).isAlive === false) {
+  wss.clients.forEach((ws) => {
+    const authWs = ws as AuthenticatedWebSocket;
+    if ((authWs).isAlive === false) {
       return authWs.terminate(); 
     }
-    (authWs as any).isAlive = false;
+    (authWs).isAlive = false;
     authWs.ping();
   });
 }, 30000);
