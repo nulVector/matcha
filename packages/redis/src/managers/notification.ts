@@ -5,14 +5,15 @@ import { EventType } from '@matcha/shared';
 export class NotificationManager {
   constructor(private redis: Redis) {}
 
-  async setNotificationFlag(userId: string, category: NotificationCategory) {
+  async setNotificationFlag(userId: string, category: NotificationCategory, traceId?: string) {
     const key = `user:notifications:${userId}`;
     const tx = this.redis.multi();
     tx.hset(key, category, "1"); 
     const publishPayload = JSON.stringify({
       receiverId: userId,
       eventType: EventType.NOTIFICATION_UPDATE,
-      eventData: { category }
+      eventData: { category },
+      traceId
     });
     tx.publish('chat_router', publishPayload);
     await tx.exec();

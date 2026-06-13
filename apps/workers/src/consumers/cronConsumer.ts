@@ -5,6 +5,7 @@ import prisma, { ConnectionStatus } from "@matcha/prisma";
 import { ConnectionListType, UserState } from "@matcha/redis";
 import { logger } from "@matcha/logger";
 import { EventType } from "@matcha/shared";
+import { createId } from "@paralleldrive/cuid2";
 
 export const cronWorker = new Worker(
   QueueName.CRON,
@@ -52,9 +53,12 @@ export const cronWorker = new Worker(
         });
         const publishPromises = [];
         for (const conn of expiredConnections) {
+          const traceId = createId();
+          logger.info({ traceId, connectionId: conn.id }, "Cron archiving expired match");
           const payload = JSON.stringify({
             eventType: EventType.MATCH_EXPIRED,
             eventData: { connectionId: conn.id },
+            traceId
           });
           publishPromises.push(
             redisManager.chat.publish('chat_router', JSON.stringify({ receiverId: conn.user1Id, ...JSON.parse(payload) })),

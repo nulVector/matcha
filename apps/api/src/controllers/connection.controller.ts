@@ -4,6 +4,8 @@ import { ConnectionListType, MatchAction, UserState } from "@matcha/redis";
 import { connectionIdType, requestHandleType } from "@matcha/zod";
 import prisma, { ConnectionStatus } from "@matcha/prisma";
 import { EventType, SystemAction } from "@matcha/shared";
+import { createId } from "@paralleldrive/cuid2";
+import { logger } from "@matcha/logger";
 
 async function getSafeMatchInfo(connectionId: string) {
   let matchInfo = await redisManager.match.getMatchInfo(connectionId);
@@ -75,9 +77,11 @@ export const extendTimer = async (req:Request,res:Response,next:NextFunction) =>
         message: "Extension declined."
       });
     }
+    const traceId = createId();
     const receiverId = matchInfo.user1Id === profileId ? matchInfo.user2Id : matchInfo.user1Id;
     const voteCount = await redisManager.match.recordMatchVotes(connectionId,profileId,MatchAction.EXTEND);
     if (voteCount === 1) {
+      logger.info({ traceId, action: "extendTimer", connectionId }, "Processing match extension");
       await redisManager.chat.publish(
         'chat_router',
         JSON.stringify({
@@ -87,7 +91,8 @@ export const extendTimer = async (req:Request,res:Response,next:NextFunction) =>
             event: SystemAction.EXTEND_REQUESTED,
             senderId:profileId,
             connectionId
-          }
+          },
+          traceId
         })
       )
       return res.json({
@@ -107,13 +112,15 @@ export const extendTimer = async (req:Request,res:Response,next:NextFunction) =>
         redisManager.match.clearSpecificVote(connectionId, MatchAction.EXTEND),
         redisManager.match.setMatchInfo(connectionId, profileId, receiverId, newExpiresAt.toISOString())
       ]);
+      logger.info({ traceId, action: "extendTimer_success", connectionId }, "Match extended");
       const successEvent = {
         eventType: EventType.SYSTEM_EVENT,
         eventData:{
           event: SystemAction.EXTEND_ACCEPTED,
           expiresAt:newExpiresAt.toISOString(),
           connectionId
-        }
+        },
+        traceId
       }
       await Promise.all([
         redisManager.chat.publish('chat_router', JSON.stringify({...successEvent,receiverId})),
@@ -152,9 +159,11 @@ export const convertConnection = async (req:Request,res:Response,next:NextFuncti
         message: "Friend request declined."
       });
     }
+    const traceId = createId();
     const receiverId = matchInfo.user1Id === profileId ? matchInfo.user2Id : matchInfo.user1Id;
     const voteCount = await redisManager.match.recordMatchVotes(connectionId,profileId,MatchAction.CONVERT);
     if (voteCount === 1){
+      logger.info({ traceId, action: "convertConnection", connectionId }, "Friend request dispatched in match");
       await redisManager.chat.publish(
         'chat_router',
         JSON.stringify({
@@ -164,7 +173,8 @@ export const convertConnection = async (req:Request,res:Response,next:NextFuncti
             event: SystemAction.CONVERT_REQUESTED,
             senderId: profileId,
             connectionId
-          }
+          },
+          traceId
         })
       );
       return res.json({
@@ -173,6 +183,7 @@ export const convertConnection = async (req:Request,res:Response,next:NextFuncti
       })
     }
     if (voteCount === 2){
+      logger.info({ traceId, action: "convertConnection_success", connectionId }, "Match converted to friend");
       await prisma.connection.update({
         where: { id: connectionId },
         data: { status: ConnectionStatus.FRIEND, expiresAt: null }
@@ -188,7 +199,8 @@ export const convertConnection = async (req:Request,res:Response,next:NextFuncti
         eventData: { 
           event: SystemAction.CONVERT_ACCEPTED,
           connectionId
-        }
+        },
+        traceId
       };
       await Promise.all([
         redisManager.chat.publish('chat_router', JSON.stringify({ ...successEvent, receiverId: profileId })),
@@ -232,6 +244,8 @@ export const skipConnection = async (req:Request,res:Response,next:NextFunction)
       redisManager.match.clearMatchInfo(connectionId),
       redisManager.userConnection.setConnectionInfo(connectionId, profileId, receiverId, ConnectionListType.ARCHIVED)
     ]);
+    const traceId = createId();
+    logger.info({ traceId, action: "skipConnection", connectionId, profileId }, "User skipped chat");
     await redisManager.chat.publish(
       'chat_router',
       JSON.stringify({
@@ -241,7 +255,8 @@ export const skipConnection = async (req:Request,res:Response,next:NextFunction)
           event: SystemAction.CHAT_ENDED,
           message: "The other user has left the chat.",
           connectionId
-        }
+        },
+        traceId
       })
     );
     await Promise.all([

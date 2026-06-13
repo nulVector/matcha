@@ -10,6 +10,7 @@ import { redisManager } from "../services/redis";
 import { createId } from '@paralleldrive/cuid2';
 import { EventType} from "@matcha/shared";
 import { TaskProducer } from "@matcha/queue";
+import { logger } from "@matcha/logger";
 
 const jwtSecret = process.env.JWT_SECRET;
 if (!jwtSecret){
@@ -102,6 +103,8 @@ export const requestResetPassword = async (req:Request,res:Response,next:NextFun
       await redisManager.auth.setResetToken(resetToken, user.id);
       const frontendUrl = process.env.CLIENT_URL || 'http://localhost:3000';
       const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
+      const traceId = createId();
+      logger.info({ traceId, email }, "Dispatching password reset email to queue");
       await TaskProducer.dispatchSendEmail({
         to:email,
         subject: "Reset your password",
@@ -109,7 +112,8 @@ export const requestResetPassword = async (req:Request,res:Response,next:NextFun
         context: {
           resetUrl,
           expiresIn: "10 minutes"
-        }
+        },
+        traceId
       });
     }
     return res.json({ message: "If an account exists, a reset code has been sent." });
@@ -137,6 +141,8 @@ export const confirmResetPassword = async (req: Request, res: Response,next:Next
       redisManager.auth.invalidateAllUserSessions(userId)
     ];
     if (updatedUser.profile) {
+      const traceId = createId();
+      logger.info({ traceId, userId }, "FORCE DISCONNECT after password reset");
       killPromises.push(
         redisManager.chat.publish(
           'chat_router',
@@ -146,7 +152,8 @@ export const confirmResetPassword = async (req: Request, res: Response,next:Next
             eventData: {
               killAll: true,
               reason: "Password reset"
-            }
+            },
+            traceId
           })
         )
       );
@@ -166,6 +173,8 @@ export const logout = async (req:Request,res:Response,next:NextFunction)=>{
     const sessionId = req.user!.sessionId!;
     await redisManager.auth.invalidateSession(userId, sessionId);
     res.clearCookie("token", COOKIE_OPTIONS);
+    const traceId = createId();
+    logger.info({ traceId, userId }, "FORCE DISCONNECT due to logout");
     await redisManager.chat.publish(
       'chat_router',
       JSON.stringify({
@@ -174,7 +183,8 @@ export const logout = async (req:Request,res:Response,next:NextFunction)=>{
         eventData: {
           sessionId,
           reason: "Logged out of device."
-        }
+        },
+        traceId
       })
     )
     return res.json({ message: "Logged out successfully" });
@@ -189,6 +199,8 @@ export const logoutAll = async (req:Request,res:Response,next:NextFunction)=>{
     const userProfileId = req.user!.profile!.id;
     await redisManager.auth.invalidateAllUserSessions(userId);
     res.clearCookie("token", COOKIE_OPTIONS);
+    const traceId = createId();
+    logger.info({ traceId, userId }, "FORCE DISCONNECT for all sessions");
     await redisManager.chat.publish(
       'chat_router',
       JSON.stringify({
@@ -197,7 +209,8 @@ export const logoutAll = async (req:Request,res:Response,next:NextFunction)=>{
         eventData: {
           killAll: true,
           reason: "Auth state change"
-        }
+        },
+        traceId
       })
     )
     return res.json({ message: "Logged out of all devices." });

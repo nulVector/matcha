@@ -18,7 +18,8 @@ export class ChatManager {
     connectionId: string, 
     receiverId: string, 
     message: CachedMessage, 
-    eventType: string
+    eventType: string,
+    traceId?: string
   ) {
     const activeChat = await this.getActiveChat(receiverId);
     const tx = this.redis.multi(); 
@@ -34,7 +35,8 @@ export class ChatManager {
     const publishPayload = JSON.stringify({
       receiverId,
       eventType,
-      eventData: message
+      eventData: message,
+      traceId
     });
     tx.publish('chat_router', publishPayload);
     await tx.exec();
@@ -97,10 +99,11 @@ export class ChatManager {
   async trimMessageBufferBatch(batchSize: number) {
     await this.redis.ltrim("buffer:messages", batchSize, -1);
   }
-  async bufferReadReceipt(connectionId: string, userId: string, messageId: string) {
+  async bufferReadReceipt(connectionId: string, userId: string, messageId: string, traceId?: string) {
     const payload = JSON.stringify({
       messageId,
-      readAt: new Date().toISOString()
+      readAt: new Date().toISOString(),
+      traceId
     });
     await this.redis.hset("buffer:reads", `${connectionId}:${userId}`, payload);
   }

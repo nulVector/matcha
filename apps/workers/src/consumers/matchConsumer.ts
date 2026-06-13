@@ -3,6 +3,7 @@ import prisma, { ConnectionStatus } from "@matcha/prisma";
 import { UserState } from "@matcha/redis";
 import { logger } from "@matcha/logger";
 import { EventType, getDeterministicIds } from "@matcha/shared";
+import { createId } from "@paralleldrive/cuid2";
 
 interface MatchConstraints {
   radiusKm: number;
@@ -72,9 +73,11 @@ async function runLoop() {
             if (alreadyMatched) continue;
             const locked = await redisManager.match.lockMatch(searcherId, candidate.id);
             if (locked) {
+              const traceId = createId()
               try {
                 const expiresAt = new Date(Date.now() + MATCH_EXPIRY_MS);
                 const [u1, u2] = getDeterministicIds(searcherId, candidate.id);
+                logger.info({ traceId, searcherId, candidateId: candidate.id }, "Match locked, publishing to clients");
                 const newConnection = await prisma.connection.create({
                   data: {
                     user1Id: u1,
@@ -93,21 +96,23 @@ async function runLoop() {
                   redisManager.chat.publish('chat_router', JSON.stringify({ 
                     receiverId: searcherId, 
                     eventType: EventType.MATCH_FOUND, 
-                    eventData: { ...baseEventData, matchedUserId: candidate.id } 
+                    eventData: { ...baseEventData, matchedUserId: candidate.id },
+                    traceId
                   })),
                   redisManager.chat.publish('chat_router', JSON.stringify({ 
                     receiverId: candidate.id, 
                     eventType: EventType.MATCH_FOUND, 
-                    eventData: { ...baseEventData, matchedUserId: searcherId } 
+                    eventData: { ...baseEventData, matchedUserId: searcherId },
+                    traceId
                   }))
                 ]);
                 break;
               } catch (dbError: any) {
                 if (dbError.code === 'P2002') {
-                  logger.info({ searcherId, candidateId: candidate.id }, "Concurrent match detected. Skipping.");
+                  logger.info({ traceId, searcherId, candidateId: candidate.id }, "Concurrent match detected. Skipping.");
                   break; 
                 }
-                logger.error({ err: dbError, searcherId, candidateId: candidate.id }, "Postgres failed after Redis lock. Reverting.");
+                logger.error({ traceId, err: dbError, searcherId, candidateId: candidate.id }, "Postgres failed after Redis lock. Reverting.");
                 await redisManager.match.addToQueue(searcherId);
                 await redisManager.match.addToQueue(candidate.id);
                 break;

@@ -21,6 +21,7 @@ export interface CachedMessage {
   senderId: string;
   createdAt: string;     
   type: MessageType; 
+  traceId?: string;
 }
 export enum EventType {
   // Commands

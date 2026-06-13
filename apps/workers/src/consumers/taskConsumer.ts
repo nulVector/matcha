@@ -21,6 +21,7 @@ export const taskWorker = new Worker(
           locationLatitude,
           locationLongitude,
           interest,
+          traceId
         } = task.data;
         await redisManager.bloom.add('bf:usernames', username);
         await redisManager.match.updateMatchProfile(
@@ -29,10 +30,11 @@ export const taskWorker = new Worker(
           locationLongitude, 
           interest
         );
+        logger.info({ traceId, userId, username }, "Profile initialization complete");
         break;
       }
       case JobName.SEND_EMAIL:{
-        const { to, subject, template, context } = task.data;
+        const { to, subject, template, context, traceId } = task.data;
         let html = '';
         if (template === "PASSWORD_RESET") {
           html = await renderPasswordResetEmail({
@@ -47,15 +49,15 @@ export const taskWorker = new Worker(
             subject: subject,
             html: html,
           });
-          logger.info({ to, subject }, "Email sent successfully");
+          logger.info({ to, subject, traceId }, "Email sent successfully");
         } catch (err) {
-          logger.error({ err, to }, "Failed to send email via Resend");
+          logger.error({ err, traceId, to }, "Failed to send email via Resend");
           throw err; 
         }
         break;
       }
       case JobName.HANDLE_DROPPED_MATCH:{
-        const { userId, connectionId, partnerId} = task.data;
+        const { userId, connectionId, partnerId, traceId } = task.data;
         const socketCount = await redisManager.userConnection.countSockets(userId);
         if (socketCount > 0) {
           logger.info({ userId, connectionId }, "User reconnected during grace period. Aborting match drop.");
@@ -65,7 +67,7 @@ export const taskWorker = new Worker(
           where: { id: connectionId }
         });
         if (connection?.status !== ConnectionStatus.MATCHED) break;
-        logger.info({ userId, connectionId }, "Grace period expired. Terminating abandoned match.");
+        logger.info({ traceId, userId, connectionId }, "Grace period expired. Terminating abandoned match.");
         const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
         await prisma.connection.update({
           where: { id: connectionId },
@@ -91,7 +93,8 @@ export const taskWorker = new Worker(
             eventData: {
               event: SystemAction.CHAT_ENDED,
               connectionId
-            }
+            },
+            traceId
           })
         );
         break;

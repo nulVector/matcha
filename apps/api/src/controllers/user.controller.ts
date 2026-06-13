@@ -10,6 +10,7 @@ import { USERNAME_VIBES } from '../constant/usernameList';
 import { redisManager } from '../services/redis';
 import { logger } from '@matcha/logger';
 import { getDeterministicIds, EventType, SystemAction } from '@matcha/shared';
+import { createId } from '@paralleldrive/cuid2';
 
 type LocationMetadata = { id: string; name: string; latitude: number; longitude: number };
 type InterestMetadata = { id: string; name: string };
@@ -115,12 +116,15 @@ export const initiateProfile = async (req:Request, res:Response,next:NextFunctio
       isActive: true,
       allowDiscovery
     });
+    const traceId = createId();
+    logger.info({ traceId, userId }, "Dispatching profile init task to queue");
     await TaskProducer.dispatchProfileInit({
       userId: userProfile.id,
       username: userProfile.username,
       locationLatitude,
       locationLongitude,
-      interest
+      interest,
+      traceId
     });
     res.status(201).json({
       success:true,
@@ -316,6 +320,8 @@ export const updatePassword = async (req:Request,res:Response, next:NextFunction
       where:{ id:userId },
       data:{ password:hashedPassword }
     })
+    const traceId = createId();
+    logger.info({ traceId, userId }, "FORCE DISCONNECT due to password update");
     await Promise.all([
       redisManager.auth.invalidateAllUserSessions(userId),
       redisManager.chat.publish(
@@ -327,7 +333,8 @@ export const updatePassword = async (req:Request,res:Response, next:NextFunction
             killAll: true,
             exceptSessionId: sessionId,
             reason: "Password changed"
-          }
+          },
+          traceId
         })
       )
     ]);
@@ -473,6 +480,8 @@ export const deleteConnection = async (req: Request, res: Response, next: NextFu
         ? { user1ChatVisible: false, user1HistoryClearedAt: now } 
         : { user2ChatVisible: false, user2HistoryClearedAt: now }
     });
+    const traceId = createId();
+    logger.info({ traceId, action: "deleteConnection", connectionId }, "User deleted chat");
     await redisManager.chat.hideChat(connectionId);
     await redisManager.chat.publish(
       'chat_router',
@@ -482,7 +491,8 @@ export const deleteConnection = async (req: Request, res: Response, next: NextFu
         eventData: {
           event: SystemAction.CHAT_DELETED,
           connectionId
-        }
+        },
+        traceId
       })
     );
     res.json({
@@ -742,10 +752,12 @@ export const sendRequest = async (req:Request,res:Response,next:NextFunction) =>
           : "This user has already sent you a request! Check your inbox." 
       });
     }
-
+    const traceId = createId();
+    logger.info({ traceId, targetUserId, myProfileId }, "Friend request dispatched");
     await redisManager.notification.setNotificationFlag(
       targetUserId, 
-      NotificationCategory.NEW_FRIEND_REQUEST
+      NotificationCategory.NEW_FRIEND_REQUEST,
+      traceId
     );
     res.status(201).json({
       success: true,
@@ -776,6 +788,8 @@ export const cancelRequest = async (req:Request,res:Response,next:NextFunction) 
       });
       return;
     }
+    const traceId = createId();
+    logger.info({ traceId, action: "cancelRequest", requestId }, "User cancelled friend request");
     await prisma.friendRequest.delete({
       where: { id: requestId }
     });
@@ -787,7 +801,8 @@ export const cancelRequest = async (req:Request,res:Response,next:NextFunction) 
         eventData: {
           event: SystemAction.REQUEST_CANCELLED,
           requestId
-        }
+        },
+        traceId
       })
     );
     res.json({
@@ -825,7 +840,9 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
     if (!friendRequest) {
       return res.status(404).json({ message: "Request not found or already processed." });
     }
+    const traceId = createId();
     if (action === "REJECT") {
+      logger.info({ traceId, action: "rejectRequest", requestId }, "User rejected friend request");
       await prisma.friendRequest.delete({ where: { id: requestId } });
       await redisManager.chat.publish(
         'chat_router',
@@ -835,7 +852,8 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
           eventData: {
             event: SystemAction.REQUEST_DECLINED,
             requestId
-          }
+          },
+          traceId
         })
       );
       return res.status(200).json({
@@ -885,6 +903,7 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
           }
         }
       });
+      logger.info({ traceId, action: "acceptRequest", requestId }, "User accepted friend request");
       await Promise.all([
         redisManager.userConnection.setConnectionInfo(
           resolvedConnectionId!, 
@@ -900,7 +919,8 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
             eventData: {
               event: SystemAction.REQUEST_ACCEPTED, 
               connectionId: resolvedConnectionId
-            }
+            },
+            traceId
           })
         ),
         redisManager.bloom.addPair('bf:matches', user1Id, user2Id)
@@ -947,6 +967,8 @@ export const handleUnfriendRequest = async (req:Request,res:Response,next:NextFu
         user2ChatVisible: false
       }
     });
+    const traceId = createId();
+    logger.info({ traceId, action: "unfriend", connectionId: connection.id }, "User severed connection");
     await redisManager.userConnection.clearConnectionInfo(connection.id);
     await redisManager.chat.publish(
       'chat_router',
@@ -956,7 +978,8 @@ export const handleUnfriendRequest = async (req:Request,res:Response,next:NextFu
         eventData: {
           event: SystemAction.UNFRIENDED,
           connectionId: connection.id
-        }
+        },
+        traceId
       })
     );
     res.json({
@@ -1001,6 +1024,8 @@ export const deactivateProfile = async (req:Request,res:Response,next:NextFuncti
         }
       }
     })
+    const traceId = createId();
+    logger.info({ traceId, userId }, "FORCE DISCONNECT due to profile deactivation");
     await Promise.all([
       redisManager.match.leaveQueue(profileId),
       redisManager.userDetail.invalidateProfile(profileId),
@@ -1013,7 +1038,8 @@ export const deactivateProfile = async (req:Request,res:Response,next:NextFuncti
           eventData: {
             killAll: true,
             reason: "Auth state change"
-          }
+          },
+          traceId
         })
       )
     ])

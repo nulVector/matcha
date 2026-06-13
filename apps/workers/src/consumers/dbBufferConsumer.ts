@@ -23,6 +23,8 @@ export const dbBufferWorker = new Worker(
           type: msg.type,
           createdAt: new Date(msg.createdAt),
         }));
+        const traceIds = messages.map(m => m.traceId).filter(Boolean);
+        logger.info({ batchSize: messages.length, traceIds }, "Flushing message batch to Postgres");
         const latestMessagePerConnection = new Map<string, Date>();
         for (const msg of messagesToInsert) {
           const currentLatest = latestMessagePerConnection.get(msg.connectionId);
@@ -59,12 +61,14 @@ export const dbBufferWorker = new Worker(
         }
         const readEntries = Object.entries(reads);
         const connectionUpdates: Record<string, { userId: string; messageId: string; readAt: string }[]> = {};
+        const traceIds: string[] = [];
         for (const [hashField, jsonStr] of readEntries) {
           const parts = hashField.split(":");
           const connectionId = parts[0];
           const userId = parts[1];
           if (!connectionId || !userId) continue; 
           const parsed = JSON.parse(jsonStr);
+          if (parsed.traceId) traceIds.push(parsed.traceId);
           if (!connectionUpdates[connectionId]) {
             connectionUpdates[connectionId] = [];
           }
@@ -102,6 +106,7 @@ export const dbBufferWorker = new Worker(
           pgU2Ids.push(u2Id);
           pgU2Ats.push(u2At);
         }
+        logger.info({ batchSize: readEntries.length, traceIds }, "Flushing read receipts to Postgres");
         if (pgConnIds.length > 0) {
           await prisma.$executeRawUnsafe(`
             UPDATE "Connection" AS c

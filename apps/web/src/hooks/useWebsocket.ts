@@ -51,13 +51,15 @@ const handleUnreadOrReceipt = (
     }));
   } else {
     if (payload.senderId !== myId && socketRef.current?.readyState === WebSocket.OPEN) {
+      const traceId = crypto.randomUUID();
       socketRef.current.send(JSON.stringify({
         type: EventType.VIEW_CHAT,
         payload: {
           connectionId: payload.connectionId,
           receiverId: payload.senderId,
           lastMessageId: payload.id
-        }
+        },
+        traceId
       }));
     }
   }
@@ -149,6 +151,7 @@ export function useWebsocket() {
 
         if (pendingMessages.length > 0) {
           pendingMessages.forEach((msg) => {
+            const traceId = crypto.randomUUID();
             ws.send(
               JSON.stringify({
                 type: EventType.SEND_MESSAGE,
@@ -157,6 +160,7 @@ export function useWebsocket() {
                   receiverId: msg.receiverId,
                   content: msg.content,
                 },
+                traceId
               })
             );
             setTimeout(() => {
@@ -383,7 +387,11 @@ export function useWebsocket() {
     payload: Extract<SocketMessage, { type: T }>["payload"]
   ) => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {
-      socketRef.current.send(JSON.stringify({ type, payload }));
+      const traceId = crypto.randomUUID();
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`WS out - ${traceId}_${type}`)
+      }
+      socketRef.current.send(JSON.stringify({ type, payload, traceId }));
     } else {
       console.warn("Cannot send message, WebSocket is not open.");
     }

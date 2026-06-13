@@ -7,17 +7,20 @@ export interface ProfileInitPayload {
   locationLatitude: number;
   locationLongitude: number;
   interest: string[];
+  traceId?: string;
 }
 export interface SendEmailPayload {
   to: string;
   subject: string;
   template: "PASSWORD_RESET" | "WELCOME";
   context: Record<string, string>;
+  traceId?: string;
 }
 export interface HandleDroppedMatchPayload {
   userId: string;
   connectionId: string;
   partnerId: string;
+  traceId?: string;
 }
 
 // DB BUFFER QUEUE PAYLOADS

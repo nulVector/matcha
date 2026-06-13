@@ -96,6 +96,8 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
       });
       if (activeConnection) {
         const partnerId = activeConnection.user1Id === profileId ? activeConnection.user2Id : activeConnection.user1Id;
+        const traceId = createId();
+        logger.info({ traceId, profileId, connectionId: activeConnection.id }, "User reconnected during match");
         await redisManager.chat.publish(
           'chat_router',
           JSON.stringify({
@@ -104,7 +106,8 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
             eventData: { 
               event: SystemAction.PARTNER_ONLINE, 
               connectionId: activeConnection.id 
-            }
+            },
+            traceId
           })
         );
       }
@@ -157,7 +160,10 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
       return;
     }
     const parsedData = validation.data;
+    const traceId = parsedData.traceId || 'no-trace-id';
+
     try {
+      logger.info({ profileId, traceId, type: parsedData.type }, "Received WS message");
       switch (parsedData.type) {
         case EventType.SEND_MESSAGE: {
           const { connectionId, receiverId, content } = parsedData.payload;
@@ -179,7 +185,8 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
             content,
             senderId: profileId,
             createdAt: new Date().toISOString(),
-            type: MessageType.TEXT
+            type: MessageType.TEXT,
+            traceId
           };
           const wasHidden = await redisManager.chat.checkAndUnhideChat(connectionId);
           if (wasHidden){
@@ -197,14 +204,16 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
             connectionId, 
             receiverId, 
             message, 
-            EventType.NEW_MESSAGE
+            EventType.NEW_MESSAGE,
+            traceId
           );
           await redisManager.chat.publish(
             'chat_router',
             JSON.stringify({
               receiverId: profileId, 
               eventType: EventType.NEW_MESSAGE,
-              eventData: message
+              eventData: message,
+              traceId
             })
           );
           break;
@@ -215,11 +224,12 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
             'chat_router',
             JSON.stringify({
               receiverId,
+              eventType:EventType.USER_TYPING,
               eventData:{
                 senderId:profileId,
                 connectionId
               },
-              eventType:EventType.USER_TYPING
+              traceId
             })
           )
           break;
@@ -234,7 +244,8 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
               eventData: {
                 senderId: profileId,
                 connectionId
-              }
+              },
+              traceId
             })
           );
           break;
@@ -246,14 +257,15 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
             redisManager.chat.resetUnread(profileId,connectionId)
           ])
           if (lastMessageId) {
-            await redisManager.chat.bufferReadReceipt(connectionId, profileId, lastMessageId);
+            await redisManager.chat.bufferReadReceipt(connectionId, profileId, lastMessageId, traceId);
           }
           await redisManager.chat.publish(
             'chat_router',
             JSON.stringify({
               receiverId,
               eventType:EventType.MESSAGE_READ,
-              eventData: { connectionId }
+              eventData: { connectionId },
+              traceId
             })
           )
           break;
@@ -266,7 +278,7 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
           break;
       }
     } catch (err: any) {
-      logger.error({ err, profileId }, "Error processing message");
+      logger.error({ err, profileId, traceId }, "Error processing message");
     }
   });
   authWs.on('close', async () => {
@@ -293,6 +305,8 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
           });
           if (activeConnection) {
             const partnerId = activeConnection.user1Id === profileId ? activeConnection.user2Id : activeConnection.user1Id;
+            const traceId = createId();
+            logger.info({ traceId, profileId, connectionId: activeConnection.id }, "User disconnected during match grace period");
             await redisManager.chat.publish(
               'chat_router',
               JSON.stringify({
@@ -301,13 +315,15 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
                 eventData: { 
                   event: SystemAction.PARTNER_OFFLINE, 
                   connectionId: activeConnection.id 
-                }
+                },
+                traceId
               })
             );
             await TaskProducer.dispatchHandleDroppedMatch({
               userId: profileId,
               connectionId: activeConnection.id,
-              partnerId
+              partnerId,
+              traceId
             });
           }
         } else {
@@ -326,7 +342,7 @@ async function bootstrap(){
   redisManager.chat.onMessage((channel, payload) => {
     if (channel === 'chat_router') {
       try {
-        const { receiverId, eventData, eventType } = JSON.parse(payload);
+        const { receiverId, eventData, eventType, traceId } = JSON.parse(payload);
         const receiverSockets = localSockets.get(receiverId);
         if (receiverSockets) {
           if (eventType === EventType.FORCE_DISCONNECT){
@@ -343,8 +359,10 @@ async function bootstrap(){
           }
           const outGoingPayload = JSON.stringify({
             type: eventType,
-            payload: eventData
+            payload: eventData,
+            traceId
           });
+          logger.info({ receiverId, traceId, type: eventType }, "Routing message to client");
           receiverSockets.forEach(authWs => authWs.send(outGoingPayload));
         }
       } catch (err: any) {
