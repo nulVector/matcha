@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { redisManager } from '../services/redis';
+import { authManager } from '../services/redis';
 
 type RateLimitKey = 'ip' | 'device' | 'email' | 'user';
 export const rateLimiter = (action:string, type: RateLimitKey, limit: number, windowSeconds: number) => {
@@ -20,7 +20,7 @@ export const rateLimiter = (action:string, type: RateLimitKey, limit: number, wi
         identifier = req.validatedData?.body?.email || 'unknown_email';
       }
       const redisKey = `${action}:${type}:${identifier}`;
-      const isRateLimited = await redisManager.auth.checkRateLimit(redisKey, limit, windowSeconds);
+      const isRateLimited = await authManager.checkRateLimit(redisKey, limit, windowSeconds);
       if (isRateLimited) {
         res.status(429).json({message: `Too many requests. Please try again later.`});
         return;

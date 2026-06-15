@@ -2,7 +2,7 @@ import { taskWorker } from "./consumers/taskConsumer";
 import { dbBufferWorker } from "./consumers/dbBufferConsumer";
 import { cronWorker } from "./consumers/cronConsumer";
 import { startMatchmakingLoop, stopMatchmakingLoop } from "./consumers/matchConsumer";
-import { workerConnection, redisManager } from "./config/redis";
+import { closeRedisConnections, pingRedisConnections, workerConnection } from "./config/redis";
 import prisma from "@matcha/prisma";
 import { logger } from "@matcha/logger";
 import http from "http";
@@ -14,7 +14,7 @@ const healthServer = http.createServer(async (req, res) => {
     try {
       await prisma.$queryRaw`SELECT 1`;
       const redisPing = await workerConnection.ping();
-      const managerRedisPing = await redisManager.ping()
+      const managerRedisPing = await pingRedisConnections()
       if (redisPing === 'PONG' && managerRedisPing) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ status: 'healthy', worker: 'up' }));
@@ -84,7 +84,7 @@ async function gracefulShutdown(signal: string) {
   healthServer.close();
   try {
     await workerConnection.quit();
-    await redisManager.quit();
+    await closeRedisConnections();
     await prisma.$disconnect();
     logger.info("Data store connections closed successfully.");
   } catch (err) {

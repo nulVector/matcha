@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { redisManager } from '../services/redis';
+import { authManager } from '../services/redis';
 
 export const idempotencyGuard = (action: string, expireTimeSeconds: number) => {
   return async (req: Request, res: Response, next: NextFunction) => {
@@ -10,7 +10,7 @@ export const idempotencyGuard = (action: string, expireTimeSeconds: number) => {
         return;
       }
       const redisKey = `${action}:${idempotencyKey}`;
-      const isFirstRequest = await redisManager.auth.checkIdempotency(redisKey, expireTimeSeconds);
+      const isFirstRequest = await authManager.checkIdempotency(redisKey, expireTimeSeconds);
       
       if (!isFirstRequest) {
         res.status(409).json({ message: "Request already processed or currently processing." });
@@ -18,7 +18,7 @@ export const idempotencyGuard = (action: string, expireTimeSeconds: number) => {
       }
       res.on('finish', async () => {
         if (res.statusCode >= 400) {
-          await redisManager.auth.consumeIdempotency(redisKey);
+          await authManager.consumeIdempotency(redisKey);
         }
       });
       next();

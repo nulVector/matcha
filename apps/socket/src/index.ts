@@ -4,11 +4,11 @@ import { createServer, IncomingMessage, Server } from 'http';
 import jwt from 'jsonwebtoken';
 import prisma, { ConnectionStatus } from '@matcha/prisma';
 import { WebSocket, WebSocketServer } from 'ws';
-import { redisManager } from './services/redis';
 import { createId } from '@paralleldrive/cuid2';
 import { logger } from '@matcha/logger';
 import { JwtPayload, UserSession, EventType, SystemAction, CachedMessage, MessageType } from "@matcha/shared"
 import { socketMessageSchema } from '@matcha/zod';
+import { authManager, chatManager, closeRedisConnections, matchManager, subClient, userConnectionManager, userDetailManager } from './services/redis';
 
 interface AuthenticatedWebSocket extends WebSocket {
   isAlive: boolean;
@@ -54,7 +54,7 @@ server.on('upgrade',async (request,socket,head)=>{
       return;
     }
     const jwt_payload = jwt.verify(token,jwtSecret) as JwtPayload;
-    const userSession = await redisManager.auth.getSession(jwt_payload.id, jwt_payload.sessionId);
+    const userSession = await authManager.getSession(jwt_payload.id, jwt_payload.sessionId);
     if (!userSession){
       socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
       socket.destroy();
@@ -84,8 +84,8 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
   if (!localSockets.has(profileId)) localSockets.set(profileId, new Set());
   localSockets.get(profileId)!.add(authWs);
   try {
-    await redisManager.userConnection.mapSocket(profileId,socketId);
-    const profileData = await redisManager.userDetail.getProfileFields(profileId, ["queueStatus"]);
+    await userConnectionManager.mapSocket(profileId,socketId);
+    const profileData = await userDetailManager.getProfileFields(profileId, ["queueStatus"]);
     if (profileData.queueStatus === UserState.MATCHED) {
       const activeConnection = await prisma.connection.findFirst({
         where: {
@@ -98,7 +98,7 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
         const partnerId = activeConnection.user1Id === profileId ? activeConnection.user2Id : activeConnection.user1Id;
         const traceId = createId();
         logger.info({ traceId, profileId, connectionId: activeConnection.id }, "User reconnected during match");
-        await redisManager.chat.publish(
+        await chatManager.publish(
           'chat_router',
           JSON.stringify({
             receiverId: partnerId,
@@ -125,7 +125,7 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
       return authWs.close(4001, "Token Expired");
     }
     try {
-      const isValidSession = await redisManager.userConnection.validateAndUpdatePresence(
+      const isValidSession = await userConnectionManager.validateAndUpdatePresence(
         authWs.userId, 
         authWs.sessionId,
         profileId
@@ -139,7 +139,7 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
     }
   });
   authWs.on('message', async (rawMessage: Buffer) => {
-    const isRateLimited = await redisManager.auth.checkRateLimit(`ws:msg:${socketId}`, 100, 5);
+    const isRateLimited = await authManager.checkRateLimit(`ws:msg:${socketId}`, 100, 5);
     if (isRateLimited) {
       logger.warn({ profileId, socketId }, "WebSocket rate limit exceeded.");
       return;
@@ -168,8 +168,8 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
         case EventType.SEND_MESSAGE: {
           const { connectionId, receiverId, content } = parsedData.payload;
           const [matchInfo, connInfo] = await Promise.all([
-            redisManager.match.getMatchInfo(connectionId),
-            redisManager.userConnection.getConnectionInfo(connectionId)
+            matchManager.getMatchInfo(connectionId),
+            userConnectionManager.getConnectionInfo(connectionId)
           ]);
           if (connInfo?.status === ConnectionListType.ARCHIVED) {
             logger.warn({ profileId, connectionId }, "Attempted to send message to an archived chat");
@@ -188,7 +188,7 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
             type: MessageType.TEXT,
             traceId
           };
-          const wasHidden = await redisManager.chat.checkAndUnhideChat(connectionId);
+          const wasHidden = await chatManager.checkAndUnhideChat(connectionId);
           if (wasHidden){
             await prisma.connection.update({
               where:{
@@ -200,14 +200,14 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
               }
             })
           }
-          await redisManager.chat.processNewMessage(
+          await chatManager.processNewMessage(
             connectionId, 
             receiverId, 
             message, 
             EventType.NEW_MESSAGE,
             traceId
           );
-          await redisManager.chat.publish(
+          await chatManager.publish(
             'chat_router',
             JSON.stringify({
               receiverId: profileId, 
@@ -220,7 +220,7 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
         }
         case EventType.START_TYPING: {
           const { connectionId, receiverId} = parsedData.payload;
-          await redisManager.chat.publish(
+          await chatManager.publish(
             'chat_router',
             JSON.stringify({
               receiverId,
@@ -236,7 +236,7 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
         }
         case EventType.STOP_TYPING: {
           const { connectionId, receiverId } = parsedData.payload;
-          await redisManager.chat.publish(
+          await chatManager.publish(
             'chat_router',
             JSON.stringify({
               receiverId,
@@ -253,13 +253,13 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
         case EventType.VIEW_CHAT: {
           const { connectionId, receiverId, lastMessageId } = parsedData.payload;
           await Promise.all([
-            redisManager.chat.setActiveChat(profileId,connectionId),
-            redisManager.chat.resetUnread(profileId,connectionId)
+            chatManager.setActiveChat(profileId,connectionId),
+            chatManager.resetUnread(profileId,connectionId)
           ])
           if (lastMessageId) {
-            await redisManager.chat.bufferReadReceipt(connectionId, profileId, lastMessageId, traceId);
+            await chatManager.bufferReadReceipt(connectionId, profileId, lastMessageId, traceId);
           }
-          await redisManager.chat.publish(
+          await chatManager.publish(
             'chat_router',
             JSON.stringify({
               receiverId,
@@ -271,7 +271,7 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
           break;
         }
         case EventType.LEAVE_CHAT: {
-          await redisManager.chat.removeActiveChat(profileId);
+          await chatManager.removeActiveChat(profileId);
           break;
         }
         default:
@@ -288,13 +288,13 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
         userTabs.delete(authWs);
         if (userTabs.size === 0) localSockets.delete(profileId);
       }
-      const activeChat = await redisManager.chat.getActiveChat(profileId);
+      const activeChat = await chatManager.getActiveChat(profileId);
       if (activeChat) {
-        await redisManager.chat.removeActiveChat(profileId);
+        await chatManager.removeActiveChat(profileId);
       }
-      const count = await redisManager.userConnection.removeSocket(socketId);
+      const count = await userConnectionManager.removeSocket(socketId);
       if (count === 0) {
-        const profile = await redisManager.userDetail.getProfileFields(profileId, ["queueStatus"]);
+        const profile = await userDetailManager.getProfileFields(profileId, ["queueStatus"]);
         if (profile.queueStatus === UserState.MATCHED) {
           const activeConnection = await prisma.connection.findFirst({
             where: {
@@ -307,7 +307,7 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
             const partnerId = activeConnection.user1Id === profileId ? activeConnection.user2Id : activeConnection.user1Id;
             const traceId = createId();
             logger.info({ traceId, profileId, connectionId: activeConnection.id }, "User disconnected during match grace period");
-            await redisManager.chat.publish(
+            await chatManager.publish(
               'chat_router',
               JSON.stringify({
                 receiverId: partnerId,
@@ -327,7 +327,7 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
             });
           }
         } else {
-          await redisManager.match.leaveQueue(profileId, UserState.IDLE);
+          await matchManager.leaveQueue(profileId, UserState.IDLE);
         }
       }
     } catch (err: any) {
@@ -338,8 +338,8 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
 
 let httpServer: Server;
 async function bootstrap(){
-  await redisManager.chat.subscribe('chat_router');
-  redisManager.chat.onMessage((channel, payload) => {
+  await subClient.subscribe('chat_router');
+  subClient.on("message",(channel, payload) => {
     if (channel === 'chat_router') {
       try {
         const { receiverId, eventData, eventType, traceId } = JSON.parse(payload);
@@ -416,7 +416,7 @@ async function gracefulShutdown(signal: string) {
       httpServer.close(async () => {
         logger.info("Underlying HTTP server closed. Disconnecting Redis...");
         try {
-          await redisManager.quit();
+          await closeRedisConnections();
           logger.info("WebSocket graceful shutdown complete.");
           process.exit(0);
         } catch (err) {

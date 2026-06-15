@@ -1,9 +1,9 @@
-import { redisManager } from "../config/redis";
 import prisma, { ConnectionStatus } from "@matcha/prisma";
 import { UserState } from "@matcha/redis";
 import { logger } from "@matcha/logger";
 import { EventType, getDeterministicIds } from "@matcha/shared";
 import { createId } from "@paralleldrive/cuid2";
+import { bloomManager, chatManager, matchManager } from "../config/redis";
 
 interface MatchConstraints {
   radiusKm: number;
@@ -46,7 +46,7 @@ export async function stopMatchmakingLoop() {
 async function runLoop() {
   while (isRunning) {
     try {
-      const usersInQueue = await redisManager.match.getUsersInQueue();
+      const usersInQueue = await matchManager.getUsersInQueue();
       if (usersInQueue.length < 2) {
         await sleep(2000);
         continue;
@@ -57,11 +57,11 @@ async function runLoop() {
         if (!isRunning) break;
         await Promise.all(chunk.map(async (searcherId) => {
           if (!isRunning) return;
-          const profile = await redisManager.match.getSearcherProfile(searcherId);
+          const profile = await matchManager.getSearcherProfile(searcherId);
           if (!profile || profile.queueStatus !== UserState.QUEUED) return;
           const waitTimeMs = Date.now() - profile.queuedAt;
           const { radiusKm, maxScore } = getMatchConstraints(waitTimeMs);
-          const potentialMatches = await redisManager.match.findMatchesInRadius(
+          const potentialMatches = await matchManager.findMatchesInRadius(
             profile.searcherVector,
             profile.lat,
             profile.long,
@@ -69,9 +69,9 @@ async function runLoop() {
           );
           for (const candidate of potentialMatches) {
             if (candidate.id === searcherId || candidate.score > maxScore) continue;
-            const alreadyMatched = await redisManager.bloom.existsPair('bf:matches', searcherId, candidate.id);
+            const alreadyMatched = await bloomManager.existsPair('bf:matches', searcherId, candidate.id);
             if (alreadyMatched) continue;
-            const locked = await redisManager.match.lockMatch(searcherId, candidate.id);
+            const locked = await matchManager.lockMatch(searcherId, candidate.id);
             if (locked) {
               const traceId = createId()
               try {
@@ -91,15 +91,15 @@ async function runLoop() {
                   expiresAt: expiresAt.toISOString(),
                 };
                 await Promise.all([
-                  redisManager.match.setMatchInfo(newConnection.id, searcherId, candidate.id, expiresAt.toISOString()),
-                  redisManager.bloom.addPair('bf:matches', searcherId, candidate.id),
-                  redisManager.chat.publish('chat_router', JSON.stringify({ 
+                  matchManager.setMatchInfo(newConnection.id, searcherId, candidate.id, expiresAt.toISOString()),
+                  bloomManager.addPair('bf:matches', searcherId, candidate.id),
+                  chatManager.publish('chat_router', JSON.stringify({ 
                     receiverId: searcherId, 
                     eventType: EventType.MATCH_FOUND, 
                     eventData: { ...baseEventData, matchedUserId: candidate.id },
                     traceId
                   })),
-                  redisManager.chat.publish('chat_router', JSON.stringify({ 
+                  chatManager.publish('chat_router', JSON.stringify({ 
                     receiverId: candidate.id, 
                     eventType: EventType.MATCH_FOUND, 
                     eventData: { ...baseEventData, matchedUserId: searcherId },
@@ -113,8 +113,8 @@ async function runLoop() {
                   break; 
                 }
                 logger.error({ traceId, err: dbError, searcherId, candidateId: candidate.id }, "Postgres failed after Redis lock. Reverting.");
-                await redisManager.match.addToQueue(searcherId);
-                await redisManager.match.addToQueue(candidate.id);
+                await matchManager.addToQueue(searcherId);
+                await matchManager.addToQueue(candidate.id);
                 break;
               }
             }

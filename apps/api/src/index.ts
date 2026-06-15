@@ -8,10 +8,10 @@ import type { Server } from 'http';
 import { logger } from "@matcha/logger";
 import { configurePassport } from "./config/passport";
 import mainRouter from "./routes/index";
-import { redisManager } from "./services/redis";
 import { serverAdapter, adminAuth } from "./config/bullboard";
 import { checkHealth } from "./controllers/health.controller";
 import prisma from "@matcha/prisma";
+import { bloomManager, closeRedisConnections, matchManager } from "./services/redis";
 
 const app = express();
 const PORT = Number(process.env.API_PORT) || 3001;
@@ -58,9 +58,9 @@ app.use("/api/v1",mainRouter);
 let server: Server;
 async function bootstrap() {
   try {
-    await redisManager.match.createIndex();
-    await redisManager.bloom.reserve('bf:usernames', 0.001, 100000);
-    await redisManager.bloom.reserve('bf:matches', 0.01, 5000000);
+    await matchManager.createIndex();
+    await bloomManager.reserve('bf:usernames', 0.001, 100000);
+    await bloomManager.reserve('bf:matches', 0.01, 5000000);
 
     server = app.listen(PORT, '0.0.0.0', 8192, () => {
       logger.info('API listening on port 3001');
@@ -85,7 +85,7 @@ async function gracefulShutdown(signal: string) {
     server.close(async () => {
       logger.info("HTTP server closed. Disconnecting databases...");
       try {
-        await redisManager.quit();
+        await closeRedisConnections();
         await prisma.$disconnect();
         logger.info("API graceful shutdown complete.");
         process.exit(0);

@@ -1,8 +1,8 @@
 import { Job, Worker } from "bullmq";
 import { QueueName, JobName, DbBufferQueueJob } from "@matcha/queue";
-import { redisManager, workerConnection } from "../config/redis";
 import prisma from "@matcha/prisma";
 import { logger } from "@matcha/logger";
+import { chatManager, workerConnection } from "../config/redis";
 
 export const dbBufferWorker = new Worker(
   QueueName.DB_BUFFER,
@@ -11,7 +11,7 @@ export const dbBufferWorker = new Worker(
     switch (task.name) {
       case JobName.PROCESS_MESSAGE_BATCH: {
         const batchSize = task.data.batchSize || 500;
-        const messages = await redisManager.chat.getMessageBufferBatch(batchSize);
+        const messages = await chatManager.getMessageBufferBatch(batchSize);
         if (messages.length === 0) {
           return;
         }
@@ -51,11 +51,11 @@ export const dbBufferWorker = new Worker(
             });
           }
         });
-        await redisManager.chat.trimMessageBufferBatch(messages.length);
+        await chatManager.trimMessageBufferBatch(messages.length);
         break;
       }
       case JobName.PROCESS_READ_BATCH: {
-        const reads = await redisManager.chat.extractReadReceiptBuffer();
+        const reads = await chatManager.extractReadReceiptBuffer();
         if (!reads || Object.keys(reads).length === 0) {
           return;
         }

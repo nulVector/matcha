@@ -1,12 +1,24 @@
 import prisma, { ConnectionStatus } from '@matcha/prisma';
-import { RedisManager } from '@matcha/redis';
+import {
+  createRedisClient,
+  MatchManager,
+  UserDetailManager,
+  UserConnectionManager,
+  RedisClient
+} from '@matcha/redis';
 import { getDeterministicIds } from '@matcha/shared';
 import { createId } from '@paralleldrive/cuid2';
 
 const REDIS_URL = process.env.REDIS_URL;
 if (!REDIS_URL) throw new Error("Missing Environment variable.");
 
-const redisManager = new RedisManager(REDIS_URL);
+const cacheClient: RedisClient = createRedisClient(REDIS_URL, "CACHE");
+const matchClient: RedisClient = createRedisClient(REDIS_URL, "MATCH");
+const systemClient: RedisClient = createRedisClient(REDIS_URL, "SYSTEM");
+const userDetailManager = new UserDetailManager(cacheClient);
+const userConnectionManager = new UserConnectionManager(cacheClient);
+const matchManager = new MatchManager(matchClient);
+
 const TOTAL_USERS = 20000; 
 const PAIR_BATCH_SIZE = 500; 
 const BENGALURU_LAT = 12.9716;
@@ -18,7 +30,7 @@ const INTEREST_POOL = [
 
 async function seedRealWorldData() {
   console.time('RealWorldSeedDuration');
-  await redisManager["redis"].del('artillery:users:queue');
+  await systemClient.del('artillery:users:queue');
   
   for (let i = 0; i < TOTAL_USERS; i += (PAIR_BATCH_SIZE * 2)) {
     const pairsToMake = Math.min(PAIR_BATCH_SIZE, (TOTAL_USERS - i) / 2);
@@ -55,13 +67,13 @@ async function seedRealWorldData() {
       dbMessages.push({ id: messageId, connectionId: connectionId, senderId: profileAId, content: "Load test message" });
 
       redisPromises.push(
-        redisManager.userDetail.cacheProfile(profileAId, { locationLatitude: BENGALURU_LAT, locationLongitude: BENGALURU_LNG }),
-        redisManager.match.updateMatchProfile(profileAId, BENGALURU_LAT, BENGALURU_LNG, interestsA),
-        redisManager.userConnection.setUserStatus(profileAId),
+        userDetailManager.cacheProfile(profileAId, { locationLatitude: BENGALURU_LAT, locationLongitude: BENGALURU_LNG }),
+        matchManager.updateMatchProfile(profileAId, BENGALURU_LAT, BENGALURU_LNG, interestsA),
+        userConnectionManager.setUserStatus(profileAId),
         
-        redisManager.userDetail.cacheProfile(profileBId, { locationLatitude: BENGALURU_LAT, locationLongitude: BENGALURU_LNG }),
-        redisManager.match.updateMatchProfile(profileBId, BENGALURU_LAT, BENGALURU_LNG, interestsB),
-        redisManager.userConnection.setUserStatus(profileBId)
+        userDetailManager.cacheProfile(profileBId, { locationLatitude: BENGALURU_LAT, locationLongitude: BENGALURU_LNG }),
+        matchManager.updateMatchProfile(profileBId, BENGALURU_LAT, BENGALURU_LNG, interestsB),
+        userConnectionManager.setUserStatus(profileBId)
       );
 
       queueBatch.push(`${userAId},${profileAId},${connectionId},${profileBId},${messageId}`);
@@ -73,7 +85,7 @@ async function seedRealWorldData() {
     await prisma.connection.createMany({ data: dbConnections, skipDuplicates: true });
     await prisma.message.createMany({ data: dbMessages, skipDuplicates: true });
     
-    redisPromises.push(redisManager["redis"].rpush('artillery:users:queue', ...queueBatch));
+    redisPromises.push(systemClient.rpush('artillery:users:queue', ...queueBatch));
     await Promise.all(redisPromises);
   }
   console.log(`Real-World Seeding complete.`);
@@ -87,5 +99,9 @@ seedRealWorldData()
   })
   .finally(async () => { 
     await prisma.$disconnect(); 
-    await redisManager.quit(); 
+    await Promise.all([
+      cacheClient.quit(),
+      matchClient.quit(),
+      systemClient.quit()
+    ]); 
   });

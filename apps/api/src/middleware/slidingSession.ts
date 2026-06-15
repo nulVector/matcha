@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from 'jsonwebtoken';
 import { COOKIE_OPTIONS } from "../constant/cookie";
-import { redisManager } from "../services/redis";
+import { authManager } from "../services/redis";
 import { logger } from "@matcha/logger";
 
 const jwtSecret = process.env.JWT_SECRET;
@@ -27,7 +27,7 @@ export const slidingSession = async (req:Request, res: Response, next: NextFunct
         sessionId
       },jwtSecret, {expiresIn: '7d' });
       res.cookie("token", newToken, COOKIE_OPTIONS);
-      await redisManager.auth.cacheSession(userId, sessionId, userProfile ? userProfile.id : null, hasPassword);
+      await authManager.cacheSession(userId, sessionId, userProfile ? userProfile.id : null, hasPassword);
     }
     next();
   } catch (err) {

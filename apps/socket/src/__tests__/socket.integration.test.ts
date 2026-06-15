@@ -1,13 +1,15 @@
-import { describe, expect, it, beforeAll, afterAll } from 'vitest';
-import WebSocket from 'ws';
+import type { PrismaClient } from '@matcha/prisma';
+import type { AuthManager, UserConnectionManager, RedisClient } from '@matcha/redis';
 import { createId } from '@paralleldrive/cuid2';
 import jwt from 'jsonwebtoken';
-import type { PrismaClient } from '@matcha/prisma';
-import type { RedisManager } from '@matcha/redis';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import WebSocket from 'ws';
 
 let prisma: PrismaClient;
-let serverRedisManager: RedisManager;
-let testRedisManager: RedisManager;
+let serverAuthManager: AuthManager;
+let serverUserConnectionManager: UserConnectionManager;
+let closeServerRedis: () => Promise<void>;
+let testPubClient: RedisClient;
 const WS_PORT = 8081;
 const WS_URL = `ws://localhost:${WS_PORT}`;
 const JWT_SECRET = process.env.JWT_SECRET || 'test_secret';
@@ -22,18 +24,20 @@ describe('WebSocket Integration Tests', () => {
     prisma = prismaModule.default as unknown as PrismaClient;
 
     const redisModule = await import('../services/redis.js');
-    serverRedisManager = redisModule.redisManager;
+    serverAuthManager = redisModule.authManager;
+    serverUserConnectionManager = redisModule.userConnectionManager;
+    closeServerRedis = redisModule.closeRedisConnections;
 
-    const { RedisManager } = await import('@matcha/redis');
-    testRedisManager = new RedisManager(process.env.REDIS_URL!);
+    const { createRedisClient } = await import('@matcha/redis');
+    testPubClient = createRedisClient(process.env.REDIS_URL!, "PUBSUB_PUB");
 
     await import('../index.js');
     await sleep(500);
   }, 20000);
 
   afterAll(async () => {
-    await testRedisManager.quit();
-    await serverRedisManager.quit();
+    if (testPubClient) await testPubClient.quit();
+    if (closeServerRedis) await closeServerRedis();
   });
 
   async function createAuthUser() {
@@ -49,7 +53,7 @@ describe('WebSocket Integration Tests', () => {
         avatarUrl: '', location: 'Bengaluru', locationLatitude: 0, locationLongitude: 0, interest: []
       }
     });
-    await serverRedisManager.auth.cacheSession(userId, sessionId, profileId, true);
+    await serverAuthManager.cacheSession(userId, sessionId, profileId, true);
     const token = jwt.sign({ id: userId, sessionId}, JWT_SECRET);
     return { userId, profileId, token };
   }
@@ -80,8 +84,8 @@ describe('WebSocket Integration Tests', () => {
       ws.on('open', async () => {
         try {
           await sleep(100);
-          const isOnline = await serverRedisManager.userConnection.checkUserStatus(profileId);
-          const socketCount = await serverRedisManager.userConnection.countSockets(profileId);
+          const isOnline = await serverUserConnectionManager.checkUserStatus(profileId);
+          const socketCount = await serverUserConnectionManager.countSockets(profileId);
           expect(isOnline).toBe(true);
           expect(socketCount).toBeGreaterThan(0);
           ws.on('close', () => setTimeout(() => resolve(), 100));
@@ -125,7 +129,7 @@ describe('WebSocket Integration Tests', () => {
             eventType: 'SYSTEM_EVENT',
             eventData: { message: 'Hello from Redis!' }
           });
-          await testRedisManager.chat.publish('chat_router', payload);
+          await testPubClient.publish('chat_router', payload);
         } catch (err) {
           ws.on('close', () => reject(err));
           ws.close();

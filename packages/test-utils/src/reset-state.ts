@@ -1,11 +1,15 @@
 import { beforeAll, beforeEach, inject } from 'vitest';
-import Redis from 'ioredis';
 import type { PrismaClient } from '@matcha/prisma';
-import type { RedisManager } from '@matcha/redis';
+import type { 
+  RedisClient, 
+  MatchManager, 
+  BloomFilterManager 
+} from '@matcha/redis';
 
 let prisma: PrismaClient;
-let testRedisManager: RedisManager;
-let rawRedisClient: Redis;
+let testRedisClient: RedisClient;
+let matchManager: MatchManager;
+let bloomManager: BloomFilterManager;
 
 beforeAll(async () => {
   const dbUrl = inject('databaseUrl');
@@ -13,10 +17,16 @@ beforeAll(async () => {
   process.env.DATABASE_URL = dbUrl;
   process.env.REDIS_URL = redisUrl;
   const { default: prismaClient } = await import('@matcha/prisma');
-  const { RedisManager: Manager } = await import('@matcha/redis');
+  const { 
+    createRedisClient, 
+    MatchManager: MatchMgr, 
+    BloomFilterManager: BloomMgr 
+  } = await import('@matcha/redis');
+  
   prisma = prismaClient as unknown as PrismaClient;
-  testRedisManager = new Manager(redisUrl);
-  rawRedisClient = new Redis(redisUrl);
+  testRedisClient = createRedisClient(redisUrl, "SYSTEM");
+  matchManager = new MatchMgr(testRedisClient);
+  bloomManager = new BloomMgr(testRedisClient);
 });
 
 beforeEach(async () => {
@@ -30,8 +40,8 @@ beforeEach(async () => {
     }
   }
 
-  await rawRedisClient.flushall();
-  await testRedisManager.match.createIndex();
-  await testRedisManager.bloom.reserve('bf:usernames', 0.001, 100000);
-  await testRedisManager.bloom.reserve('bf:matches', 0.01, 5000000);
+  await testRedisClient.flushall();
+  await matchManager.createIndex();
+  await bloomManager.reserve('bf:usernames', 0.001, 100000);
+  await bloomManager.reserve('bf:matches', 0.01, 5000000);
 });

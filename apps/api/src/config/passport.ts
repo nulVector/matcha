@@ -5,7 +5,7 @@ import { PassportStatic } from "passport";
 import { ExtractJwt, Strategy as JwtStrategy } from "passport-jwt";
 import { Strategy as LocalStrategy } from "passport-local";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
-import { redisManager } from "../services/redis";
+import { authManager } from "../services/redis";
 
 const jwtSecret = process.env.JWT_SECRET;
 const clientID = process.env.GOOGLE_CLIENT_ID;
@@ -164,7 +164,7 @@ export const configurePassport = (passport:PassportStatic) =>{
     },
     async (jwt_payload:JwtPayload,done) => {
       try {
-        const session = await redisManager.auth.getSession(jwt_payload.id, jwt_payload.sessionId);
+        const session = await authManager.getSession(jwt_payload.id, jwt_payload.sessionId);
         if (!session) {
           return done(null, false);
         }

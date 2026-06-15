@@ -3,7 +3,7 @@ import { UnreadCountData } from "../common";
 import { CachedMessage } from "@matcha/shared";
 
 export class ChatManager {
-  constructor (private redis:Redis, private subRedis:Redis) {}
+  constructor (private redis:Redis, private pubRedis:Redis) {}
 
   async setActiveChat(userId:string,connectionId:string){
     await this.redis.set(`user:${userId}:activeChat`,connectionId,"EX",60 * 60);
@@ -32,14 +32,14 @@ export class ChatManager {
     if (activeChat !== connectionId) {
       tx.hincrby(unreadKey, connectionId, 1);
     }
+    await tx.exec();
     const publishPayload = JSON.stringify({
       receiverId,
       eventType,
       eventData: message,
       traceId
     });
-    tx.publish('chat_router', publishPayload);
-    await tx.exec();
+    await this.pubRedis.publish('chat_router', publishPayload);
   }
   async seedMessages(connectionId:string, messages:CachedMessage[]){
     if (messages.length === 0) return;
@@ -122,14 +122,6 @@ export class ChatManager {
     }
   }
   async publish(channel:string,msg:string){
-    return await this.redis.publish(channel,msg);
-  }
-  async subscribe(channel:string){
-    await this.subRedis.subscribe(channel);
-  }
-  onMessage(callback: (channel: string, message: string) => void) {
-    this.subRedis.on("message", (channel, message) => {
-      callback(channel, message);
-    });
+    return await this.pubRedis.publish(channel,msg);
   }
 }

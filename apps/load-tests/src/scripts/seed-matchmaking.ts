@@ -1,5 +1,11 @@
 import prisma from '@matcha/prisma';
-import { RedisManager } from '@matcha/redis';
+import {
+  createRedisClient,
+  MatchManager,
+  UserDetailManager,
+  UserConnectionManager,
+  RedisClient
+} from '@matcha/redis';
 import { createId } from '@paralleldrive/cuid2';
 
 const REDIS_URL = process.env.REDIS_URL;
@@ -7,7 +13,13 @@ if (!REDIS_URL) {
   throw new Error("Missing Environment variable.");
 }
 
-const redisManager = new RedisManager(REDIS_URL);
+const cacheClient: RedisClient = createRedisClient(REDIS_URL, "CACHE");
+const matchClient: RedisClient = createRedisClient(REDIS_URL, "MATCH");
+const systemClient: RedisClient = createRedisClient(REDIS_URL, "SYSTEM");
+const userDetailManager = new UserDetailManager(cacheClient);
+const userConnectionManager = new UserConnectionManager(cacheClient);
+const matchManager = new MatchManager(matchClient);
+
 const TOTAL_USERS = 20000;
 const BATCH_SIZE = 1000;
 const BENGALURU_LAT = 12.9716;
@@ -19,7 +31,7 @@ const INTEREST_POOL = [
 
 async function seedData() {
   console.time('MatchmakingSeedDuration');
-  await redisManager["redis"].del('artillery:users:queue');
+  await systemClient.del('artillery:users:queue');
   for (let i = 0; i < TOTAL_USERS; i += BATCH_SIZE) {
     const batchSize = Math.min(BATCH_SIZE, TOTAL_USERS - i);
     const dbUser = [];
@@ -51,22 +63,22 @@ async function seedData() {
         interest: userInterests
       });
       
-      redisPromises.push(redisManager.userDetail.cacheProfile(userProfileId, { 
+      redisPromises.push(userDetailManager.cacheProfile(userProfileId, { 
         locationLatitude: BENGALURU_LAT, 
         locationLongitude: BENGALURU_LNG 
       }));
-      redisPromises.push(redisManager.match.updateMatchProfile(
+      redisPromises.push(matchManager.updateMatchProfile(
         userProfileId, 
         BENGALURU_LAT, 
         BENGALURU_LNG, 
         userInterests
       ));
-      redisPromises.push(redisManager.userConnection.setUserStatus(userProfileId));
+      redisPromises.push(userConnectionManager.setUserStatus(userProfileId));
     }
     
     await prisma.user.createMany({ data: dbUser, skipDuplicates: true });
     await prisma.userProfile.createMany({ data: dbUserProfiles, skipDuplicates: true });
-    redisPromises.push(redisManager["redis"].rpush('artillery:users:queue', ...queueBatch));
+    redisPromises.push(systemClient.rpush('artillery:users:queue', ...queueBatch));
     await Promise.all(redisPromises); 
   }
   console.log(`Seeding complete.`);
@@ -80,5 +92,9 @@ seedData()
   })
   .finally(async () => {
     await prisma.$disconnect();
-    await redisManager.quit(); 
+    await Promise.all([
+      cacheClient.quit(),
+      matchClient.quit(),
+      systemClient.quit()
+    ]);
   });

@@ -6,11 +6,11 @@ import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import passport from 'passport';
 import { COOKIE_OPTIONS } from "../constant/cookie";
-import { redisManager } from "../services/redis";
 import { createId } from '@paralleldrive/cuid2';
 import { EventType} from "@matcha/shared";
 import { TaskProducer } from "@matcha/queue";
 import { logger } from "@matcha/logger";
+import { authManager, chatManager } from "../services/redis";
 
 const jwtSecret = process.env.JWT_SECRET;
 if (!jwtSecret){
@@ -30,7 +30,7 @@ export const signup = async (req:Request, res:Response,next:NextFunction) =>{
       }
     });
     const sessionId = createId();
-    await redisManager.auth.cacheSession(newUser.id, sessionId, null, true);
+    await authManager.cacheSession(newUser.id, sessionId, null, true);
     const token = jwt.sign({
       id:newUser.id,
       sessionId
@@ -58,7 +58,7 @@ export const login = async (req:Request,res:Response,next:NextFunction)=>{
     }
     try {
       const sessionId = createId();
-      await redisManager.auth.cacheSession(user.id, sessionId, user.profile ? user.profile.id : null, true);
+      await authManager.cacheSession(user.id, sessionId, user.profile ? user.profile.id : null, true);
       const token = jwt.sign({
         id:user.id,
         sessionId
@@ -76,7 +76,7 @@ export const googleAuthCallback = async (req: Request, res: Response, next: Next
   try {
     const user = req.user!;
     const sessionId = createId();
-    await redisManager.auth.cacheSession(user.id, sessionId, user.profile ? user.profile.id : null, user.hasPassword);
+    await authManager.cacheSession(user.id, sessionId, user.profile ? user.profile.id : null, user.hasPassword);
     const token = jwt.sign({
       id: user.id,
       sessionId: sessionId
@@ -100,7 +100,7 @@ export const requestResetPassword = async (req:Request,res:Response,next:NextFun
     });
     if (user) {
       const resetToken = crypto.randomBytes(32).toString('hex');
-      await redisManager.auth.setResetToken(resetToken, user.id);
+      await authManager.setResetToken(resetToken, user.id);
       const frontendUrl = process.env.CLIENT_URL || 'http://localhost:3000';
       const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
       const traceId = createId();
@@ -126,7 +126,7 @@ export const requestResetPassword = async (req:Request,res:Response,next:NextFun
 export const confirmResetPassword = async (req: Request, res: Response,next:NextFunction) => {
   try {
     const {token,password}:resetPasswordType = req.validatedData!.body;
-    const userId = await redisManager.auth.getUserIdByResetToken(token);
+    const userId = await authManager.getUserIdByResetToken(token);
     if (!userId) {
       return res.status(400).json({ message: "Invalid or expired reset token." });
     }
@@ -136,15 +136,15 @@ export const confirmResetPassword = async (req: Request, res: Response,next:Next
       data: { password: hashedPassword },
       select: { profile: { select: { id: true }}}
     });
-    await redisManager.auth.consumeResetToken(token);
+    await authManager.consumeResetToken(token);
     const killPromises: Promise<unknown>[] = [
-      redisManager.auth.invalidateAllUserSessions(userId)
+      authManager.invalidateAllUserSessions(userId)
     ];
     if (updatedUser.profile) {
       const traceId = createId();
       logger.info({ traceId, userId }, "FORCE DISCONNECT after password reset");
       killPromises.push(
-        redisManager.chat.publish(
+        chatManager.publish(
           'chat_router',
           JSON.stringify({
             receiverId: updatedUser.profile.id,
@@ -171,11 +171,11 @@ export const logout = async (req:Request,res:Response,next:NextFunction)=>{
     const userId = req.user!.id;
     const userProfileId = req.user!.profile!.id;
     const sessionId = req.user!.sessionId!;
-    await redisManager.auth.invalidateSession(userId, sessionId);
+    await authManager.invalidateSession(userId, sessionId);
     res.clearCookie("token", COOKIE_OPTIONS);
     const traceId = createId();
     logger.info({ traceId, userId }, "FORCE DISCONNECT due to logout");
-    await redisManager.chat.publish(
+    await chatManager.publish(
       'chat_router',
       JSON.stringify({
         receiverId: userProfileId,
@@ -197,11 +197,11 @@ export const logoutAll = async (req:Request,res:Response,next:NextFunction)=>{
   try {
     const userId = req.user!.id;
     const userProfileId = req.user!.profile!.id;
-    await redisManager.auth.invalidateAllUserSessions(userId);
+    await authManager.invalidateAllUserSessions(userId);
     res.clearCookie("token", COOKIE_OPTIONS);
     const traceId = createId();
     logger.info({ traceId, userId }, "FORCE DISCONNECT for all sessions");
-    await redisManager.chat.publish(
+    await chatManager.publish(
       'chat_router',
       JSON.stringify({
         receiverId: userProfileId,

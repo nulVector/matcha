@@ -1,13 +1,15 @@
-import Redis from 'ioredis';
 import jwt from 'jsonwebtoken';
 import { createId } from '@paralleldrive/cuid2';
+import { createRedisClient, AuthManager, RedisClient } from '@matcha/redis';
 
 const REDIS_URL = process.env.REDIS_URL;
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!REDIS_URL || !JWT_SECRET) {
   throw new Error("Missing Environment variable.");
 }
-const redisClient = new Redis(REDIS_URL, { maxRetriesPerRequest: null });
+const systemClient: RedisClient = createRedisClient(REDIS_URL, "SYSTEM");
+const sessionClient: RedisClient = createRedisClient(REDIS_URL, "SESSION");
+const authManager = new AuthManager(sessionClient);
 
 export interface ArtilleryContext {
   vars: Record<string, string | undefined>;
@@ -20,7 +22,7 @@ export type DoneCallback = (err?: Error | unknown) => void;
 
 export function setupUser(params: RequestParams, context: ArtilleryContext, done: DoneCallback) {
   Promise.resolve().then(async () => {
-    const userData = await redisClient.lpop('artillery:users:queue');
+    const userData = await systemClient.lpop('artillery:users:queue');
     if (!userData) {
       throw new Error("Redis queue ran out of users.");
     }
@@ -34,7 +36,7 @@ export function setupUser(params: RequestParams, context: ArtilleryContext, done
       userProfileId: profileId,
       hasPassword: true
     };
-    await redisClient.set(`session:${userId}:${sessionId}`, JSON.stringify(sessionData), 'EX', 60 * 30);
+    await authManager.cacheSession(userId, sessionId, profileId, true);
     
     const token = jwt.sign(
       { id: userId, sessionId },
@@ -65,7 +67,7 @@ export function cleanupSession(context: ArtilleryContext, events: unknown, done:
   Promise.resolve().then(async () => {
     const { userId, sessionId } = context.vars;
     if (userId && sessionId) {
-      await redisClient.del(`session:${userId}:${sessionId}`);
+      await sessionClient.del(`session:${userId}:${sessionId}`);
     }
     done();
   }).catch((err) => {

@@ -1,11 +1,11 @@
 import { CronQueueJob, JobName, QueueName } from "@matcha/queue";
 import { Job, Worker } from "bullmq";
-import { redisManager, workerConnection } from "../config/redis";
 import prisma, { ConnectionStatus } from "@matcha/prisma";
 import { ConnectionListType, UserState } from "@matcha/redis";
 import { logger } from "@matcha/logger";
 import { EventType } from "@matcha/shared";
 import { createId } from "@paralleldrive/cuid2";
+import { chatManager, matchManager, userConnectionManager, workerConnection } from "../config/redis";
 
 export const cronWorker = new Worker(
   QueueName.CRON,
@@ -23,7 +23,7 @@ export const cronWorker = new Worker(
           where: { id: { in: connectionIds } },
         });
         const cachePromises = expiredConnections.flatMap(conn => [
-          redisManager.userConnection.clearConnectionInfo(conn.id)
+          userConnectionManager.clearConnectionInfo(conn.id)
         ]);
         await Promise.all(cachePromises);
         break;
@@ -61,25 +61,25 @@ export const cronWorker = new Worker(
             traceId
           });
           publishPromises.push(
-            redisManager.chat.publish('chat_router', JSON.stringify({ receiverId: conn.user1Id, ...JSON.parse(payload) })),
-            redisManager.chat.publish('chat_router', JSON.stringify({ receiverId: conn.user2Id, ...JSON.parse(payload) })),
-            redisManager.match.clearMatchInfo(conn.id),
-            redisManager.match.clearMatchVotes(conn.id),
-            redisManager.match.clearMatchTimer(conn.id),
-            redisManager.match.leaveQueue(conn.user1Id, UserState.IDLE),
-            redisManager.match.leaveQueue(conn.user2Id, UserState.IDLE),
-            redisManager.userConnection.setConnectionInfo(conn.id, conn.user1Id, conn.user2Id, ConnectionListType.ARCHIVED)
+            chatManager.publish('chat_router', JSON.stringify({ receiverId: conn.user1Id, ...JSON.parse(payload) })),
+            chatManager.publish('chat_router', JSON.stringify({ receiverId: conn.user2Id, ...JSON.parse(payload) })),
+            matchManager.clearMatchInfo(conn.id),
+            matchManager.clearMatchVotes(conn.id),
+            matchManager.clearMatchTimer(conn.id),
+            matchManager.leaveQueue(conn.user1Id, UserState.IDLE),
+            matchManager.leaveQueue(conn.user2Id, UserState.IDLE),
+            userConnectionManager.setConnectionInfo(conn.id, conn.user1Id, conn.user2Id, ConnectionListType.ARCHIVED)
           );
         }
         await Promise.all(publishPromises);
         break;
       }
       case JobName.SWEEP_MATCH_QUEUE: {
-        const usersInQueue = await redisManager.match.getUsersInQueue(); 
+        const usersInQueue = await matchManager.getUsersInQueue(); 
         for (const userId of usersInQueue) {
-          const isOnline = await redisManager.userConnection.checkUserStatus(userId);
+          const isOnline = await userConnectionManager.checkUserStatus(userId);
           if (!isOnline) {
-            await redisManager.match.leaveQueue(userId, UserState.IDLE);
+            await matchManager.leaveQueue(userId, UserState.IDLE);
           }
         }
         break;

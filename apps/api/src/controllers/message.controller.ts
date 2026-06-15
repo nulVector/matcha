@@ -2,13 +2,13 @@ import prisma from "@matcha/prisma";
 import { ConnectionListType } from "@matcha/redis";
 import { connectionIdType, getChatHistoryType } from "@matcha/zod";
 import { NextFunction, Request, Response } from "express";
-import { redisManager } from "../services/redis";
 import { CachedMessage } from "@matcha/shared";
+import { chatManager, matchManager, userConnectionManager, userDetailManager } from "../services/redis";
 
 export const getUnreadCounts = async (req:Request,res:Response,next:NextFunction) => {
   try {
     const profileId = req.user!.profile!.id;
-    const isHydrated = await redisManager.chat.isUnreadHydrated(profileId);
+    const isHydrated = await chatManager.isUnreadHydrated(profileId);
     if (!isHydrated) {
       const unreadData = await prisma.$queryRaw<{ connectionId: string, count: number }[]>`
         SELECT 
@@ -35,10 +35,10 @@ export const getUnreadCounts = async (req:Request,res:Response,next:NextFunction
           AND (c."user2LastReadAt" IS NULL OR m."createdAt" > c."user2LastReadAt")
         GROUP BY c.id
       `;
-      await redisManager.chat.seedUnreadCount(profileId,unreadData)
-      await redisManager.chat.setUnreadHydrateflag(profileId);
+      await chatManager.seedUnreadCount(profileId,unreadData)
+      await chatManager.setUnreadHydrateflag(profileId);
     }
-    const unreadCount = await redisManager.chat.getUnread(profileId);
+    const unreadCount = await chatManager.getUnread(profileId);
     res.json({
       success:true,
       data: unreadCount
@@ -86,7 +86,7 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
     const connectionExpiresAt = connection.expiresAt ? connection.expiresAt.toISOString() : null;
       
     let chatPartnerMeta = null;
-    const partnerProfile = await redisManager.userDetail.getProfileFields(partnerId, ['username', 'avatarUrl', 'openingQues', 'isActive']);
+    const partnerProfile = await userDetailManager.getProfileFields(partnerId, ['username', 'avatarUrl', 'openingQues', 'isActive']);
     
     if (partnerProfile && partnerProfile.username) {
       chatPartnerMeta = {
@@ -109,9 +109,9 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
         isActive: dbPartnerProfile?.isActive ?? false
       };
       if (connectionStatus === "MATCHED" && connection.expiresAt) {
-        await redisManager.match.setMatchInfo(connectionId, connection.user1Id, connection.user2Id, connection.expiresAt.toISOString());
+        await matchManager.setMatchInfo(connectionId, connection.user1Id, connection.user2Id, connection.expiresAt.toISOString());
       } else if (connectionStatus === "FRIEND" || connectionStatus === "ARCHIVED") {
-        await redisManager.userConnection.setConnectionInfo(connectionId, connection.user1Id, connection.user2Id, connectionStatus as ConnectionListType);
+        await userConnectionManager.setConnectionInfo(connectionId, connection.user1Id, connection.user2Id, connectionStatus as ConnectionListType);
       }
     }
 
@@ -119,7 +119,7 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
     let iRequestedExtend = false;
     let iRequestedConvert = false;
     if (connectionStatus === "MATCHED") {
-      const votes = await redisManager.match.getMatchVotes(connectionId);
+      const votes = await matchManager.getMatchVotes(connectionId);
       iRequestedExtend = votes.extend.includes(profileId);
       iRequestedConvert = votes.convert.includes(profileId);
       if (votes.extend.includes(partnerId)) partnerRequested = "EXTEND";
@@ -152,7 +152,7 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
       } as CachedMessage));
     }
     else {
-      let messages = await redisManager.chat.getMessages(connectionId);
+      let messages = await chatManager.getMessages(connectionId);
       if (!messages || messages.length === 0) {
         if (connectionStatus === "MATCHED") {
           orderedMessages = [];
@@ -171,7 +171,7 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
             id: msg.id, content: msg.content, senderId: msg.senderId,
             createdAt: msg.createdAt.toISOString(), type: msg.type
           } as CachedMessage));
-          await redisManager.chat.seedMessages(connectionId, orderedMessages);
+          await chatManager.seedMessages(connectionId, orderedMessages);
         }
       } else {
         orderedMessages = messages;

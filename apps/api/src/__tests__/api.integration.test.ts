@@ -3,12 +3,16 @@ import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { createId } from '@paralleldrive/cuid2';
 import jwt from 'jsonwebtoken';
 import type { PrismaClient, ConnectionStatus as ConnectionStatusEnum } from '@matcha/prisma';
-import type { RedisManager } from '@matcha/redis';
+import type { AuthManager, BloomFilterManager, MatchManager, RedisClient } from '@matcha/redis';
 import { getDeterministicIds } from '@matcha/shared';
 import type { Express, Router } from 'express';
 
 let app: Express;
-let redisManager: RedisManager;
+let authManager: AuthManager;
+let bloomManager: BloomFilterManager;
+let matchManager: MatchManager;
+let matchClient: RedisClient;
+let closeRedisConnections: () => Promise<void>;
 let prisma: PrismaClient;
 let ConnectionStatus: typeof ConnectionStatusEnum;
 
@@ -18,7 +22,11 @@ describe('API Integration Tests', () => {
   
   beforeAll(async () => {
     const redisModule = await import('../services/redis.js');
-    redisManager = redisModule.redisManager;
+    authManager = redisModule.authManager;
+    bloomManager = redisModule.bloomManager;
+    matchManager = redisModule.matchManager;
+    matchClient = redisModule.matchClient;
+    closeRedisConnections = redisModule.closeRedisConnections;
     
     const prismaModule = await import('@matcha/prisma');
     prisma = prismaModule.default as unknown as PrismaClient;
@@ -38,8 +46,8 @@ describe('API Integration Tests', () => {
   }, 20000);
 
   afterAll(async () => {
-    if (redisManager) {
-      await redisManager.quit();
+    if (closeRedisConnections) {
+      await closeRedisConnections();
     }
   });
 
@@ -65,7 +73,7 @@ describe('API Integration Tests', () => {
         }
       });
     }
-    await redisManager.auth.cacheSession(userId, sessionId, profileId, true);
+    await authManager.cacheSession(userId, sessionId, profileId, true);
     const token = jwt.sign({ id: userId, sessionId}, JWT_SECRET, { expiresIn: '1h' });
     return { userId, profileId, token };
   }
@@ -117,7 +125,7 @@ describe('API Integration Tests', () => {
           interest: ['coding'],
         }
       });
-      await redisManager.bloom.add('bf:usernames', testUsername);
+      await bloomManager.add('bf:usernames', testUsername);
       const response = await request(app)
         .get(`/api/v1/users/check-username?username=${testUsername}`)
         .set('Cookie', [`token=${token}`]);
@@ -143,7 +151,7 @@ describe('API Integration Tests', () => {
         }
       });
       const mockExpiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
-      await redisManager.match.setMatchInfo(connectionId, user1.profileId!, user2.profileId!, mockExpiresAt);
+      await matchManager.setMatchInfo(connectionId, user1.profileId!, user2.profileId!, mockExpiresAt);
       const requestPromises = Array(5).fill(null).map(() => 
         request(app)
           .patch(`/api/v1/connections/${connectionId}/extend`)
@@ -157,7 +165,7 @@ describe('API Integration Tests', () => {
       expect(statusCodes.filter(s => s === 409).length).toBe(2); 
       expect(statusCodes.filter(s => s === 429).length).toBe(2); 
       const voteCountKey = `match:votes:${connectionId}:EXTEND`;
-      const actualVotes = await redisManager['redis'].hlen(voteCountKey);
+      const actualVotes = await matchClient.hlen(voteCountKey);
       expect(actualVotes).toBe(1); 
     });
   });

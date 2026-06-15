@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '@matcha/prisma';
-import { redisManager } from '../services/redis';
+import { pingRedisConnections } from '../services/redis';
 import { logger } from '@matcha/logger';
 
 export const checkHealth = async (req: Request, res: Response) => {
@@ -19,7 +19,7 @@ export const checkHealth = async (req: Request, res: Response) => {
       health.services.database = 'down';
       throw dbError;
     }
-    const isRedisHealthy = await redisManager.ping();
+    const isRedisHealthy = await pingRedisConnections();
     if (!isRedisHealthy) {
       health.services.redis = 'down';
       throw new Error("Redis ping failed");

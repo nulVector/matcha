@@ -1,20 +1,27 @@
-import { createId } from '@paralleldrive/cuid2';
-import { QueueEvents, Queue } from 'bullmq';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { PrismaClient, ConnectionStatus as ConnectionStatusEnum } from '@matcha/prisma';
-import type { RedisManager } from '@matcha/redis';
+import type { ConnectionStatus as ConnectionStatusEnum, PrismaClient } from '@matcha/prisma';
+import type { UserDetailManager, MatchManager, UserConnectionManager, RedisClient } from '@matcha/redis';
 import { getDeterministicIds } from '@matcha/shared';
+import { createId } from '@paralleldrive/cuid2';
+import { Queue, QueueEvents } from 'bullmq';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import type { 
-  QueueName as QueueNameEnum, 
-  JobName as JobNameEnum,
-  CronProducer as CronProducerType
+import type {
+    CronProducer as CronProducerType,
+    JobName as JobNameEnum,
+    QueueName as QueueNameEnum
 } from '@matcha/queue';
 import Redis from 'ioredis';
 
 let prisma: PrismaClient;
 let ConnectionStatus: typeof ConnectionStatusEnum;
-let redisManager: RedisManager;
+
+let userDetailManager: UserDetailManager;
+let matchManager: MatchManager;
+let userConnectionManager: UserConnectionManager;
+let cacheClient: RedisClient;
+let matchClient: RedisClient;
+let closeRedisConnections: () => Promise<void>;
+
 let dbBufferQueue: Queue;
 let cronQueue: Queue;
 let taskQueue: Queue;
@@ -40,7 +47,12 @@ describe('Worker Integration Tests', () => {
     ConnectionStatus = prismaModule.ConnectionStatus;
     
     const redisModule = await import('../config/redis.js');
-    redisManager = redisModule.redisManager;
+    userDetailManager = redisModule.userDetailManager;
+    matchManager = redisModule.matchManager;
+    userConnectionManager = redisModule.userConnectionManager;
+    cacheClient = redisModule.cacheClient;
+    matchClient = redisModule.matchClient;
+    closeRedisConnections = redisModule.closeRedisConnections;
     queueConnection = redisModule.workerConnection;
     
     const queuePackage = await import('@matcha/queue');
@@ -78,7 +90,7 @@ describe('Worker Integration Tests', () => {
     await queueEvents.close();
     await cronQueueEvents.close();
     await testSubscriber.quit();
-    await redisManager.quit();
+    await closeRedisConnections();
   });
 
   describe('The DB Buffer Consumer', () => {
@@ -105,13 +117,13 @@ describe('Worker Integration Tests', () => {
         type: 'TEXT' as const
       }));
       const stringifiedMessages = fakeMessages.map(msg => JSON.stringify(msg));
-      await redisManager['redis'].rpush('buffer:messages', ...stringifiedMessages);
+      await cacheClient.rpush('buffer:messages', ...stringifiedMessages);
       const job = await dbBufferQueue.add(JobName.PROCESS_MESSAGE_BATCH, { batchSize: 500 });
       await job.waitUntilFinished(queueEvents);
       const dbMessageCount = await prisma.message.count({
         where: { connectionId }
       });
-      const remainingBuffer = await redisManager['redis'].llen('buffer:messages');
+      const remainingBuffer = await cacheClient.llen('buffer:messages');
       expect(dbMessageCount).toBe(50);
       expect(remainingBuffer).toBe(0);
     });
@@ -145,7 +157,7 @@ describe('Worker Integration Tests', () => {
         messageId: messageId,
         readAt: readTimestamp
       });
-      await redisManager['redis'].hset('buffer:reads', `${connectionId}:${user2Id}`, payload);
+      await cacheClient.hset('buffer:reads', `${connectionId}:${user2Id}`, payload);
       const job = await dbBufferQueue.add(JobName.PROCESS_READ_BATCH, {});
       await job.waitUntilFinished(queueEvents);
       const state = await job.getState();
@@ -155,7 +167,7 @@ describe('Worker Integration Tests', () => {
       });
       expect(updatedConnection?.user2LastReadId).toBe(messageId);
       expect(updatedConnection?.user2LastReadAt?.toISOString()).toBe(new Date(readTimestamp).toISOString());
-      const remainingBuffer = await redisManager['redis'].exists('buffer:reads');
+      const remainingBuffer = await cacheClient.exists('buffer:reads');
       expect(remainingBuffer).toBe(0); 
     });
   });
@@ -186,28 +198,28 @@ describe('Worker Integration Tests', () => {
           { id: candidateId, username: 'candidate_bot', avatarUrl: '', location: 'Bengaluru', locationLatitude: 12.97, locationLongitude: 77.59, interest: ['coding'] }
         ]
       });
-      await redisManager.userDetail.cacheProfile(searcherId, {
+      await userDetailManager.cacheProfile(searcherId, {
         locationLatitude: 12.97,
         locationLongitude: 77.59
       });
-      await redisManager.userDetail.cacheProfile(candidateId, {
+      await userDetailManager.cacheProfile(candidateId, {
         locationLatitude: 12.97,
         locationLongitude: 77.59
       });
-      await redisManager.match.updateMatchProfile(searcherId, 12.97, 77.59, ['coding']);
-      await redisManager.match.updateMatchProfile(candidateId, 12.97, 77.59, ['coding']);
-      await redisManager.match.addToQueue(searcherId);
-      await redisManager.match.addToQueue(candidateId);
-      await redisManager.userConnection.setUserStatus(searcherId);
-      await redisManager.userConnection.setUserStatus(candidateId);
+      await matchManager.updateMatchProfile(searcherId, 12.97, 77.59, ['coding']);
+      await matchManager.updateMatchProfile(candidateId, 12.97, 77.59, ['coding']);
+      await matchManager.addToQueue(searcherId);
+      await matchManager.addToQueue(candidateId);
+      await userConnectionManager.setUserStatus(searcherId);
+      await userConnectionManager.setUserStatus(candidateId);
       
       await sleep(500);
       startMatchmakingLoop();
       await sleep(4000);
       stopMatchmakingLoop();
       
-      const searcherStatus = await redisManager['redis'].hget(`user:profile:${searcherId}`, 'queueStatus');
-      const queueLength = await redisManager['redis'].llen('match:queue');
+      const searcherStatus = await matchClient.hget(`user:profile:${searcherId}`, 'queueStatus');
+      const queueLength = await matchClient.llen('match:queue');
       expect(searcherStatus).toBe('MATCHED');
       expect(queueLength).toBe(0);
       const [u1, u2] = getDeterministicIds(searcherId, candidateId);

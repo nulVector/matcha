@@ -7,10 +7,10 @@ import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { COOKIE_OPTIONS } from '../constant/cookie';
 import { USERNAME_VIBES } from '../constant/usernameList';
-import { redisManager } from '../services/redis';
 import { logger } from '@matcha/logger';
 import { getDeterministicIds, EventType, SystemAction } from '@matcha/shared';
 import { createId } from '@paralleldrive/cuid2';
+import { authManager, bloomManager, chatManager, matchManager, metadataManager, notificationManager, userConnectionManager, userDetailManager } from '../services/redis';
 
 type LocationMetadata = { id: string; name: string; latitude: number; longitude: number };
 type InterestMetadata = { id: string; name: string };
@@ -24,7 +24,7 @@ if (!jwtSecret) {
 export const checkUsername = async (req:Request,res:Response,next:NextFunction) =>{
   try{
     const {username}:usernameCheckType= req.validatedData.query;
-    const mightExist = await redisManager.bloom.exists('bf:usernames', username);
+    const mightExist = await bloomManager.exists('bf:usernames', username);
     if (!mightExist) {
       return res.status(200).json({ available: true, message: "Username available." });
     }
@@ -54,7 +54,7 @@ export const generateUsername = async (req:Request,res:Response,next:NextFunctio
       attempts++;
       const generatedUsername = `${getRandom(adjectives)}_${getRandom(nouns)}_${Math.floor(100 + Math.random() * 900)}`;
       if (generatedList.includes(generatedUsername)) continue;
-      const mightExist = await redisManager.bloom.exists('bf:usernames', generatedUsername);
+      const mightExist = await bloomManager.exists('bf:usernames', generatedUsername);
       if (mightExist) continue;
       generatedList.push(generatedUsername);
     }
@@ -102,8 +102,8 @@ export const initiateProfile = async (req:Request, res:Response,next:NextFunctio
         avatarUrl: true
       }
     });
-    await redisManager.auth.cacheSession(userId, sessionId, userProfile.id, hasPassword);
-    await redisManager.userDetail.cacheProfile(userProfile.id, {
+    await authManager.cacheSession(userId, sessionId, userProfile.id, hasPassword);
+    await userDetailManager.cacheProfile(userProfile.id, {
       id: userProfile.id,
       username: userProfile.username,
       avatarUrl: userProfile.avatarUrl,
@@ -144,9 +144,9 @@ export const initiateProfile = async (req:Request, res:Response,next:NextFunctio
 export const getMetadata = async (req:Request,res:Response,next:NextFunction) =>{
   try {
     const [cachedLocations,cachedInterests,cachedAvatars] = await Promise.all([
-      redisManager.metaData.getMetadata<LocationMetadata>('locations'),
-      redisManager.metaData.getMetadata<InterestMetadata>('interests'),
-      redisManager.metaData.getMetadata<AvatarMetadata>('avatars'),
+      metadataManager.getMetadata<LocationMetadata>('locations'),
+      metadataManager.getMetadata<InterestMetadata>('interests'),
+      metadataManager.getMetadata<AvatarMetadata>('avatars'),
     ]);
     if (cachedLocations && cachedInterests && cachedAvatars) {
       return res.json({
@@ -164,9 +164,9 @@ export const getMetadata = async (req:Request,res:Response,next:NextFunction) =>
       cachedAvatars || prisma.avatar.findMany()
     ]);
     const cachePromises: Promise<void>[] = [];
-    if (!cachedLocations) cachePromises.push(redisManager.metaData.cacheMetadata('locations', locations));
-    if (!cachedInterests) cachePromises.push(redisManager.metaData.cacheMetadata('interests', interests));
-    if (!cachedAvatars) cachePromises.push(redisManager.metaData.cacheMetadata('avatars', avatars));
+    if (!cachedLocations) cachePromises.push(metadataManager.cacheMetadata('locations', locations));
+    if (!cachedInterests) cachePromises.push(metadataManager.cacheMetadata('interests', interests));
+    if (!cachedAvatars) cachePromises.push(metadataManager.cacheMetadata('avatars', avatars));
     Promise.all(cachePromises).catch(err => logger.error({ err }, "Failed to cache metadata"));
     res.json({
       success: true,
@@ -219,9 +219,9 @@ export const updateProfile = async (req:Request,res:Response,next:NextFunction) 
         allowDiscovery: true
       }
     });
-    await redisManager.userDetail.updateProfileFields(profileId, updateData);
+    await userDetailManager.updateProfileFields(profileId, updateData);
     if (interest || (locationLatitude && locationLongitude)) {
-      await redisManager.match.updateMatchProfile(
+      await matchManager.updateMatchProfile(
         profileId, 
         updatedProfile.locationLatitude, 
         updatedProfile.locationLongitude, 
@@ -243,7 +243,7 @@ export const updateProfile = async (req:Request,res:Response,next:NextFunction) 
 export const getProfile = async (req:Request,res:Response, next:NextFunction) =>{
   try {
     const profileId = req.user!.profile!.id;
-    const cachedProfile = await redisManager.userDetail.getProfile(profileId);
+    const cachedProfile = await userDetailManager.getProfile(profileId);
     
     if (cachedProfile) {
       return res.json({
@@ -271,7 +271,7 @@ export const getProfile = async (req:Request,res:Response, next:NextFunction) =>
         message: "Profile not found. Please complete onboarding." 
       });
     }
-    redisManager.userDetail.cacheProfile(profileId, userProfile).catch(err => {
+    userDetailManager.cacheProfile(profileId, userProfile).catch(err => {
       logger.error({ err, profileId }, "Failed to cache profile");
     });
     res.json({
@@ -323,8 +323,8 @@ export const updatePassword = async (req:Request,res:Response, next:NextFunction
     const traceId = createId();
     logger.info({ traceId, userId }, "FORCE DISCONNECT due to password update");
     await Promise.all([
-      redisManager.auth.invalidateAllUserSessions(userId),
-      redisManager.chat.publish(
+      authManager.invalidateAllUserSessions(userId),
+      chatManager.publish(
         'chat_router',
         JSON.stringify({
           receiverId: profileId,
@@ -338,7 +338,7 @@ export const updatePassword = async (req:Request,res:Response, next:NextFunction
         })
       )
     ]);
-    await redisManager.auth.cacheSession(userId, sessionId, profileId, true);
+    await authManager.cacheSession(userId, sessionId, profileId, true);
     const token = jwt.sign({ 
         id: userId,
         sessionId
@@ -482,8 +482,8 @@ export const deleteConnection = async (req: Request, res: Response, next: NextFu
     });
     const traceId = createId();
     logger.info({ traceId, action: "deleteConnection", connectionId }, "User deleted chat");
-    await redisManager.chat.hideChat(connectionId);
-    await redisManager.chat.publish(
+    await chatManager.hideChat(connectionId);
+    await chatManager.publish(
       'chat_router',
       JSON.stringify({
         receiverId: profileId, 
@@ -754,7 +754,7 @@ export const sendRequest = async (req:Request,res:Response,next:NextFunction) =>
     }
     const traceId = createId();
     logger.info({ traceId, targetUserId, myProfileId }, "Friend request dispatched");
-    await redisManager.notification.setNotificationFlag(
+    await notificationManager.setNotificationFlag(
       targetUserId, 
       NotificationCategory.NEW_FRIEND_REQUEST,
       traceId
@@ -793,7 +793,7 @@ export const cancelRequest = async (req:Request,res:Response,next:NextFunction) 
     await prisma.friendRequest.delete({
       where: { id: requestId }
     });
-    await redisManager.chat.publish(
+    await chatManager.publish(
       'chat_router',
       JSON.stringify({
         receiverId: requestToCancel.receiverId,
@@ -844,7 +844,7 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
     if (action === "REJECT") {
       logger.info({ traceId, action: "rejectRequest", requestId }, "User rejected friend request");
       await prisma.friendRequest.delete({ where: { id: requestId } });
-      await redisManager.chat.publish(
+      await chatManager.publish(
         'chat_router',
         JSON.stringify({
           receiverId: friendRequest.senderId,
@@ -905,13 +905,13 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
       });
       logger.info({ traceId, action: "acceptRequest", requestId }, "User accepted friend request");
       await Promise.all([
-        redisManager.userConnection.setConnectionInfo(
+        userConnectionManager.setConnectionInfo(
           resolvedConnectionId!, 
           user1Id,
           user2Id, 
           ConnectionListType.FRIEND
         ),
-        redisManager.chat.publish(
+        chatManager.publish(
           'chat_router',
           JSON.stringify({
             receiverId: friendRequest.senderId,
@@ -923,7 +923,7 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
             traceId
           })
         ),
-        redisManager.bloom.addPair('bf:matches', user1Id, user2Id)
+        bloomManager.addPair('bf:matches', user1Id, user2Id)
       ])
       return res.status(200).json({
         success: true,
@@ -969,8 +969,8 @@ export const handleUnfriendRequest = async (req:Request,res:Response,next:NextFu
     });
     const traceId = createId();
     logger.info({ traceId, action: "unfriend", connectionId: connection.id }, "User severed connection");
-    await redisManager.userConnection.clearConnectionInfo(connection.id);
-    await redisManager.chat.publish(
+    await userConnectionManager.clearConnectionInfo(connection.id);
+    await chatManager.publish(
       'chat_router',
       JSON.stringify({
         receiverId: targetUserId,
@@ -1027,10 +1027,10 @@ export const deactivateProfile = async (req:Request,res:Response,next:NextFuncti
     const traceId = createId();
     logger.info({ traceId, userId }, "FORCE DISCONNECT due to profile deactivation");
     await Promise.all([
-      redisManager.match.leaveQueue(profileId),
-      redisManager.userDetail.invalidateProfile(profileId),
-      redisManager.auth.invalidateAllUserSessions(userId),
-      redisManager.chat.publish(
+      matchManager.leaveQueue(profileId),
+      userDetailManager.invalidateProfile(profileId),
+      authManager.invalidateAllUserSessions(userId),
+      chatManager.publish(
         'chat_router',
         JSON.stringify({
           receiverId: profileId,

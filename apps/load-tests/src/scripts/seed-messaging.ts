@@ -1,18 +1,18 @@
 import prisma, { ConnectionStatus } from '@matcha/prisma';
-import { RedisManager } from '@matcha/redis';
+import { createRedisClient, RedisClient } from '@matcha/redis';
 import { getDeterministicIds } from '@matcha/shared';
 import { createId } from '@paralleldrive/cuid2';
 
 const REDIS_URL = process.env.REDIS_URL;
 if (!REDIS_URL) throw new Error("Missing Environment variable.");
 
-const redisManager = new RedisManager(REDIS_URL);
+const systemClient: RedisClient = createRedisClient(REDIS_URL, "SYSTEM");
 const TOTAL_USERS = 20000; 
 const PAIR_BATCH_SIZE = 500; 
 
 async function seedMessagingData() {
   console.time('MessagingSeedDuration');
-  await redisManager["redis"].del('artillery:users:queue');
+  await systemClient.del('artillery:users:queue');
   
   for (let i = 0; i < TOTAL_USERS; i += (PAIR_BATCH_SIZE * 2)) {
     const pairsToMake = Math.min(PAIR_BATCH_SIZE, (TOTAL_USERS - i) / 2);
@@ -58,7 +58,7 @@ async function seedMessagingData() {
     await prisma.userProfile.createMany({ data: dbUserProfiles, skipDuplicates: true });
     await prisma.connection.createMany({ data: dbConnections, skipDuplicates: true });
 		await prisma.message.createMany({ data: dbMessages, skipDuplicates: true });
-    await redisManager["redis"].rpush('artillery:users:queue', ...queueBatch);
+    await systemClient.rpush('artillery:users:queue', ...queueBatch);
   }
   console.timeEnd('MessagingSeedDuration');
 }
@@ -70,5 +70,5 @@ seedMessagingData()
   })
   .finally(async () => {
     await prisma.$disconnect();
-    await redisManager.quit(); 
+    await systemClient.quit(); 
   });

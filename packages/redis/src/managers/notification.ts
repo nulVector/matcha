@@ -3,20 +3,20 @@ import { NotificationCategory } from '../common';
 import { EventType } from '@matcha/shared';
 
 export class NotificationManager {
-  constructor(private redis: Redis) {}
+  constructor(private redis: Redis, private pubRedis: Redis) {}
 
   async setNotificationFlag(userId: string, category: NotificationCategory, traceId?: string) {
     const key = `user:notifications:${userId}`;
     const tx = this.redis.multi();
     tx.hset(key, category, "1"); 
+    await tx.exec();
     const publishPayload = JSON.stringify({
       receiverId: userId,
       eventType: EventType.NOTIFICATION_UPDATE,
       eventData: { category },
       traceId
     });
-    tx.publish('chat_router', publishPayload);
-    await tx.exec();
+    await this.pubRedis.publish('chat_router', publishPayload);
   }
   async clearNotificationFlag(userId: string, category: NotificationCategory) {
     const key = `user:notifications:${userId}`;

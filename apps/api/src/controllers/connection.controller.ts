@@ -1,14 +1,14 @@
 import { NextFunction, Request, Response } from "express";
-import { redisManager } from "../services/redis";
 import { ConnectionListType, MatchAction, UserState } from "@matcha/redis";
 import { connectionIdType, requestHandleType } from "@matcha/zod";
 import prisma, { ConnectionStatus } from "@matcha/prisma";
 import { EventType, SystemAction } from "@matcha/shared";
 import { createId } from "@paralleldrive/cuid2";
 import { logger } from "@matcha/logger";
+import { chatManager, matchManager, userConnectionManager, userDetailManager } from "../services/redis";
 
 async function getSafeMatchInfo(connectionId: string) {
-  let matchInfo = await redisManager.match.getMatchInfo(connectionId);
+  let matchInfo = await matchManager.getMatchInfo(connectionId);
   if (matchInfo) return matchInfo;
   const connection = await prisma.connection.findUnique({
     where: { id: connectionId },
@@ -17,7 +17,7 @@ async function getSafeMatchInfo(connectionId: string) {
   if (!connection || connection.status !== ConnectionStatus.MATCHED || !connection.expiresAt) {
     return null;
   }
-  await redisManager.match.setMatchInfo(connectionId,connection.user1Id,connection.user2Id, connection.expiresAt.toISOString());
+  await matchManager.setMatchInfo(connectionId,connection.user1Id,connection.user2Id, connection.expiresAt.toISOString());
   return {
     user1Id: connection.user1Id,
     user2Id: connection.user2Id
@@ -27,7 +27,7 @@ async function getSafeMatchInfo(connectionId: string) {
 export const joinQueue = async (req:Request,res:Response,next:NextFunction) => {
   try {
     const profileId = req.user!.profile!.id;
-    const {queueStatus} = await redisManager.userDetail.getProfileFields(profileId,["queueStatus"]);
+    const {queueStatus} = await userDetailManager.getProfileFields(profileId,["queueStatus"]);
     const currentStatus = queueStatus || UserState.IDLE;
     if(currentStatus !== UserState.IDLE) {
       return res.status(400).json({
@@ -35,7 +35,7 @@ export const joinQueue = async (req:Request,res:Response,next:NextFunction) => {
         message:"You are already in the queue or currently in a match."
       })
     }
-    await redisManager.match.addToQueue(profileId);
+    await matchManager.addToQueue(profileId);
     return res.json({
       success:true,
       message:"Successfully joined the matchmaking queue."
@@ -48,7 +48,7 @@ export const joinQueue = async (req:Request,res:Response,next:NextFunction) => {
 export const leaveQueue = async (req:Request,res:Response,next:NextFunction) => {
   try {
     const profileId = req.user!.profile!.id;
-    await redisManager.match.leaveQueue(profileId, UserState.IDLE);
+    await matchManager.leaveQueue(profileId, UserState.IDLE);
     return res.json({
       success:true,
       message:"Successfully left the matchmaking queue."
@@ -71,7 +71,7 @@ export const extendTimer = async (req:Request,res:Response,next:NextFunction) =>
       })
     }
     if (action === 'REJECT') {
-      await redisManager.match.clearSpecificVote(connectionId, MatchAction.EXTEND);
+      await matchManager.clearSpecificVote(connectionId, MatchAction.EXTEND);
       return res.json({
         success: true,
         message: "Extension declined."
@@ -79,10 +79,10 @@ export const extendTimer = async (req:Request,res:Response,next:NextFunction) =>
     }
     const traceId = createId();
     const receiverId = matchInfo.user1Id === profileId ? matchInfo.user2Id : matchInfo.user1Id;
-    const voteCount = await redisManager.match.recordMatchVotes(connectionId,profileId,MatchAction.EXTEND);
+    const voteCount = await matchManager.recordMatchVotes(connectionId,profileId,MatchAction.EXTEND);
     if (voteCount === 1) {
       logger.info({ traceId, action: "extendTimer", connectionId }, "Processing match extension");
-      await redisManager.chat.publish(
+      await chatManager.publish(
         'chat_router',
         JSON.stringify({
           receiverId,
@@ -108,9 +108,9 @@ export const extendTimer = async (req:Request,res:Response,next:NextFunction) =>
           where: { id:connectionId },
           data:{ expiresAt:newExpiresAt }
         }),
-        redisManager.match.setMatchTimer(connectionId, 60 * 30),
-        redisManager.match.clearSpecificVote(connectionId, MatchAction.EXTEND),
-        redisManager.match.setMatchInfo(connectionId, profileId, receiverId, newExpiresAt.toISOString())
+        matchManager.setMatchTimer(connectionId, 60 * 30),
+        matchManager.clearSpecificVote(connectionId, MatchAction.EXTEND),
+        matchManager.setMatchInfo(connectionId, profileId, receiverId, newExpiresAt.toISOString())
       ]);
       logger.info({ traceId, action: "extendTimer_success", connectionId }, "Match extended");
       const successEvent = {
@@ -123,8 +123,8 @@ export const extendTimer = async (req:Request,res:Response,next:NextFunction) =>
         traceId
       }
       await Promise.all([
-        redisManager.chat.publish('chat_router', JSON.stringify({...successEvent,receiverId})),
-        redisManager.chat.publish('chat_router', JSON.stringify({...successEvent,receiverId:profileId})),
+        chatManager.publish('chat_router', JSON.stringify({...successEvent,receiverId})),
+        chatManager.publish('chat_router', JSON.stringify({...successEvent,receiverId:profileId})),
       ]);
       return res.json({ 
         success: true,
@@ -153,7 +153,7 @@ export const convertConnection = async (req:Request,res:Response,next:NextFuncti
       })
     }
     if (action === 'REJECT') {
-      await redisManager.match.clearSpecificVote(connectionId, MatchAction.CONVERT);
+      await matchManager.clearSpecificVote(connectionId, MatchAction.CONVERT);
       return res.json({
         success: true,
         message: "Friend request declined."
@@ -161,10 +161,10 @@ export const convertConnection = async (req:Request,res:Response,next:NextFuncti
     }
     const traceId = createId();
     const receiverId = matchInfo.user1Id === profileId ? matchInfo.user2Id : matchInfo.user1Id;
-    const voteCount = await redisManager.match.recordMatchVotes(connectionId,profileId,MatchAction.CONVERT);
+    const voteCount = await matchManager.recordMatchVotes(connectionId,profileId,MatchAction.CONVERT);
     if (voteCount === 1){
       logger.info({ traceId, action: "convertConnection", connectionId }, "Friend request dispatched in match");
-      await redisManager.chat.publish(
+      await chatManager.publish(
         'chat_router',
         JSON.stringify({
           receiverId,
@@ -189,10 +189,10 @@ export const convertConnection = async (req:Request,res:Response,next:NextFuncti
         data: { status: ConnectionStatus.FRIEND, expiresAt: null }
       });
       await Promise.all([
-        redisManager.match.clearMatchVotes(connectionId),
-        redisManager.match.clearMatchTimer(connectionId),
-        redisManager.match.clearMatchInfo(connectionId),
-        redisManager.userConnection.setConnectionInfo(connectionId, profileId, receiverId, ConnectionListType.FRIEND)
+        matchManager.clearMatchVotes(connectionId),
+        matchManager.clearMatchTimer(connectionId),
+        matchManager.clearMatchInfo(connectionId),
+        userConnectionManager.setConnectionInfo(connectionId, profileId, receiverId, ConnectionListType.FRIEND)
       ]);
       const successEvent = {
         eventType: EventType.SYSTEM_EVENT,
@@ -203,8 +203,8 @@ export const convertConnection = async (req:Request,res:Response,next:NextFuncti
         traceId
       };
       await Promise.all([
-        redisManager.chat.publish('chat_router', JSON.stringify({ ...successEvent, receiverId: profileId })),
-        redisManager.chat.publish('chat_router', JSON.stringify({ ...successEvent, receiverId}))
+        chatManager.publish('chat_router', JSON.stringify({ ...successEvent, receiverId: profileId })),
+        chatManager.publish('chat_router', JSON.stringify({ ...successEvent, receiverId}))
       ]);
       return res.json({ success: true, message: "You are now friends!" });
     }
@@ -239,14 +239,14 @@ export const skipConnection = async (req:Request,res:Response,next:NextFunction)
       }
     });
     await Promise.all([
-      redisManager.match.clearMatchVotes(connectionId),
-      redisManager.match.clearMatchTimer(connectionId),
-      redisManager.match.clearMatchInfo(connectionId),
-      redisManager.userConnection.setConnectionInfo(connectionId, profileId, receiverId, ConnectionListType.ARCHIVED)
+      matchManager.clearMatchVotes(connectionId),
+      matchManager.clearMatchTimer(connectionId),
+      matchManager.clearMatchInfo(connectionId),
+      userConnectionManager.setConnectionInfo(connectionId, profileId, receiverId, ConnectionListType.ARCHIVED)
     ]);
     const traceId = createId();
     logger.info({ traceId, action: "skipConnection", connectionId, profileId }, "User skipped chat");
-    await redisManager.chat.publish(
+    await chatManager.publish(
       'chat_router',
       JSON.stringify({
         receiverId: receiverId,
@@ -260,8 +260,8 @@ export const skipConnection = async (req:Request,res:Response,next:NextFunction)
       })
     );
     await Promise.all([
-      redisManager.match.addToQueue(profileId),
-      redisManager.match.leaveQueue(receiverId, UserState.IDLE)
+      matchManager.addToQueue(profileId),
+      matchManager.leaveQueue(receiverId, UserState.IDLE)
     ]);
     return res.json({
       success: true,

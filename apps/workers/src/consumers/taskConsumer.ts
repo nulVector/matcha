@@ -1,12 +1,12 @@
 import { JobName, QueueName, TaskQueueJob } from "@matcha/queue";
 import { Job, Worker } from "bullmq";
-import { redisManager, workerConnection } from "../config/redis";
 import { logger } from "@matcha/logger";
 import prisma, { ConnectionStatus } from "@matcha/prisma";
 import { Resend } from "resend";
 import { renderPasswordResetEmail } from "@matcha/emails";
 import { ConnectionListType, UserState } from "@matcha/redis";
 import { EventType, SystemAction } from "@matcha/shared";
+import { bloomManager, chatManager, matchManager, userConnectionManager, workerConnection } from "../config/redis";
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const taskWorker = new Worker(
@@ -23,8 +23,8 @@ export const taskWorker = new Worker(
           interest,
           traceId
         } = task.data;
-        await redisManager.bloom.add('bf:usernames', username);
-        await redisManager.match.updateMatchProfile(
+        await bloomManager.add('bf:usernames', username);
+        await matchManager.updateMatchProfile(
           userId, 
           locationLatitude, 
           locationLongitude, 
@@ -58,7 +58,7 @@ export const taskWorker = new Worker(
       }
       case JobName.HANDLE_DROPPED_MATCH:{
         const { userId, connectionId, partnerId, traceId } = task.data;
-        const socketCount = await redisManager.userConnection.countSockets(userId);
+        const socketCount = await userConnectionManager.countSockets(userId);
         if (socketCount > 0) {
           logger.info({ userId, connectionId }, "User reconnected during grace period. Aborting match drop.");
           break; 
@@ -78,14 +78,14 @@ export const taskWorker = new Worker(
           }
         });
         await Promise.all([
-          redisManager.match.clearMatchVotes(connectionId),
-          redisManager.match.clearMatchTimer(connectionId),
-          redisManager.match.clearMatchInfo(connectionId),
-          redisManager.userConnection.setConnectionInfo(connectionId, userId, partnerId, ConnectionListType.ARCHIVED),
-          redisManager.match.leaveQueue(userId, UserState.IDLE),
-          redisManager.match.leaveQueue(partnerId, UserState.IDLE),
+          matchManager.clearMatchVotes(connectionId),
+          matchManager.clearMatchTimer(connectionId),
+          matchManager.clearMatchInfo(connectionId),
+          userConnectionManager.setConnectionInfo(connectionId, userId, partnerId, ConnectionListType.ARCHIVED),
+          matchManager.leaveQueue(userId, UserState.IDLE),
+          matchManager.leaveQueue(partnerId, UserState.IDLE),
         ]);
-        await redisManager.chat.publish(
+        await chatManager.publish(
           'chat_router',
           JSON.stringify({
             receiverId: partnerId,
