@@ -7,9 +7,8 @@ import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { COOKIE_OPTIONS } from '../constant/cookie';
 import { USERNAME_VIBES } from '../constant/usernameList';
-import { logger } from '@matcha/logger';
+import { logger, traceStorage } from '@matcha/logger';
 import { getDeterministicIds, EventType, SystemAction } from '@matcha/shared';
-import { createId } from '@paralleldrive/cuid2';
 import { authManager, bloomManager, chatManager, matchManager, metadataManager, notificationManager, userConnectionManager, userDetailManager } from '../services/redis';
 
 type LocationMetadata = { id: string; name: string; latitude: number; longitude: number };
@@ -116,8 +115,8 @@ export const initiateProfile = async (req:Request, res:Response,next:NextFunctio
       isActive: true,
       allowDiscovery
     });
-    const traceId = createId();
-    logger.info({ traceId, userId }, "Dispatching profile init task to queue");
+    const traceId = traceStorage.getStore()?.traceId;
+    logger.info({ userId }, "Dispatching profile init task to queue");
     await TaskProducer.dispatchProfileInit({
       userId: userProfile.id,
       username: userProfile.username,
@@ -320,8 +319,8 @@ export const updatePassword = async (req:Request,res:Response, next:NextFunction
       where:{ id:userId },
       data:{ password:hashedPassword }
     })
-    const traceId = createId();
-    logger.info({ traceId, userId }, "FORCE DISCONNECT due to password update");
+    const traceId = traceStorage.getStore()?.traceId;
+    logger.info({ userId }, "FORCE DISCONNECT due to password update");
     await Promise.all([
       authManager.invalidateAllUserSessions(userId),
       chatManager.publish(
@@ -480,8 +479,8 @@ export const deleteConnection = async (req: Request, res: Response, next: NextFu
         ? { user1ChatVisible: false, user1HistoryClearedAt: now } 
         : { user2ChatVisible: false, user2HistoryClearedAt: now }
     });
-    const traceId = createId();
-    logger.info({ traceId, action: "deleteConnection", connectionId }, "User deleted chat");
+    const traceId = traceStorage.getStore()?.traceId;
+    logger.info({ action: "deleteConnection", connectionId }, "User deleted chat");
     await chatManager.hideChat(connectionId);
     await chatManager.publish(
       'chat_router',
@@ -752,8 +751,8 @@ export const sendRequest = async (req:Request,res:Response,next:NextFunction) =>
           : "This user has already sent you a request! Check your inbox." 
       });
     }
-    const traceId = createId();
-    logger.info({ traceId, targetUserId, myProfileId }, "Friend request dispatched");
+    const traceId = traceStorage.getStore()?.traceId;
+    logger.info({ targetUserId, myProfileId }, "Friend request dispatched");
     await notificationManager.setNotificationFlag(
       targetUserId, 
       NotificationCategory.NEW_FRIEND_REQUEST,
@@ -788,8 +787,8 @@ export const cancelRequest = async (req:Request,res:Response,next:NextFunction) 
       });
       return;
     }
-    const traceId = createId();
-    logger.info({ traceId, action: "cancelRequest", requestId }, "User cancelled friend request");
+    const traceId = traceStorage.getStore()?.traceId;
+    logger.info({ action: "cancelRequest", requestId }, "User cancelled friend request");
     await prisma.friendRequest.delete({
       where: { id: requestId }
     });
@@ -840,9 +839,9 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
     if (!friendRequest) {
       return res.status(404).json({ message: "Request not found or already processed." });
     }
-    const traceId = createId();
+    const traceId = traceStorage.getStore()?.traceId;
     if (action === "REJECT") {
-      logger.info({ traceId, action: "rejectRequest", requestId }, "User rejected friend request");
+      logger.info({ action: "rejectRequest", requestId }, "User rejected friend request");
       await prisma.friendRequest.delete({ where: { id: requestId } });
       await chatManager.publish(
         'chat_router',
@@ -903,7 +902,7 @@ export const handleRequest = async (req:Request,res:Response,next:NextFunction) 
           }
         }
       });
-      logger.info({ traceId, action: "acceptRequest", requestId }, "User accepted friend request");
+      logger.info({ action: "acceptRequest", requestId }, "User accepted friend request");
       await Promise.all([
         userConnectionManager.setConnectionInfo(
           resolvedConnectionId!, 
@@ -967,8 +966,8 @@ export const handleUnfriendRequest = async (req:Request,res:Response,next:NextFu
         user2ChatVisible: false
       }
     });
-    const traceId = createId();
-    logger.info({ traceId, action: "unfriend", connectionId: connection.id }, "User severed connection");
+    const traceId = traceStorage.getStore()?.traceId;
+    logger.info({ action: "unfriend", connectionId: connection.id }, "User severed connection");
     await userConnectionManager.clearConnectionInfo(connection.id);
     await chatManager.publish(
       'chat_router',
@@ -1024,8 +1023,8 @@ export const deactivateProfile = async (req:Request,res:Response,next:NextFuncti
         }
       }
     })
-    const traceId = createId();
-    logger.info({ traceId, userId }, "FORCE DISCONNECT due to profile deactivation");
+    const traceId = traceStorage.getStore()?.traceId;
+    logger.info({ userId }, "FORCE DISCONNECT due to profile deactivation");
     await Promise.all([
       matchManager.leaveQueue(profileId),
       userDetailManager.invalidateProfile(profileId),

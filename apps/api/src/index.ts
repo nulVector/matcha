@@ -12,6 +12,7 @@ import { serverAdapter, adminAuth } from "./config/bullboard";
 import { checkHealth } from "./controllers/health.controller";
 import prisma from "@matcha/prisma";
 import { bloomManager, closeRedisConnections, matchManager } from "./services/redis";
+import { traceMiddleware } from "./middleware/trace";
 
 const app = express();
 const PORT = Number(process.env.API_PORT) || 3001;
@@ -27,6 +28,7 @@ app.use(helmet({
 }));
 app.use(cookieParser());
 app.use(express.json());
+app.use(traceMiddleware);
 
 const allowedOrigins = process.env.CLIENT_URL 
   ? process.env.CLIENT_URL.split(',').map(url => url.trim())
@@ -45,6 +47,21 @@ app.use(cors({
 
 app.use(pinoHttp({
   logger,
+  serializers: {
+    req: (req) => ({
+      method: req.method,
+      url: req.url,
+      remoteAddress: req.remoteAddress,
+      headers: {
+        'user-agent': req.headers['user-agent'],
+        'origin': req.headers['origin'],
+        'referer': req.headers['referer']
+      }
+    }),
+    res: (res) => ({
+      statusCode: res.statusCode,
+    })
+  },
   autoLogging: process.env.ARTILLERY_TEST === 'true' ? false : {
     ignore: (req) => req.url === '/health'
   }

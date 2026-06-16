@@ -24,6 +24,7 @@ api.interceptors.request.use((config) => {
       }
     }
     config.headers['x-device-id'] = cachedDeviceId;
+    config.headers['x-trace-id'] = crypto.randomUUID();
   }
   return config;
 });

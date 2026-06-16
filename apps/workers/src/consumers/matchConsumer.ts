@@ -1,6 +1,6 @@
 import prisma, { ConnectionStatus } from "@matcha/prisma";
 import { UserState } from "@matcha/redis";
-import { logger } from "@matcha/logger";
+import { logger, traceStorage } from "@matcha/logger";
 import { EventType, getDeterministicIds } from "@matcha/shared";
 import { createId } from "@paralleldrive/cuid2";
 import { bloomManager, chatManager, matchManager } from "../config/redis";
@@ -74,49 +74,50 @@ async function runLoop() {
             const locked = await matchManager.lockMatch(searcherId, candidate.id);
             if (locked) {
               const traceId = createId()
-              try {
-                const expiresAt = new Date(Date.now() + MATCH_EXPIRY_MS);
-                const [u1, u2] = getDeterministicIds(searcherId, candidate.id);
-                logger.info({ traceId, searcherId, candidateId: candidate.id }, "Match locked, publishing to clients");
-                const newConnection = await prisma.connection.create({
-                  data: {
-                    user1Id: u1,
-                    user2Id: u2,
-                    status: ConnectionStatus.MATCHED,
-                    expiresAt: expiresAt,
+              await traceStorage.run({ traceId }, async () => {
+                try {
+                  const expiresAt = new Date(Date.now() + MATCH_EXPIRY_MS);
+                  const [u1, u2] = getDeterministicIds(searcherId, candidate.id);
+                  logger.info({ searcherId, candidateId: candidate.id }, "Match locked, publishing to clients");
+                  const newConnection = await prisma.connection.create({
+                    data: {
+                      user1Id: u1,
+                      user2Id: u2,
+                      status: ConnectionStatus.MATCHED,
+                      expiresAt: expiresAt,
+                    }
+                  });
+                  const baseEventData = {
+                    connectionId: newConnection.id,
+                    expiresAt: expiresAt.toISOString(),
+                  };
+                  await Promise.all([
+                    matchManager.setMatchInfo(newConnection.id, searcherId, candidate.id, expiresAt.toISOString()),
+                    bloomManager.addPair('bf:matches', searcherId, candidate.id),
+                    chatManager.publish('chat_router', JSON.stringify({ 
+                      receiverId: searcherId, 
+                      eventType: EventType.MATCH_FOUND, 
+                      eventData: { ...baseEventData, matchedUserId: candidate.id },
+                      traceId
+                    })),
+                    chatManager.publish('chat_router', JSON.stringify({ 
+                      receiverId: candidate.id, 
+                      eventType: EventType.MATCH_FOUND, 
+                      eventData: { ...baseEventData, matchedUserId: searcherId },
+                      traceId
+                    }))
+                  ]);
+                } catch (dbError: any) {
+                  if (dbError.code === 'P2002') {
+                    logger.info({ searcherId, candidateId: candidate.id }, "Concurrent match detected. Skipping.");
+                    return;
                   }
-                });
-                const baseEventData = {
-                  connectionId: newConnection.id,
-                  expiresAt: expiresAt.toISOString(),
-                };
-                await Promise.all([
-                  matchManager.setMatchInfo(newConnection.id, searcherId, candidate.id, expiresAt.toISOString()),
-                  bloomManager.addPair('bf:matches', searcherId, candidate.id),
-                  chatManager.publish('chat_router', JSON.stringify({ 
-                    receiverId: searcherId, 
-                    eventType: EventType.MATCH_FOUND, 
-                    eventData: { ...baseEventData, matchedUserId: candidate.id },
-                    traceId
-                  })),
-                  chatManager.publish('chat_router', JSON.stringify({ 
-                    receiverId: candidate.id, 
-                    eventType: EventType.MATCH_FOUND, 
-                    eventData: { ...baseEventData, matchedUserId: searcherId },
-                    traceId
-                  }))
-                ]);
-                break;
-              } catch (dbError: any) {
-                if (dbError.code === 'P2002') {
-                  logger.info({ traceId, searcherId, candidateId: candidate.id }, "Concurrent match detected. Skipping.");
-                  break; 
+                  logger.error({ err: dbError, searcherId, candidateId: candidate.id }, "Postgres failed after Redis lock. Reverting.");
+                  await matchManager.addToQueue(searcherId);
+                  await matchManager.addToQueue(candidate.id);
                 }
-                logger.error({ traceId, err: dbError, searcherId, candidateId: candidate.id }, "Postgres failed after Redis lock. Reverting.");
-                await matchManager.addToQueue(searcherId);
-                await matchManager.addToQueue(candidate.id);
-                break;
-              }
+              });
+              break; 
             }
           }
         }));

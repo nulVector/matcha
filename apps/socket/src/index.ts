@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 import prisma, { ConnectionStatus } from '@matcha/prisma';
 import { WebSocket, WebSocketServer } from 'ws';
 import { createId } from '@paralleldrive/cuid2';
-import { logger } from '@matcha/logger';
+import { logger, traceStorage } from '@matcha/logger';
 import { JwtPayload, UserSession, EventType, SystemAction, CachedMessage, MessageType } from "@matcha/shared"
 import { socketMessageSchema } from '@matcha/zod';
 import { authManager, chatManager, closeRedisConnections, matchManager, subClient, userConnectionManager, userDetailManager } from './services/redis';
@@ -83,60 +83,67 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
   authWs.exp = jwtPayload.exp;
   if (!localSockets.has(profileId)) localSockets.set(profileId, new Set());
   localSockets.get(profileId)!.add(authWs);
-  try {
-    await userConnectionManager.mapSocket(profileId,socketId);
-    const profileData = await userDetailManager.getProfileFields(profileId, ["queueStatus"]);
-    if (profileData.queueStatus === UserState.MATCHED) {
-      const activeConnection = await prisma.connection.findFirst({
-        where: {
-          status: "MATCHED",
-          OR: [{ user1Id: profileId }, { user2Id: profileId }]
-        },
-        select: { id: true, user1Id: true, user2Id: true }
-      });
-      if (activeConnection) {
-        const partnerId = activeConnection.user1Id === profileId ? activeConnection.user2Id : activeConnection.user1Id;
-        const traceId = createId();
-        logger.info({ traceId, profileId, connectionId: activeConnection.id }, "User reconnected during match");
-        await chatManager.publish(
-          'chat_router',
-          JSON.stringify({
-            receiverId: partnerId,
-            eventType: EventType.SYSTEM_EVENT,
-            eventData: { 
-              event: SystemAction.PARTNER_ONLINE, 
-              connectionId: activeConnection.id 
-            },
-            traceId
-          })
-        );
-      }
-    }
-  } catch (err: any) {
-    logger.error({ err, profileId }, "Failed to initialize connection");
-    ws.close();
-    return;
-  }
-  authWs.on('pong', async () => {
-    authWs.isAlive = true;
-    const currentTime = Math.floor(Date.now() / 1000);
-    if (currentTime > authWs.exp) {
-      logger.warn({ profileId }, "Token expired. Forcing disconnect.");
-      return authWs.close(4001, "Token Expired");
-    }
+  const connectionTraceId = createId();
+  await traceStorage.run({ traceId: connectionTraceId }, async () => {
     try {
-      const isValidSession = await userConnectionManager.validateAndUpdatePresence(
-        authWs.userId, 
-        authWs.sessionId,
-        profileId
-      );
-      if (!isValidSession) {
-        logger.warn({profileId},"Session revoked. Forcing disconnect.")
-        return authWs.close(4001, "Session Revoked");  
+      await userConnectionManager.mapSocket(profileId,socketId);
+      const profileData = await userDetailManager.getProfileFields(profileId, ["queueStatus"]);
+      if (profileData.queueStatus === UserState.MATCHED) {
+        const activeConnection = await prisma.connection.findFirst({
+          where: {
+            status: "MATCHED",
+            OR: [{ user1Id: profileId }, { user2Id: profileId }]
+          },
+          select: { id: true, user1Id: true, user2Id: true }
+        });
+        if (activeConnection) {
+          const partnerId = activeConnection.user1Id === profileId 
+          ? activeConnection.user2Id 
+          : activeConnection.user1Id;
+          logger.info({ profileId, connectionId: activeConnection.id }, "User reconnected during match");
+          await chatManager.publish(
+            'chat_router',
+            JSON.stringify({
+              receiverId: partnerId,
+              eventType: EventType.SYSTEM_EVENT,
+              eventData: { 
+                event: SystemAction.PARTNER_ONLINE, 
+                connectionId: activeConnection.id 
+              },
+              traceId: connectionTraceId
+            })
+          );
+        }
       }
     } catch (err: any) {
-      logger.error({ err, profileId }, "Heartbeat update failed/validation failed");
+      logger.error({ err, profileId }, "Failed to initialize connection");
+      ws.close();
+      return;
     }
+  });
+  authWs.on('pong', async () => {
+    const heartbeatTraceId = `heartbeat-${profileId}-${createId()}`;
+    await traceStorage.run({ traceId: heartbeatTraceId }, async () => {
+      authWs.isAlive = true;
+      const currentTime = Math.floor(Date.now() / 1000);
+      if (currentTime > authWs.exp) {
+        logger.warn({ profileId }, "Token expired. Forcing disconnect.");
+        return authWs.close(4001, "Token Expired");
+      }
+      try {
+        const isValidSession = await userConnectionManager.validateAndUpdatePresence(
+          authWs.userId, 
+          authWs.sessionId,
+          profileId
+        );
+        if (!isValidSession) {
+          logger.warn({profileId},"Session revoked. Forcing disconnect.")
+          return authWs.close(4001, "Session Revoked");  
+        }
+      } catch (err: any) {
+        logger.error({ err, profileId }, "Heartbeat update failed/validation failed");
+      }
+    });
   });
   authWs.on('message', async (rawMessage: Buffer) => {
     const isRateLimited = await authManager.checkRateLimit(`ws:msg:${socketId}`, 100, 5);
@@ -160,179 +167,183 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
       return;
     }
     const parsedData = validation.data;
-    const traceId = parsedData.traceId || 'no-trace-id';
+    const traceId = parsedData.traceId || createId();
 
-    try {
-      logger.info({ profileId, traceId, type: parsedData.type }, "Received WS message");
-      switch (parsedData.type) {
-        case EventType.SEND_MESSAGE: {
-          const { connectionId, receiverId, content } = parsedData.payload;
-          const [matchInfo, connInfo] = await Promise.all([
-            matchManager.getMatchInfo(connectionId),
-            userConnectionManager.getConnectionInfo(connectionId)
-          ]);
-          if (connInfo?.status === ConnectionListType.ARCHIVED) {
-            logger.warn({ profileId, connectionId }, "Attempted to send message to an archived chat");
-            return;
-          }
-          if (!matchInfo && !connInfo) {
-            logger.warn({ profileId, connectionId }, "Attempted to send message to an unknown chat");
-            return;
-          }
-          const message: CachedMessage = {
-            id: createId(),
-            connectionId,
-            content,
-            senderId: profileId,
-            createdAt: new Date().toISOString(),
-            type: MessageType.TEXT,
-            traceId
-          };
-          const wasHidden = await chatManager.checkAndUnhideChat(connectionId);
-          if (wasHidden){
-            await prisma.connection.update({
-              where:{
-                id:connectionId
-              }, data: {
-                user1ChatVisible: true,
-                user2ChatVisible: true,
-                updatedAt: new Date()
-              }
-            })
-          }
-          await chatManager.processNewMessage(
-            connectionId, 
-            receiverId, 
-            message, 
-            EventType.NEW_MESSAGE,
-            traceId
-          );
-          await chatManager.publish(
-            'chat_router',
-            JSON.stringify({
-              receiverId: profileId, 
-              eventType: EventType.NEW_MESSAGE,
-              eventData: message,
+    await traceStorage.run({ traceId }, async () => {
+      try {
+        logger.info({ profileId, type: parsedData.type }, "Received WS message");
+        switch (parsedData.type) {
+          case EventType.SEND_MESSAGE: {
+            const { connectionId, receiverId, content } = parsedData.payload;
+            const [matchInfo, connInfo] = await Promise.all([
+              matchManager.getMatchInfo(connectionId),
+              userConnectionManager.getConnectionInfo(connectionId)
+            ]);
+            if (connInfo?.status === ConnectionListType.ARCHIVED) {
+              logger.warn({ profileId, connectionId }, "Attempted to send message to an archived chat");
+              return;
+            }
+            if (!matchInfo && !connInfo) {
+              logger.warn({ profileId, connectionId }, "Attempted to send message to an unknown chat");
+              return;
+            }
+            const message: CachedMessage = {
+              id: createId(),
+              connectionId,
+              content,
+              senderId: profileId,
+              createdAt: new Date().toISOString(),
+              type: MessageType.TEXT,
               traceId
-            })
-          );
-          break;
-        }
-        case EventType.START_TYPING: {
-          const { connectionId, receiverId} = parsedData.payload;
-          await chatManager.publish(
-            'chat_router',
-            JSON.stringify({
-              receiverId,
-              eventType:EventType.USER_TYPING,
-              eventData:{
-                senderId:profileId,
-                connectionId
-              },
+            };
+            const wasHidden = await chatManager.checkAndUnhideChat(connectionId);
+            if (wasHidden){
+              await prisma.connection.update({
+                where:{
+                  id:connectionId
+                }, data: {
+                  user1ChatVisible: true,
+                  user2ChatVisible: true,
+                  updatedAt: new Date()
+                }
+              })
+            }
+            await chatManager.processNewMessage(
+              connectionId, 
+              receiverId, 
+              message, 
+              EventType.NEW_MESSAGE,
               traceId
-            })
-          )
-          break;
-        }
-        case EventType.STOP_TYPING: {
-          const { connectionId, receiverId } = parsedData.payload;
-          await chatManager.publish(
-            'chat_router',
-            JSON.stringify({
-              receiverId,
-              eventType: EventType.USER_STOPPED_TYPING,
-              eventData: {
-                senderId: profileId,
-                connectionId
-              },
-              traceId
-            })
-          );
-          break;
-        }
-        case EventType.VIEW_CHAT: {
-          const { connectionId, receiverId, lastMessageId } = parsedData.payload;
-          await Promise.all([
-            chatManager.setActiveChat(profileId,connectionId),
-            chatManager.resetUnread(profileId,connectionId)
-          ])
-          if (lastMessageId) {
-            await chatManager.bufferReadReceipt(connectionId, profileId, lastMessageId, traceId);
-          }
-          await chatManager.publish(
-            'chat_router',
-            JSON.stringify({
-              receiverId,
-              eventType:EventType.MESSAGE_READ,
-              eventData: { connectionId },
-              traceId
-            })
-          )
-          break;
-        }
-        case EventType.LEAVE_CHAT: {
-          await chatManager.removeActiveChat(profileId);
-          break;
-        }
-        default:
-          break;
-      }
-    } catch (err: any) {
-      logger.error({ err, profileId, traceId }, "Error processing message");
-    }
-  });
-  authWs.on('close', async () => {
-    try {
-      const userTabs = localSockets.get(profileId);
-      if (userTabs) {
-        userTabs.delete(authWs);
-        if (userTabs.size === 0) localSockets.delete(profileId);
-      }
-      const activeChat = await chatManager.getActiveChat(profileId);
-      if (activeChat) {
-        await chatManager.removeActiveChat(profileId);
-      }
-      const count = await userConnectionManager.removeSocket(socketId);
-      if (count === 0) {
-        const profile = await userDetailManager.getProfileFields(profileId, ["queueStatus"]);
-        if (profile.queueStatus === UserState.MATCHED) {
-          const activeConnection = await prisma.connection.findFirst({
-            where: {
-              status: ConnectionStatus.MATCHED,
-              OR: [{ user1Id: profileId }, { user2Id: profileId }]
-            },
-            select: { id: true, user1Id: true, user2Id: true }
-          });
-          if (activeConnection) {
-            const partnerId = activeConnection.user1Id === profileId ? activeConnection.user2Id : activeConnection.user1Id;
-            const traceId = createId();
-            logger.info({ traceId, profileId, connectionId: activeConnection.id }, "User disconnected during match grace period");
+            );
             await chatManager.publish(
               'chat_router',
               JSON.stringify({
-                receiverId: partnerId,
-                eventType: EventType.SYSTEM_EVENT,
-                eventData: { 
-                  event: SystemAction.PARTNER_OFFLINE, 
-                  connectionId: activeConnection.id 
+                receiverId: profileId, 
+                eventType: EventType.NEW_MESSAGE,
+                eventData: message,
+                traceId
+              })
+            );
+            break;
+          }
+          case EventType.START_TYPING: {
+            const { connectionId, receiverId} = parsedData.payload;
+            await chatManager.publish(
+              'chat_router',
+              JSON.stringify({
+                receiverId,
+                eventType:EventType.USER_TYPING,
+                eventData:{
+                  senderId:profileId,
+                  connectionId
+                },
+                traceId
+              })
+            )
+            break;
+          }
+          case EventType.STOP_TYPING: {
+            const { connectionId, receiverId } = parsedData.payload;
+            await chatManager.publish(
+              'chat_router',
+              JSON.stringify({
+                receiverId,
+                eventType: EventType.USER_STOPPED_TYPING,
+                eventData: {
+                  senderId: profileId,
+                  connectionId
                 },
                 traceId
               })
             );
-            await TaskProducer.dispatchHandleDroppedMatch({
-              userId: profileId,
-              connectionId: activeConnection.id,
-              partnerId,
-              traceId
-            });
+            break;
           }
-        } else {
-          await matchManager.leaveQueue(profileId, UserState.IDLE);
+          case EventType.VIEW_CHAT: {
+            const { connectionId, receiverId, lastMessageId } = parsedData.payload;
+            await Promise.all([
+              chatManager.setActiveChat(profileId,connectionId),
+              chatManager.resetUnread(profileId,connectionId)
+            ])
+            if (lastMessageId) {
+              await chatManager.bufferReadReceipt(connectionId, profileId, lastMessageId, traceId);
+            }
+            await chatManager.publish(
+              'chat_router',
+              JSON.stringify({
+                receiverId,
+                eventType:EventType.MESSAGE_READ,
+                eventData: { connectionId },
+                traceId
+              })
+            )
+            break;
+          }
+          case EventType.LEAVE_CHAT: {
+            await chatManager.removeActiveChat(profileId);
+            break;
+          }
+          default:
+            break;
         }
+      } catch (err: any) {
+        logger.error({ err, profileId }, "Error processing message");
       }
-    } catch (err: any) {
-      logger.error({ err, profileId }, "Error cleaning up socket");
-    }
+    });
+  });
+  authWs.on('close', async () => {
+    const disconnectTraceId = createId();
+    await traceStorage.run({ traceId: disconnectTraceId }, async () => {
+      try {
+        const userTabs = localSockets.get(profileId);
+        if (userTabs) {
+          userTabs.delete(authWs);
+          if (userTabs.size === 0) localSockets.delete(profileId);
+        }
+        const activeChat = await chatManager.getActiveChat(profileId);
+        if (activeChat) {
+          await chatManager.removeActiveChat(profileId);
+        }
+        const count = await userConnectionManager.removeSocket(socketId);
+        if (count === 0) {
+          const profile = await userDetailManager.getProfileFields(profileId, ["queueStatus"]);
+          if (profile.queueStatus === UserState.MATCHED) {
+            const activeConnection = await prisma.connection.findFirst({
+              where: {
+                status: ConnectionStatus.MATCHED,
+                OR: [{ user1Id: profileId }, { user2Id: profileId }]
+              },
+              select: { id: true, user1Id: true, user2Id: true }
+            });
+            if (activeConnection) {
+              const partnerId = activeConnection.user1Id === profileId ? activeConnection.user2Id : activeConnection.user1Id;
+              logger.info({ profileId, connectionId: activeConnection.id }, "User disconnected during match grace period");
+              await chatManager.publish(
+                'chat_router',
+                JSON.stringify({
+                  receiverId: partnerId,
+                  eventType: EventType.SYSTEM_EVENT,
+                  eventData: { 
+                    event: SystemAction.PARTNER_OFFLINE, 
+                    connectionId: activeConnection.id 
+                  },
+                  traceId: disconnectTraceId
+                })
+              );
+              await TaskProducer.dispatchHandleDroppedMatch({
+                userId: profileId,
+                connectionId: activeConnection.id,
+                partnerId,
+                traceId: disconnectTraceId
+              });
+            }
+          } else {
+            await matchManager.leaveQueue(profileId, UserState.IDLE);
+          }
+        }
+      } catch (err: any) {
+        logger.error({ err, profileId }, "Error cleaning up socket");
+      }
+    });
   });
 });
 
@@ -343,28 +354,30 @@ async function bootstrap(){
     if (channel === 'chat_router') {
       try {
         const { receiverId, eventData, eventType, traceId } = JSON.parse(payload);
-        const receiverSockets = localSockets.get(receiverId);
-        if (receiverSockets) {
-          if (eventType === EventType.FORCE_DISCONNECT){
-            receiverSockets.forEach(ws => {
-              const authWs = ws as AuthenticatedWebSocket;
-              if (eventData.exceptSessionId && authWs.sessionId === eventData.exceptSessionId) {
-                return;
-              }
-              if (eventData.killAll || authWs.sessionId === eventData.sessionId) {
-                authWs.close(4001, eventData.reason || "Session Revoked");
-              }
+        traceStorage.run({ traceId: traceId || createId() }, () => {
+          const receiverSockets = localSockets.get(receiverId);
+          if (receiverSockets) {
+            if (eventType === EventType.FORCE_DISCONNECT){
+              receiverSockets.forEach(ws => {
+                const authWs = ws as AuthenticatedWebSocket;
+                if (eventData.exceptSessionId && authWs.sessionId === eventData.exceptSessionId) {
+                  return;
+                }
+                if (eventData.killAll || authWs.sessionId === eventData.sessionId) {
+                  authWs.close(4001, eventData.reason || "Session Revoked");
+                }
+              });
+              return;
+            }
+            const outGoingPayload = JSON.stringify({
+              type: eventType,
+              payload: eventData,
+              traceId
             });
-            return;
+            logger.info({ receiverId, type: eventType }, "Routing message to client");
+            receiverSockets.forEach(authWs => authWs.send(outGoingPayload));
           }
-          const outGoingPayload = JSON.stringify({
-            type: eventType,
-            payload: eventData,
-            traceId
-          });
-          logger.info({ receiverId, traceId, type: eventType }, "Routing message to client");
-          receiverSockets.forEach(authWs => authWs.send(outGoingPayload));
-        }
+        });
       } catch (err: any) {
         logger.error({ err }, "Failed to parse Redis router message");
       }

@@ -3,8 +3,7 @@ import { ConnectionListType, MatchAction, UserState } from "@matcha/redis";
 import { connectionIdType, requestHandleType } from "@matcha/zod";
 import prisma, { ConnectionStatus } from "@matcha/prisma";
 import { EventType, SystemAction } from "@matcha/shared";
-import { createId } from "@paralleldrive/cuid2";
-import { logger } from "@matcha/logger";
+import { logger, traceStorage } from "@matcha/logger";
 import { chatManager, matchManager, userConnectionManager, userDetailManager } from "../services/redis";
 
 async function getSafeMatchInfo(connectionId: string) {
@@ -77,11 +76,11 @@ export const extendTimer = async (req:Request,res:Response,next:NextFunction) =>
         message: "Extension declined."
       });
     }
-    const traceId = createId();
+    const traceId = traceStorage.getStore()?.traceId;
     const receiverId = matchInfo.user1Id === profileId ? matchInfo.user2Id : matchInfo.user1Id;
     const voteCount = await matchManager.recordMatchVotes(connectionId,profileId,MatchAction.EXTEND);
     if (voteCount === 1) {
-      logger.info({ traceId, action: "extendTimer", connectionId }, "Processing match extension");
+      logger.info({ action: "extendTimer", connectionId }, "Processing match extension");
       await chatManager.publish(
         'chat_router',
         JSON.stringify({
@@ -112,7 +111,7 @@ export const extendTimer = async (req:Request,res:Response,next:NextFunction) =>
         matchManager.clearSpecificVote(connectionId, MatchAction.EXTEND),
         matchManager.setMatchInfo(connectionId, profileId, receiverId, newExpiresAt.toISOString())
       ]);
-      logger.info({ traceId, action: "extendTimer_success", connectionId }, "Match extended");
+      logger.info({ action: "extendTimer_success", connectionId }, "Match extended");
       const successEvent = {
         eventType: EventType.SYSTEM_EVENT,
         eventData:{
@@ -159,11 +158,11 @@ export const convertConnection = async (req:Request,res:Response,next:NextFuncti
         message: "Friend request declined."
       });
     }
-    const traceId = createId();
+    const traceId = traceStorage.getStore()?.traceId;
     const receiverId = matchInfo.user1Id === profileId ? matchInfo.user2Id : matchInfo.user1Id;
     const voteCount = await matchManager.recordMatchVotes(connectionId,profileId,MatchAction.CONVERT);
     if (voteCount === 1){
-      logger.info({ traceId, action: "convertConnection", connectionId }, "Friend request dispatched in match");
+      logger.info({ action: "convertConnection", connectionId }, "Friend request dispatched in match");
       await chatManager.publish(
         'chat_router',
         JSON.stringify({
@@ -183,7 +182,7 @@ export const convertConnection = async (req:Request,res:Response,next:NextFuncti
       })
     }
     if (voteCount === 2){
-      logger.info({ traceId, action: "convertConnection_success", connectionId }, "Match converted to friend");
+      logger.info({ action: "convertConnection_success", connectionId }, "Match converted to friend");
       await prisma.connection.update({
         where: { id: connectionId },
         data: { status: ConnectionStatus.FRIEND, expiresAt: null }
@@ -244,8 +243,8 @@ export const skipConnection = async (req:Request,res:Response,next:NextFunction)
       matchManager.clearMatchInfo(connectionId),
       userConnectionManager.setConnectionInfo(connectionId, profileId, receiverId, ConnectionListType.ARCHIVED)
     ]);
-    const traceId = createId();
-    logger.info({ traceId, action: "skipConnection", connectionId, profileId }, "User skipped chat");
+    const traceId = traceStorage.getStore()?.traceId;
+    logger.info({ action: "skipConnection", connectionId, profileId }, "User skipped chat");
     await chatManager.publish(
       'chat_router',
       JSON.stringify({

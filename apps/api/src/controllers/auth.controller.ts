@@ -9,7 +9,7 @@ import { COOKIE_OPTIONS } from "../constant/cookie";
 import { createId } from '@paralleldrive/cuid2';
 import { EventType} from "@matcha/shared";
 import { TaskProducer } from "@matcha/queue";
-import { logger } from "@matcha/logger";
+import { logger, traceStorage } from "@matcha/logger";
 import { authManager, chatManager } from "../services/redis";
 
 const jwtSecret = process.env.JWT_SECRET;
@@ -103,8 +103,8 @@ export const requestResetPassword = async (req:Request,res:Response,next:NextFun
       await authManager.setResetToken(resetToken, user.id);
       const frontendUrl = process.env.CLIENT_URL || 'http://localhost:3000';
       const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
-      const traceId = createId();
-      logger.info({ traceId, email }, "Dispatching password reset email to queue");
+      const traceId = traceStorage.getStore()?.traceId;
+      logger.info({ email }, "Dispatching password reset email to queue");
       await TaskProducer.dispatchSendEmail({
         to:email,
         subject: "Reset your password",
@@ -141,8 +141,8 @@ export const confirmResetPassword = async (req: Request, res: Response,next:Next
       authManager.invalidateAllUserSessions(userId)
     ];
     if (updatedUser.profile) {
-      const traceId = createId();
-      logger.info({ traceId, userId }, "FORCE DISCONNECT after password reset");
+      const traceId = traceStorage.getStore()?.traceId;
+      logger.info({ userId }, "FORCE DISCONNECT after password reset");
       killPromises.push(
         chatManager.publish(
           'chat_router',
@@ -173,8 +173,8 @@ export const logout = async (req:Request,res:Response,next:NextFunction)=>{
     const sessionId = req.user!.sessionId!;
     await authManager.invalidateSession(userId, sessionId);
     res.clearCookie("token", COOKIE_OPTIONS);
-    const traceId = createId();
-    logger.info({ traceId, userId }, "FORCE DISCONNECT due to logout");
+    const traceId = traceStorage.getStore()?.traceId;
+    logger.info({ userId }, "FORCE DISCONNECT due to logout");
     await chatManager.publish(
       'chat_router',
       JSON.stringify({
@@ -199,8 +199,8 @@ export const logoutAll = async (req:Request,res:Response,next:NextFunction)=>{
     const userProfileId = req.user!.profile!.id;
     await authManager.invalidateAllUserSessions(userId);
     res.clearCookie("token", COOKIE_OPTIONS);
-    const traceId = createId();
-    logger.info({ traceId, userId }, "FORCE DISCONNECT for all sessions");
+    const traceId = traceStorage.getStore()?.traceId;
+    logger.info({ userId }, "FORCE DISCONNECT for all sessions");
     await chatManager.publish(
       'chat_router',
       JSON.stringify({
