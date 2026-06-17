@@ -26,13 +26,28 @@ async function getSafeMatchInfo(connectionId: string) {
 export const joinQueue = async (req:Request,res:Response,next:NextFunction) => {
   try {
     const profileId = req.user!.profile!.id;
-    const {queueStatus} = await userDetailManager.getProfileFields(profileId,["queueStatus"]);
-    const currentStatus = queueStatus || UserState.IDLE;
+    const cachedProfile = await userDetailManager.getProfileFields(profileId, [
+      "queueStatus", "interest", "locationLatitude" ]);
+    const currentStatus = cachedProfile.queueStatus || UserState.IDLE;
     if(currentStatus !== UserState.IDLE) {
       return res.status(400).json({
         success:false,
         message:"You are already in the queue or currently in a match."
       })
+    }
+    if (!cachedProfile.interest || cachedProfile.interest.length === 0 || cachedProfile.locationLatitude === undefined) {
+      const profile = await prisma.userProfile.findUnique({
+        where: { id: profileId },
+        select: { locationLatitude: true, locationLongitude: true, interest: true }
+      });
+      if (profile) {
+        await matchManager.updateMatchProfile(
+          profileId,
+          profile.locationLatitude,
+          profile.locationLongitude,
+          profile.interest
+        );
+      }
     }
     await matchManager.addToQueue(profileId);
     return res.json({
