@@ -16,10 +16,10 @@ export function Sidebar() {
   const pathname = usePathname();
 
   useEffect(() => {
-    if (pathname === "/home" && !activeTab) {
+    if (pathname === "/home" || pathname.includes("/home/match")) {
       setActiveTab("chat");
     }
-  }, [pathname, activeTab, setActiveTab]);
+  }, [pathname, setActiveTab]);
 
   const { data: notifications } = useQuery({
     queryKey: ["notifications"],
