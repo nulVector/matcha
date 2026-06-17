@@ -5,6 +5,7 @@ import { api } from "@/lib/axios";
 import { MatchState } from "@/types/models";
 import { Button } from "@matcha/ui/components/button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AxiosError } from "axios";
 import { ChevronLeft, Radar, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -25,7 +26,7 @@ export default function MatchmakingPage() {
     const shouldAutoQueue = queryClient.getQueryData(["auto_queue"]);
     if (shouldAutoQueue) {
       queryClient.setQueryData(["auto_queue"], null);
-      joinQueue();
+      setIsQueued(true);
     }
   }, []);
   
@@ -67,6 +68,11 @@ export default function MatchmakingPage() {
       );
     },
     onSuccess: () => setIsQueued(true),
+    onError: (err: AxiosError<{ message: string }>) => {
+      if (err.response?.status === 400 && err.response?.data?.message.includes("already in the queue")) {
+        setIsQueued(true);
+      }
+    },
     onSettled: () => resetJoinKey(),
   });
 
