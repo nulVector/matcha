@@ -126,6 +126,10 @@ export function useWebsocket() {
   const acknowledgeMessage = useOutboxStore((state) => state.acknowledgeMessage);
   const { data: profile } = useMe();
   const myId = profile?.id;
+  const myIdRef = useRef(myId);
+  useEffect(() => {
+    myIdRef.current = myId;
+  }, [myId]);
 
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -176,14 +180,14 @@ export function useWebsocket() {
     ws.onmessage = (event) => {
       try {
         const { type, payload } = JSON.parse(event.data);
-
+        const currentMyId = myIdRef.current;
         switch (type) {
           case EventType.NEW_MESSAGE:
-            if (payload.senderId === myId) {
+            if (payload.senderId === currentMyId) {
               acknowledgeMessage(payload.connectionId, payload.content);
             }
             updateMessagesCache(queryClient, payload);
-            handleUnreadOrReceipt(queryClient, payload, myId, pathnameRef.current || "", socketRef);
+            handleUnreadOrReceipt(queryClient, payload, currentMyId, pathnameRef.current || "", socketRef);
             updateConnectionsCache(queryClient, payload);
             break;
 

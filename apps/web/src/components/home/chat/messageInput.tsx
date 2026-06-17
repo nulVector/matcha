@@ -26,19 +26,24 @@ export function MessageInput({
   const [content, setContent] = useState("");
   const { sendMessage } = useWS();
   const [isTyping, setIsTyping] = useState(false);
+  const isTypingRef = useRef(isTyping);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const addMessageToOutbox = useOutboxStore((state) => state.addMessage);
   const markMessageFailed = useOutboxStore((state) => state.markFailed);
   const isDeactivated = targetUser?.isActive === false;
 
   useEffect(() => {
+    isTypingRef.current = isTyping;
+  }, [isTyping]);
+
+  useEffect(() => {
     return () => {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      if (isTyping) {
+      if (isTypingRef.current) {
         sendMessage(EventType.STOP_TYPING, { connectionId, receiverId });
       }
     };
-  }, [isTyping, connectionId, receiverId, sendMessage]);
+  }, [connectionId, receiverId, sendMessage]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setContent(e.target.value);
@@ -73,8 +78,10 @@ export function MessageInput({
     });
     
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    setIsTyping(false);
-    sendMessage(EventType.STOP_TYPING, { connectionId, receiverId });
+    if (isTypingRef.current) {
+      setIsTyping(false);
+      sendMessage(EventType.STOP_TYPING, { connectionId, receiverId });
+    }
 
     setTimeout(() => {
       markMessageFailed(localId);
