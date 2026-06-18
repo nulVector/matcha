@@ -83,44 +83,6 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
   authWs.exp = jwtPayload.exp;
   if (!localSockets.has(profileId)) localSockets.set(profileId, new Set());
   localSockets.get(profileId)!.add(authWs);
-  const connectionTraceId = createId();
-  await traceStorage.run({ traceId: connectionTraceId }, async () => {
-    try {
-      await userConnectionManager.mapSocket(profileId,socketId);
-      const profileData = await userDetailManager.getProfileFields(profileId, ["queueStatus"]);
-      if (profileData.queueStatus === UserState.MATCHED) {
-        const activeConnection = await prisma.connection.findFirst({
-          where: {
-            status: "MATCHED",
-            OR: [{ user1Id: profileId }, { user2Id: profileId }]
-          },
-          select: { id: true, user1Id: true, user2Id: true }
-        });
-        if (activeConnection) {
-          const partnerId = activeConnection.user1Id === profileId 
-          ? activeConnection.user2Id 
-          : activeConnection.user1Id;
-          logger.info({ profileId, connectionId: activeConnection.id }, "User reconnected during match");
-          await chatManager.publish(
-            'chat_router',
-            JSON.stringify({
-              receiverId: partnerId,
-              eventType: EventType.SYSTEM_EVENT,
-              eventData: { 
-                event: SystemAction.PARTNER_ONLINE, 
-                connectionId: activeConnection.id 
-              },
-              traceId: connectionTraceId
-            })
-          );
-        }
-      }
-    } catch (err: any) {
-      logger.error({ err, profileId }, "Failed to initialize connection");
-      ws.close();
-      return;
-    }
-  });
   authWs.on('pong', async () => {
     const heartbeatTraceId = `heartbeat-${profileId}-${createId()}`;
     await traceStorage.run({ traceId: heartbeatTraceId }, async () => {
@@ -344,6 +306,49 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
         logger.error({ err, profileId }, "Error cleaning up socket");
       }
     });
+  });
+  const connectionTraceId = createId();
+  await traceStorage.run({ traceId: connectionTraceId }, async () => {
+    try {
+      await userConnectionManager.mapSocket(profileId,socketId);
+      if (authWs.readyState === WebSocket.CLOSED || authWs.readyState === WebSocket.CLOSING) {
+        logger.info({ profileId, socketId }, "Socket closed during mapping. Reverting.");
+        await userConnectionManager.removeSocket(socketId);
+        return;
+      }
+      const profileData = await userDetailManager.getProfileFields(profileId, ["queueStatus"]);
+      if (profileData.queueStatus === UserState.MATCHED) {
+        const activeConnection = await prisma.connection.findFirst({
+          where: {
+            status: "MATCHED",
+            OR: [{ user1Id: profileId }, { user2Id: profileId }]
+          },
+          select: { id: true, user1Id: true, user2Id: true }
+        });
+        if (activeConnection) {
+          const partnerId = activeConnection.user1Id === profileId 
+          ? activeConnection.user2Id 
+          : activeConnection.user1Id;
+          logger.info({ profileId, connectionId: activeConnection.id }, "User reconnected during match");
+          await chatManager.publish(
+            'chat_router',
+            JSON.stringify({
+              receiverId: partnerId,
+              eventType: EventType.SYSTEM_EVENT,
+              eventData: { 
+                event: SystemAction.PARTNER_ONLINE, 
+                connectionId: activeConnection.id 
+              },
+              traceId: connectionTraceId
+            })
+          );
+        }
+      }
+    } catch (err: any) {
+      logger.error({ err, profileId }, "Failed to initialize connection");
+      ws.close();
+      return;
+    }
   });
 });
 
