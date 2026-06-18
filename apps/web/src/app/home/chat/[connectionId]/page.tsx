@@ -5,6 +5,7 @@ import { MessageInput } from "@/components/home/chat/messageInput";
 import { Doodle } from "@/components/shared/doodle";
 import { useMe } from "@/hooks/queries/useMe";
 import { useChatScroll } from "@/hooks/useChatScroll";
+import { useIdempotency } from "@/hooks/useIdempotency";
 import { api } from "@/lib/axios";
 import { useWS } from "@/providers/wsProvider";
 import { useOutboxStore } from "@/store/useOutboxStore";
@@ -33,7 +34,7 @@ export default function ActiveChatPage() {
   const connectionId = params.connectionId as string;
   const { sendMessage } = useWS();
   const queryClient = useQueryClient();
-
+  const { key: skipKey } = useIdempotency();
   const { data: profile, isLoading: isMeLoading } = useMe();
   const myId = profile?.id;
 
@@ -136,11 +137,27 @@ export default function ActiveChatPage() {
     );
     return () => {
       if (matchStatusRef.current === "MATCHED") {
-        api.delete(`/connections/${connectionId}`).catch(() => {});
+        queryClient.setQueryData(["messages", connectionId], (old: any) => {
+          if (!old || !old.pages || !old.pages[0]) return old;
+          const newPages = [...old.pages];
+          newPages[0] = {
+            ...newPages[0],
+            matchData: { ...newPages[0].matchData, status: "ARCHIVED", expiresAt: null }
+          };
+          return { ...old, pages: newPages };
+        });
+        api.delete(
+          `/connections/${connectionId}`, 
+          { headers: { "x-idempotency-key": skipKey } }
+        ).then(() => {
+          queryClient.invalidateQueries({ queryKey: ["connections"] });
+          queryClient.invalidateQueries({ queryKey: ["messages", connectionId] });
+        }).catch(console.error);
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["messages", connectionId] });
+        queryClient.invalidateQueries({ queryKey: ["connections"] });
       }
       sendMessage(EventType.LEAVE_CHAT, { connectionId });
-      queryClient.invalidateQueries({ queryKey: ["messages", connectionId] });
-      queryClient.invalidateQueries({ queryKey: ["connections"] });
     };
   }, [connectionId, chatPartner?.id]);
 
