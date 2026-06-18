@@ -36,7 +36,7 @@ export class UserDetailManager {
   }
   async getProfile(userId:string): Promise<Partial<UserProfile>|  null> {
     const data = await this.redis.hgetall(`user:profile:${userId}`);
-    if (!data || Object.keys(data).length === 0) return null;
+    if (!data || Object.keys(data).length === 0 || !data.username) return null;
     return this.deserializeProfile(data);
   }
   async updateProfileFields(userId:string,fields:Partial<UserProfile>) {

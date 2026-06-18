@@ -260,6 +260,8 @@ export const getProfile = async (req:Request,res:Response, next:NextFunction) =>
         openingQues: true,
         avatarUrl: true,
         location: true,
+        locationLatitude: true,
+        locationLongitude: true,
         interest: true,
         isActive: true
       }
@@ -270,8 +272,16 @@ export const getProfile = async (req:Request,res:Response, next:NextFunction) =>
         message: "Profile not found. Please complete onboarding." 
       });
     }
-    userDetailManager.cacheProfile(profileId, userProfile).catch(err => {
-      logger.error({ err, profileId }, "Failed to cache profile");
+    Promise.all([
+      userDetailManager.cacheProfile(profileId, userProfile),
+      matchManager.updateMatchProfile(
+        profileId,
+        userProfile.locationLatitude,
+        userProfile.locationLongitude,
+        userProfile.interest
+      )
+    ]).catch(err => {
+      logger.error({ err, profileId }, "Failed to fully hydrate profile cache");
     });
     res.json({
       success: true,
