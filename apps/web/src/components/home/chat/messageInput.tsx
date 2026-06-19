@@ -45,6 +45,16 @@ export function MessageInput({
     };
   }, [connectionId, receiverId, sendMessage]);
 
+  useEffect(() => {
+    if (isArchived || isDeactivated) {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      if (isTypingRef.current) {
+        setIsTyping(false);
+        sendMessage(EventType.STOP_TYPING, { connectionId, receiverId });
+      }
+    }
+  }, [isArchived, isDeactivated, connectionId, receiverId, sendMessage]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setContent(e.target.value);
     if (!isTyping) {

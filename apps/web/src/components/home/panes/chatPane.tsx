@@ -85,9 +85,10 @@ export function ChatPane() {
       );
     },
     onSuccess: () => {
-      resetDeleteKey();
       setConnectionToDelete(null);
+      queryClient.invalidateQueries({ queryKey: ["connections"] });
     },
+    onSettled: () => resetDeleteKey(),
   });
 
   const connections = data?.pages.flatMap((page) => page.data) || [];
