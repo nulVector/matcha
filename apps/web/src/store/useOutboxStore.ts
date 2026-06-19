@@ -19,6 +19,7 @@ interface OutboxState {
   removeMessage: (localId: string) => void;
   retryMessage: (localId: string) => void;
   clearOutbox: () => void;
+  cleanupOldMessages: () => void;
 }
 
 export const useOutboxStore = create<OutboxState>()(
@@ -70,10 +71,30 @@ export const useOutboxStore = create<OutboxState>()(
           ),
         }));
       },
+
       clearOutbox: () => set({ messages: [] }),
+
+      cleanupOldMessages: () => {
+        const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
+        const now = Date.now();
+        set((state) => {
+          let validMessages = state.messages.filter(
+            (m) => now - m.createdAt < TWO_DAYS_MS
+          );
+          if (validMessages.length > 100) {
+            validMessages = validMessages.slice(validMessages.length - 100);
+          }
+          return { messages: validMessages };
+        });
+      },
     }),
     {
       name: 'matcha-outbox',
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.cleanupOldMessages();
+        }
+      },
     }
   )
 );
