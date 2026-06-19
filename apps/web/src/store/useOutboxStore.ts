@@ -4,6 +4,7 @@ import { persist } from 'zustand/middleware';
 export type OutboxMessage = {
   localId: string;
   connectionId: string;
+  senderId: string;
   receiverId: string;
   content: string;
   status: 'pending' | 'failed';
@@ -17,6 +18,7 @@ interface OutboxState {
   markFailed: (localId: string) => void;
   removeMessage: (localId: string) => void;
   retryMessage: (localId: string) => void;
+  clearOutbox: () => void;
 }
 
 export const useOutboxStore = create<OutboxState>()(
@@ -68,6 +70,7 @@ export const useOutboxStore = create<OutboxState>()(
           ),
         }));
       },
+      clearOutbox: () => set({ messages: [] }),
     }),
     {
       name: 'matcha-outbox',

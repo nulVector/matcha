@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@matcha/ui/components/p
 import { Send, HelpCircle, ArchiveX, UserX } from "lucide-react";
 import { useOutboxStore } from "@/store/useOutboxStore";
 import { TargetUser } from "@/types/models";
+import { useMe } from "@/hooks/queries/useMe";
 
 export function MessageInput({ 
   connectionId, 
@@ -71,14 +72,18 @@ export function MessageInput({
     }, 2000);
   };
 
+  const { data: profile } = useMe();
+  const myId = profile?.id;
+
   const handleSend = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!content.trim() || isArchived || isDeactivated) return;
+    if (!content.trim() || isArchived || isDeactivated || !myId) return;
     const messageText = content.trim();
     setContent("");
     const localId = addMessageToOutbox({
       connectionId,
       receiverId,
+      senderId: myId,
       content: messageText
     });
     sendMessage(EventType.SEND_MESSAGE, {

@@ -151,7 +151,10 @@ export function useWebsocket() {
       reconnectAttempts.current = 0;
       try {
         const outboxStore = useOutboxStore.getState();
-        const pendingMessages = outboxStore.messages.filter((m) => m.status === 'pending');
+        const currentMyId = myIdRef.current;
+        const pendingMessages = outboxStore.messages.filter(
+          (m) => m.status === 'pending' && m.senderId === currentMyId
+        );
 
         if (pendingMessages.length > 0) {
           pendingMessages.forEach((msg) => {

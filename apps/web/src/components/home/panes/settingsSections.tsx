@@ -5,6 +5,7 @@ import { InterestManager } from "@/components/shared/interestManager";
 import { LocationComboBox } from "@/components/shared/locationCombobox";
 import { useIdempotency } from "@/hooks/useIdempotency";
 import { api } from "@/lib/axios";
+import { useOutboxStore } from "@/store/useOutboxStore";
 import type { Metadata, UserSettingsProfile } from "@/types/models";
 import {
   AccordionContent,
@@ -377,6 +378,7 @@ export function DeactivateAccountAction() {
   const queryClient = useQueryClient();
   const [confirmText, setConfirmText] = useState("");
   const [disableError, setDisableError] = useState("");
+  const clearOutbox = useOutboxStore(state => state.clearOutbox);
   const { key: deactivateKey, resetKey: resetDeactivateKey } = useIdempotency();
 
   const { mutate: deactivateProfile, isPending: isDeactivating } = useMutation({
@@ -386,6 +388,7 @@ export function DeactivateAccountAction() {
       }),
     onSuccess: () => {
       queryClient.clear();
+      clearOutbox();
       router.push("/login");
     },
     onError: (err: AxiosError<{ message: string }>) => {
@@ -473,21 +476,22 @@ export function DeactivateAccountAction() {
 export function LogoutActions() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const clearOutbox = useOutboxStore(state => state.clearOutbox);
+
+  const handleLogoutSuccess = () => {
+    queryClient.clear();
+    clearOutbox();
+    router.push("/login");
+  };
 
   const { mutate: logout, isPending: isLoggingOut } = useMutation({
     mutationFn: async () => await api.post("/auth/logout"),
-    onSuccess: () => {
-      queryClient.clear();
-      router.push("/login");
-    },
+    onSuccess: handleLogoutSuccess,
   });
 
   const { mutate: logoutAll, isPending: isLoggingOutAll } = useMutation({
     mutationFn: async () => await api.post("/auth/logout-all"),
-    onSuccess: () => {
-      queryClient.clear();
-      router.push("/login");
-    },
+    onSuccess: handleLogoutSuccess,
   });
 
   return (
