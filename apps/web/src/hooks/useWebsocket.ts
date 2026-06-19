@@ -386,6 +386,27 @@ export function useWebsocket() {
     };
   }, [connect]);
 
+  useEffect(() => {
+    const reviveApp = () => {
+      if (!socketRef.current || socketRef.current.readyState === WebSocket.CLOSED) {
+        connect();
+      }
+      queryClient.resumePausedMutations();
+      queryClient.invalidateQueries(); 
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        reviveApp();
+      }
+    };
+    window.addEventListener("online", reviveApp);
+    window.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("online", reviveApp);
+      window.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [connect, queryClient]);
+
   const sendMessage = useCallback(<T extends SocketMessage["type"]>(
     type: T, 
     payload: Extract<SocketMessage, { type: T }>["payload"]
