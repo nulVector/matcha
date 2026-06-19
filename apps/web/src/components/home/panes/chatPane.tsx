@@ -84,9 +84,16 @@ export function ChatPane() {
         { headers: { "x-idempotency-key": deleteKey } },
       );
     },
-    onSuccess: () => {
+    onSuccess: (_,connectionId) => {
       setConnectionToDelete(null);
       queryClient.invalidateQueries({ queryKey: ["connections"] });
+      queryClient.setQueryData(["unreadCounts"], (old: Record<string, number> | undefined) => {
+        if (!old) return old;
+        const newCounts = { ...old };
+        newCounts[connectionId] = 0;
+        return newCounts;
+      });
+      queryClient.removeQueries({ queryKey: ["messages", connectionId] });
     },
     onSettled: () => resetDeleteKey(),
   });

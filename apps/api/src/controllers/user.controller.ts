@@ -486,24 +486,27 @@ export const deleteConnection = async (req: Request, res: Response, next: NextFu
     await prisma.connection.update({
       where: { id: connectionId },
       data: isUser1 
-        ? { user1ChatVisible: false, user1HistoryClearedAt: now } 
-        : { user2ChatVisible: false, user2HistoryClearedAt: now }
+        ? { user1ChatVisible: false, user1HistoryClearedAt: now, user1LastReadAt: new Date() } 
+        : { user2ChatVisible: false, user2HistoryClearedAt: now, user2LastReadAt: new Date() }
     });
     const traceId = traceStorage.getStore()?.traceId;
     logger.info({ action: "deleteConnection", connectionId }, "User deleted chat");
-    await chatManager.hideChat(connectionId);
-    await chatManager.publish(
-      'chat_router',
-      JSON.stringify({
-        receiverId: profileId, 
-        eventType: EventType.SYSTEM_EVENT,
-        eventData: {
-          event: SystemAction.CHAT_DELETED,
-          connectionId
-        },
-        traceId
-      })
-    );
+    await Promise.all([
+      chatManager.hideChat(connectionId),
+      chatManager.resetUnread(profileId, connectionId),
+      chatManager.publish(
+        'chat_router',
+        JSON.stringify({
+          receiverId: profileId, 
+          eventType: EventType.SYSTEM_EVENT,
+          eventData: {
+            event: SystemAction.CHAT_DELETED,
+            connectionId
+          },
+          traceId
+        })
+      )
+    ]);
     res.json({
       success:true
     })
