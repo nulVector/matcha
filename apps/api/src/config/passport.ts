@@ -6,6 +6,7 @@ import { ExtractJwt, Strategy as JwtStrategy } from "passport-jwt";
 import { Strategy as LocalStrategy } from "passport-local";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { authManager } from "../services/redis";
+import { userRegistrationCounter } from "./metrics";
 
 const jwtSecret = process.env.JWT_SECRET;
 const clientID = process.env.GOOGLE_CLIENT_ID;
@@ -71,6 +72,7 @@ export const configurePassport = (passport:PassportStatic) =>{
             profile: { select: { id: true } }
           }
         });
+        userRegistrationCounter.inc();
       }
       const hasProfile = user.profile !== null;
       if (user.deletedAt) {

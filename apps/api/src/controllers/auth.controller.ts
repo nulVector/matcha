@@ -11,6 +11,7 @@ import { EventType} from "@matcha/shared";
 import { TaskProducer } from "@matcha/queue";
 import { logger, traceStorage } from "@matcha/logger";
 import { authManager, chatManager } from "../services/redis";
+import { userRegistrationCounter } from "../config/metrics";
 
 const jwtSecret = process.env.JWT_SECRET;
 if (!jwtSecret){
@@ -29,6 +30,7 @@ export const signup = async (req:Request, res:Response,next:NextFunction) =>{
         id:true
       }
     });
+    userRegistrationCounter.inc();
     const sessionId = createId();
     await authManager.cacheSession(newUser.id, sessionId, null, true);
     const token = jwt.sign({

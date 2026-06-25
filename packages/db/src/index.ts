@@ -19,6 +19,16 @@ const pool = new pg.Pool({
 });
 
 const adapter = new PrismaPg(pool);
+
+export const getDbMetrics = () => {
+  return {
+    total: pool.totalCount,
+    idle: pool.idleCount,
+    waiting: pool.waitingCount,
+    active: pool.totalCount - pool.idleCount,
+  };
+};
+
 const prismaClientSingleton = () => {
   return new PrismaClient({ adapter });
 }

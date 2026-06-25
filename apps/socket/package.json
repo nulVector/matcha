@@ -25,6 +25,7 @@
     "@matcha/zod": "workspace:*",
     "@paralleldrive/cuid2": "^3.3.0",
     "jsonwebtoken": "^9.0.3",
+    "prom-client": "15.1.3",
     "ws": "^8.19.0"
   }
 }

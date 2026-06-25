@@ -2,6 +2,7 @@ import { QueueEvents } from "bullmq";
 import { QueueName, dlqQueue, taskQueue, dbBufferQueue, cronQueue } from "@matcha/queue";
 import { workerConnection } from "../config/redis";
 import { logger } from "@matcha/logger";
+import { dlqIncidentsCounter } from "../config/metrics";
 
 const eventListeners: QueueEvents[] = [];
 
@@ -23,7 +24,8 @@ export function startDlqMonitor() {
         const maxAttempts = job.opts.attempts || 1;
         if (job.attemptsMade >= maxAttempts) {
           logger.error({ jobId, queue: name, failedReason }, `Job permanently failed. Moving to DLQ.`);
-          
+          const safeReason = failedReason ? failedReason.substring(0, 50) : 'unknown_error';
+          dlqIncidentsCounter.labels(name, job.name, safeReason).inc();
           await dlqQueue.add(
             job.name,
             { originalQueue: name, originalData: job.data, error: failedReason },

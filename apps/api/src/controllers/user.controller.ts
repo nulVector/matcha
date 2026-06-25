@@ -10,6 +10,7 @@ import { USERNAME_VIBES } from '../constant/usernameList';
 import { logger, traceStorage } from '@matcha/logger';
 import { getDeterministicIds, EventType, SystemAction } from '@matcha/shared';
 import { authManager, bloomManager, chatManager, matchManager, metadataManager, notificationManager, userConnectionManager, userDetailManager } from '../services/redis';
+import { userOnboardingFailureCounter } from '../config/metrics';
 
 type LocationMetadata = { id: string; name: string; latitude: number; longitude: number };
 type InterestMetadata = { id: string; name: string };
@@ -135,6 +136,7 @@ export const initiateProfile = async (req:Request, res:Response,next:NextFunctio
     });
     return;
   } catch (err: any) {
+    userOnboardingFailureCounter.inc({ reason: err.code || 'unknown' });
     err.context = { location: "userController.initiateProfile", userId: req.user!.id };
     next(err);
   }

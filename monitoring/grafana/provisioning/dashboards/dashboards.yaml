@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: 'Production Dashboards'
+    orgId: 1
+    folder: 'Core Infrastructure'
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

@@ -9,6 +9,7 @@ import { logger, traceStorage } from '@matcha/logger';
 import { JwtPayload, UserSession, EventType, SystemAction, CachedMessage, MessageType } from "@matcha/shared"
 import { socketMessageSchema } from '@matcha/zod';
 import { authManager, chatManager, closeRedisConnections, matchManager, subClient, userConnectionManager, userDetailManager } from './services/redis';
+import { broadcastDurationHistogram, concurrentConnectionsGauge, connectionTerminationCounter, eventProcessingCounter, socketRegistry } from './config/metrics';
 
 interface AuthenticatedWebSocket extends WebSocket {
   isAlive: boolean;
@@ -17,7 +18,28 @@ interface AuthenticatedWebSocket extends WebSocket {
   exp: number;
 }
 
-const server = createServer((req, res) => {
+const server = createServer(async (req, res) => {
+  if (req.url === '/metrics' && req.method === 'GET') {
+    const authHeader = req.headers.authorization;
+    const expectedToken = process.env.PROMETHEUS_TOKEN;
+    if (!expectedToken || authHeader !== `Bearer ${expectedToken}`) {
+      res.writeHead(401);
+      return res.end("Unauthorized")
+    }
+    
+    try {
+      res.writeHead(200, { 'Content-Type': socketRegistry.contentType });
+      const metrics = await socketRegistry.metrics();
+      return res.end(metrics);
+    } catch (err: any) {
+      res.writeHead(500);
+      return res.end(err.message);
+    }
+  }
+  if (req.url === '/health' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ status: 'ok' }));
+  }
   res.writeHead(200);
   res.end("WebSocket Server Running");
 });
@@ -75,6 +97,7 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
     ws.close(1008, "Profile required to connect");
     return;
   }
+  concurrentConnectionsGauge.inc();
   const socketId = createId(); 
   const authWs = ws as AuthenticatedWebSocket;
   authWs.isAlive = true;
@@ -134,6 +157,7 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
     await traceStorage.run({ traceId }, async () => {
       try {
         logger.info({ profileId, type: parsedData.type }, "Received WS message");
+        eventProcessingCounter.labels('inbound', parsedData.type).inc();
         switch (parsedData.type) {
           case EventType.SEND_MESSAGE: {
             const { connectionId, receiverId, content } = parsedData.payload;
@@ -252,7 +276,15 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
       }
     });
   });
-  authWs.on('close', async () => {
+  authWs.on('close', async (code) => {
+    concurrentConnectionsGauge.dec();
+    let reasonLabel = code.toString();
+    if (code === 1000) reasonLabel = 'normal_closure';
+    if (code === 1001) reasonLabel = 'going_away';
+    if (code === 1006) reasonLabel = 'abnormal_closure';
+    if (code === 4001) reasonLabel = 'unauthorized_or_expired';
+    connectionTerminationCounter.labels(reasonLabel).inc();
+    
     const disconnectTraceId = createId();
     await traceStorage.run({ traceId: disconnectTraceId }, async () => {
       try {
@@ -306,6 +338,9 @@ wss.on('connection', async (ws:WebSocket, _request:IncomingMessage, userSession:
         logger.error({ err, profileId }, "Error cleaning up socket");
       }
     });
+  });
+  authWs.on('error', (err) => {
+    logger.error({ err, profileId, socketId }, "WebSocket encountered an error");
   });
   const connectionTraceId = createId();
   await traceStorage.run({ traceId: connectionTraceId }, async () => {
@@ -380,7 +415,15 @@ async function bootstrap(){
               traceId
             });
             logger.info({ receiverId, type: eventType }, "Routing message to client");
-            receiverSockets.forEach(authWs => authWs.send(outGoingPayload));
+            receiverSockets.forEach(authWs => {
+              const endTimer = broadcastDurationHistogram.labels(eventType).startTimer();
+              authWs.send(outGoingPayload, (err) => {
+                endTimer();
+                if (!err) {
+                  eventProcessingCounter.labels('outbound', eventType).inc();
+                }
+              })
+            });
           }
         });
       } catch (err: any) {

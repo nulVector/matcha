@@ -13,6 +13,8 @@ import { checkHealth } from "./controllers/health.controller";
 import prisma from "@matcha/prisma";
 import { bloomManager, closeRedisConnections, matchManager } from "./services/redis";
 import { traceMiddleware } from "./middleware/trace";
+import { metricsAuth, metricsMiddleware } from "./middleware/metrics";
+import { getMetrics } from "./controllers/metrics.controller";
 
 const app = express();
 const PORT = Number(process.env.API_PORT) || 3001;
@@ -29,6 +31,7 @@ app.use(helmet({
 app.use(cookieParser());
 app.use(express.json());
 app.use(traceMiddleware);
+app.use(metricsMiddleware);
 
 const allowedOrigins = process.env.CLIENT_URL 
   ? process.env.CLIENT_URL.split(',').map(url => url.trim())
@@ -63,11 +66,12 @@ app.use(pinoHttp({
     })
   },
   autoLogging: process.env.ARTILLERY_TEST === 'true' ? false : {
-    ignore: (req) => req.url === '/health'
+    ignore: (req) => req.url === '/health' || req.url === '/metrics'
   }
 }));
 app.use(passport.initialize());
 configurePassport(passport);
+app.get('/metrics', metricsAuth, getMetrics);
 app.use('/admin/queues/dashboard', adminAuth, serverAdapter.getRouter());
 app.get('/health', checkHealth);
 app.use("/api/v1",mainRouter);
@@ -80,7 +84,7 @@ async function bootstrap() {
     await bloomManager.reserve('bf:matches', 0.01, 5000000);
 
     server = app.listen(PORT, '0.0.0.0', 8192, () => {
-      logger.info('API listening on port 3001');
+      logger.info(`API listening on port ${PORT}`);
     });
   } catch (err) {
     logger.error({ err }, "Failed to start server");

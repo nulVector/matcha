@@ -6,11 +6,28 @@ import { closeRedisConnections, pingRedisConnections, workerConnection } from ".
 import prisma from "@matcha/prisma";
 import { logger } from "@matcha/logger";
 import http from "http";
-import { CronProducer, DbBufferProducer } from "@matcha/queue";
+import { CronProducer, cronQueue, DbBufferProducer, dbBufferQueue, dlqQueue, taskQueue } from "@matcha/queue";
 import { startDlqMonitor, stopDlqMonitor } from "./consumers/dlqMonitor";
+import { queueLengthGauge, workerRegistry } from "./config/metrics";
 
-const healthServer = http.createServer(async (req, res) => {
-  if (req.url === '/health') {
+const server = http.createServer(async (req, res) => {
+  if (req.url === '/metrics' && req.method === 'GET') {
+    const authHeader = req.headers.authorization;
+    const expectedToken = process.env.PROMETHEUS_TOKEN;
+    if (!expectedToken || authHeader !== `Bearer ${expectedToken}`) {
+      res.writeHead(401);
+      return res.end("Unauthorized")
+    }
+    try {
+      res.writeHead(200, { 'Content-Type': workerRegistry.contentType });
+      const metrics = await workerRegistry.metrics();
+      return res.end(metrics);
+    } catch (err: any) {
+      res.writeHead(500);
+      return res.end(err.message);
+    }
+  }
+  if (req.url === '/health' && req.method === 'GET') {
     try {
       await prisma.$queryRaw`SELECT 1`;
       const redisPing = await workerConnection.ping();
@@ -32,11 +49,13 @@ const healthServer = http.createServer(async (req, res) => {
   }
 });
 
+let queueMetricsInterval: NodeJS.Timeout;
+
 async function bootstrap() {
   logger.info("Starting Matcha Worker Node.");
-  const HEALTH_PORT = process.env.WORKER_HEALTH_PORT || 3002;
-  healthServer.listen(HEALTH_PORT, () => {
-    logger.info(`Worker Health Check server listening on port ${HEALTH_PORT}`);
+  const PORT = process.env.WORKER_SERVER_PORT || 3002;
+  server.listen(PORT, () => {
+    logger.info(`Worker Health Check server listening on port ${PORT}`);
   });
 
   logger.info(`Task Worker listening on ${taskWorker.name}`);
@@ -59,6 +78,19 @@ async function bootstrap() {
     logger.error({ err }, "Native Matchmaking Loop crashed:");
   });
   
+  queueMetricsInterval = setInterval(async () => {
+    const queues = [taskQueue, dbBufferQueue, cronQueue, dlqQueue];
+    for (const queue of queues) {
+      try {
+        const counts = await queue.getJobCounts('waiting', 'active', 'delayed', 'failed');
+        queueLengthGauge.labels(queue.name, 'waiting').set(counts.waiting ?? 0);
+        queueLengthGauge.labels(queue.name, 'active').set(counts.active ?? 0);
+        queueLengthGauge.labels(queue.name, 'delayed').set(counts.delayed ?? 0);
+        queueLengthGauge.labels(queue.name, 'failed').set(counts.failed ?? 0);
+      } catch (e) {
+      }
+    }
+  }, 15000);
   logger.info("All background services are up and running!");
 }
 
@@ -67,7 +99,9 @@ async function gracefulShutdown(signal: string) {
   if (isShuttingDown) return;
   isShuttingDown = true;
   logger.info(`Received ${signal}, shutting down workers gracefully...`);
-
+  if (queueMetricsInterval) {
+    clearInterval(queueMetricsInterval);
+  }
   stopMatchmakingLoop();
   await stopDlqMonitor();
   
@@ -81,7 +115,7 @@ async function gracefulShutdown(signal: string) {
   } catch (err) {
     logger.error({ err }, "Error closing queue workers");
   }
-  healthServer.close();
+  server.close();
   try {
     await workerConnection.quit();
     await closeRedisConnections();

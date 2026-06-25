@@ -21,7 +21,11 @@
     "docker:test:setup": "pnpm docker:test:up && timeout 3 && pnpm db:test:push && pnpm db:test:seed",
     "db:test:studio": "dotenv -e .env.test -- turbo run db:studio --filter=@matcha/prisma",
     "loadtest": "dotenv -e .env.test -- pnpm --filter=load-tests run",
-    "queue:clean-dlq": "dotenv -e .env -- pnpm --filter=workers run queue:clean-dlq"
+    "queue:clean-dlq": "dotenv -e .env -- pnpm --filter=workers run queue:clean-dlq",
+    "docker:dev:up": "docker compose -f docker-compose.dev.yml up -d",
+    "docker:dev:setup": "pnpm docker:dev:up && timeout 3 && pnpm db:push && pnpm db:seed",
+    "docker:dev:down": "docker compose -f docker-compose.dev.yml down",
+    "docker:dev:wipe": "docker compose -f docker-compose.dev.yml down -v"
   },
   "devDependencies": {
     "dotenv-cli": "^11.0.0",

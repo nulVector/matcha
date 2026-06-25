@@ -4,6 +4,7 @@ import { logger, traceStorage } from "@matcha/logger";
 import { EventType, getDeterministicIds } from "@matcha/shared";
 import { createId } from "@paralleldrive/cuid2";
 import { bloomManager, chatManager, matchManager } from "../config/redis";
+import { vectorMatchesLockedCounter, vectorSearchDurationHistogram, workerMatchChunkDurationHistogram } from "../config/metrics";
 
 interface MatchConstraints {
   radiusKm: number;
@@ -55,72 +56,80 @@ async function runLoop() {
       const chunks = chunkArray(usersInQueue, CHUNK_SIZE);
       for (const chunk of chunks) {
         if (!isRunning) break;
-        await Promise.all(chunk.map(async (searcherId) => {
-          if (!isRunning) return;
-          const profile = await matchManager.getSearcherProfile(searcherId);
-          if (!profile || profile.queueStatus !== UserState.QUEUED) return;
-          const waitTimeMs = Date.now() - profile.queuedAt;
-          const { radiusKm, maxScore } = getMatchConstraints(waitTimeMs);
-          const potentialMatches = await matchManager.findMatchesInRadius(
-            profile.searcherVector,
-            profile.lat,
-            profile.long,
-            radiusKm
-          );
-          for (const candidate of potentialMatches) {
-            if (candidate.id === searcherId || candidate.score > maxScore) continue;
-            const alreadyMatched = await bloomManager.existsPair('bf:matches', searcherId, candidate.id);
-            if (alreadyMatched) continue;
-            const locked = await matchManager.lockMatch(searcherId, candidate.id);
-            if (locked) {
-              const traceId = createId()
-              await traceStorage.run({ traceId }, async () => {
-                try {
-                  const expiresAt = new Date(Date.now() + MATCH_EXPIRY_MS);
-                  const [u1, u2] = getDeterministicIds(searcherId, candidate.id);
-                  logger.info({ searcherId, candidateId: candidate.id }, "Match locked, publishing to clients");
-                  const newConnection = await prisma.connection.create({
-                    data: {
-                      user1Id: u1,
-                      user2Id: u2,
-                      status: ConnectionStatus.MATCHED,
-                      expiresAt: expiresAt,
+        const endChunkTimer = workerMatchChunkDurationHistogram.startTimer();
+        try {
+          await Promise.all(chunk.map(async (searcherId) => {
+            if (!isRunning) return;
+            const profile = await matchManager.getSearcherProfile(searcherId);
+            if (!profile || profile.queueStatus !== UserState.QUEUED) return;
+            const waitTimeMs = Date.now() - profile.queuedAt;
+            const { radiusKm, maxScore } = getMatchConstraints(waitTimeMs);
+            const endSearchTimer = vectorSearchDurationHistogram.startTimer();
+            const potentialMatches = await matchManager.findMatchesInRadius(
+              profile.searcherVector,
+              profile.lat,
+              profile.long,
+              radiusKm
+            );
+            endSearchTimer();
+            for (const candidate of potentialMatches) {
+              if (candidate.id === searcherId || candidate.score > maxScore) continue;
+              const alreadyMatched = await bloomManager.existsPair('bf:matches', searcherId, candidate.id);
+              if (alreadyMatched) continue;
+              const locked = await matchManager.lockMatch(searcherId, candidate.id);
+              if (locked) {
+                const traceId = createId()
+                await traceStorage.run({ traceId }, async () => {
+                  try {
+                    const expiresAt = new Date(Date.now() + MATCH_EXPIRY_MS);
+                    const [u1, u2] = getDeterministicIds(searcherId, candidate.id);
+                    logger.info({ searcherId, candidateId: candidate.id }, "Match locked, publishing to clients");
+                    const newConnection = await prisma.connection.create({
+                      data: {
+                        user1Id: u1,
+                        user2Id: u2,
+                        status: ConnectionStatus.MATCHED,
+                        expiresAt: expiresAt,
+                      }
+                    });
+                    vectorMatchesLockedCounter.inc();
+                    const baseEventData = {
+                      connectionId: newConnection.id,
+                      expiresAt: expiresAt.toISOString(),
+                    };
+                    await Promise.all([
+                      matchManager.setMatchInfo(newConnection.id, searcherId, candidate.id, expiresAt.toISOString()),
+                      bloomManager.addPair('bf:matches', searcherId, candidate.id),
+                      chatManager.publish('chat_router', JSON.stringify({ 
+                        receiverId: searcherId, 
+                        eventType: EventType.MATCH_FOUND, 
+                        eventData: { ...baseEventData, matchedUserId: candidate.id },
+                        traceId
+                      })),
+                      chatManager.publish('chat_router', JSON.stringify({ 
+                        receiverId: candidate.id, 
+                        eventType: EventType.MATCH_FOUND, 
+                        eventData: { ...baseEventData, matchedUserId: searcherId },
+                        traceId
+                      }))
+                    ]);
+                  } catch (dbError: any) {
+                    if (dbError.code === 'P2002') {
+                      logger.info({ searcherId, candidateId: candidate.id }, "Concurrent match detected. Skipping.");
+                      return;
                     }
-                  });
-                  const baseEventData = {
-                    connectionId: newConnection.id,
-                    expiresAt: expiresAt.toISOString(),
-                  };
-                  await Promise.all([
-                    matchManager.setMatchInfo(newConnection.id, searcherId, candidate.id, expiresAt.toISOString()),
-                    bloomManager.addPair('bf:matches', searcherId, candidate.id),
-                    chatManager.publish('chat_router', JSON.stringify({ 
-                      receiverId: searcherId, 
-                      eventType: EventType.MATCH_FOUND, 
-                      eventData: { ...baseEventData, matchedUserId: candidate.id },
-                      traceId
-                    })),
-                    chatManager.publish('chat_router', JSON.stringify({ 
-                      receiverId: candidate.id, 
-                      eventType: EventType.MATCH_FOUND, 
-                      eventData: { ...baseEventData, matchedUserId: searcherId },
-                      traceId
-                    }))
-                  ]);
-                } catch (dbError: any) {
-                  if (dbError.code === 'P2002') {
-                    logger.info({ searcherId, candidateId: candidate.id }, "Concurrent match detected. Skipping.");
-                    return;
+                    logger.error({ err: dbError, searcherId, candidateId: candidate.id }, "Postgres failed after Redis lock. Reverting.");
+                    await matchManager.addToQueue(searcherId);
+                    await matchManager.addToQueue(candidate.id);
                   }
-                  logger.error({ err: dbError, searcherId, candidateId: candidate.id }, "Postgres failed after Redis lock. Reverting.");
-                  await matchManager.addToQueue(searcherId);
-                  await matchManager.addToQueue(candidate.id);
-                }
-              });
-              break; 
+                });
+                break; 
+              }
             }
-          }
-        }));
+          }));
+        } finally {
+          endChunkTimer();
+        }
       }
       await sleep(1000);
     } catch (error: any) {
