@@ -1,16 +1,21 @@
-import React from "react";
 import { OnboardingForm } from "@/components/onboarding/onboardingForm";
+import Image from "next/image";
+import bgImage from "./../../../public/background.jpeg";
 
 export default function OnboardingPage() {
   return (
-    <div className="flex min-h-dvh w-full items-center justify-center overflow-x-hidden bg-muted/20 p-4 sm:p-8 bg-pattern">
-      <div 
-        className="flex w-full max-w-240 flex-col md:flex-row overflow-hidden rounded-2xl bg-background shadow-xl border h-[600px] animate-in fade-in zoom-in-95 duration-500 ease-out" 
-      >
-        <div 
-          className="hidden w-1/2 border-r border-border/50 md:block h-full opacity-90 bg-pattern-onboarding" 
-        />
-        <div className="flex w-full md:w-1/2 flex-col p-6 lg:p-8 relative">
+    <div className="relative flex min-h-dvh w-full items-center justify-center overflow-x-hidden p-4 sm:p-8">
+      <Image
+        src={bgImage}
+        alt="Matcha background"
+        fill
+        sizes="100vw"
+        className="object-cover object-center -z-10"
+        priority
+        placeholder="blur"
+      />
+      <div className="flex w-full max-w-140 flex-col overflow-hidden rounded-2xl bg-background shadow-2xl border h-150 animate-in fade-in zoom-in-95 duration-500 ease-out">
+        <div className="flex w-full h-full flex-col p-6 sm:p-8 relative">
           <OnboardingForm />
         </div>
       </div>

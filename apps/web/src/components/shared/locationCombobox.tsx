@@ -78,7 +78,7 @@ export function LocationComboBox({
                 >
                   <Check
                     className={cn(
-                      "mr-2 size-4 text-primary transition-opacity duration-200",
+                      "mr-1 size-4 text-primary transition-opacity duration-200",
                       value === loc.name ? "opacity-100" : "opacity-0",
                     )}
                   />

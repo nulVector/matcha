@@ -6,6 +6,7 @@ import { Button } from "@matcha/ui/components/button";
 import { Loader } from "@matcha/ui/components/loader";
 import { loginSchema, loginType } from "@matcha/zod";
 import { useMutation } from "@tanstack/react-query";
+import { AxiosError } from "axios";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormProvider, useForm } from "react-hook-form";
 import { EmailField, PasswordField } from "./AuthFields";
@@ -16,7 +17,6 @@ import {
   AuthSuccess,
   OAuthSection,
 } from "./AuthUI";
-import { AxiosError } from "axios";
 
 export function LoginForm() {
   const router = useRouter();
@@ -58,8 +58,8 @@ export function LoginForm() {
   return (
     <div className="flex flex-col gap-6">
       <AuthHeader
-        title="Welcome back"
-        description="Enter your credentials to access your account"
+        title="Welcome back to Matcha"
+        description="Dive back into your matches and conversations."
       />
 
       <FormProvider {...form}>
@@ -80,7 +80,7 @@ export function LoginForm() {
               size="lg"
               disabled={isPending}
             >
-              {isPending && <Loader inline className="mr-2 size-4" />}
+              {isPending && <Loader inline className="mr-1 size-4" />}
               Log in
             </Button>
 

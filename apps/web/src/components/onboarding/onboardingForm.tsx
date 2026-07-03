@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader } from "@matcha/ui/components/loader";
 import { initiateProfileSchema, initiateProfileType } from "@matcha/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
@@ -24,12 +25,29 @@ import {
   OnboardingProgress,
 } from "./onboardingUI";
 
+const slideVariants = {
+  enter: (direction: number) => ({
+    x: direction > 0 ? 50 : -50,
+    opacity: 0,
+  }),
+  center: {
+    x: 0,
+    opacity: 1,
+  },
+  exit: (direction: number) => ({
+    x: direction > 0 ? -50 : 50,
+    opacity: 0,
+  }),
+};
+
 export function OnboardingForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { key: idempotencyKey, resetKey: resetIdempotencyKey } = useIdempotency();
+  const { key: idempotencyKey, resetKey: resetIdempotencyKey } =
+    useIdempotency();
   const { data: metadata, isLoading: isMetadataLoading } = useMetadata();
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [direction, setDirection] = useState(1);
   const [usernameStatus, setUsernameStatus] = useState<
     "idle" | "available" | "taken"
   >("idle");
@@ -74,6 +92,7 @@ export function OnboardingForm() {
     const isValid = await form.trigger(["username", "avatarUrl"]);
     if (!isValid) return;
     if (usernameStatus === "available") {
+      setDirection(1);
       setStep(2);
       return;
     }
@@ -83,7 +102,10 @@ export function OnboardingForm() {
       );
       const isAvailable = res.data.available;
       setUsernameStatus(isAvailable ? "available" : "taken");
-      if (isAvailable) setStep(2);
+      if (isAvailable) {
+        setDirection(1);
+        setStep(2);
+      }
     } catch {
       setUsernameStatus("taken");
     }
@@ -91,7 +113,10 @@ export function OnboardingForm() {
 
   const handleNextStep2 = async () => {
     const isValid = await form.trigger(["location", "interest"]);
-    if (isValid) setStep(3);
+    if (isValid) {
+      setDirection(1);
+      setStep(3);
+    }
   };
 
   if (isMetadataLoading) {
@@ -114,65 +139,101 @@ export function OnboardingForm() {
       <OnboardingProgress step={step} />
 
       <FormProvider {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}
-          className="flex-1 overflow-y-auto overscroll-contain no-scrollbar transform-gpu pb-2 animate-in fade-in duration-300"
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="flex-1 overflow-y-auto overscroll-contain no-scrollbar transform-gpu px-2 -mx-2"
         >
-          {step === 1 && (
-            <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
-              <OnboardingHeader
-                title="Create your profile"
-                description="Let's start with the basics."
-              />
-              <AvatarField avatars={safeAvatars} />
-              <UsernameField
-                status={usernameStatus}
-                setStatus={setUsernameStatus}
-              />
-              <OnboardingNav onNext={handleNextStep1} />
-            </div>
-          )}
+          <AnimatePresence mode="wait" custom={direction}>
+            {step === 1 && (
+              <motion.div
+                key="step1"
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.3, ease: "easeOut" }}
+                className="space-y-4"
+              >
+                <OnboardingHeader
+                  title="Set up your profile"
+                  description="Just the essentials to get you started."
+                />
+                <AvatarField avatars={safeAvatars} />
+                <UsernameField
+                  status={usernameStatus}
+                  setStatus={setUsernameStatus}
+                />
+                <OnboardingNav onNext={handleNextStep1} />
+              </motion.div>
+            )}
 
-          {step === 2 && (
-            <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
-              <OnboardingHeader
-                title={`Hi ${form.getValues("username") || "there"},`}
-                description="Let's personalize your matches."
-              />
-              <LocationField locations={safeLocations} />
-              <InterestsField interests={metadata?.interests || []} />
-              <OnboardingNav
-                onNext={handleNextStep2}
-                onBack={() => setStep(1)}
-                backText="Back to Step 1"
-              />
-            </div>
-          )}
+            {step === 2 && (
+              <motion.div
+                key="step2"
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.3, ease: "easeOut" }}
+                className="space-y-4"
+              >
+                <OnboardingHeader
+                  title={`Hi ${form.getValues("username") || "there"},`}
+                  description="Let's personalize your matches."
+                />
+                <LocationField locations={safeLocations} />
+                <InterestsField interests={metadata?.interests || []} />
+                <OnboardingNav
+                  onNext={handleNextStep2}
+                  onBack={() => {
+                    setDirection(-1);
+                    setStep(1);
+                  }}
+                  backText="Back to Step 1"
+                />
+              </motion.div>
+            )}
 
-          {step === 3 && (
-            <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
-              <OnboardingHeader
-                title="Almost there!"
-                description="Add a little personality to your profile."
-              />
-              <TextAreaField
-                name="aboutMe"
-                label="About me"
-                placeholder="I spend too much time making coffee..."
-              />
-              <TextAreaField
-                name="openingQues"
-                label="Opening Question"
-                placeholder="What's your favorite controversial food opinion?"
-              />
-              <DiscoveryField />
-              <OnboardingNav
-                isSubmit
-                isPending={isPending}
-                onBack={() => setStep(2)}
-                backText="Back to Step 2"
-              />
-            </div>
-          )}
+            {step === 3 && (
+              <motion.div
+                key="step3"
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.3, ease: "easeOut" }}
+                className="space-y-4"
+              >
+                <OnboardingHeader
+                  title="Almost there!"
+                  description="Add a little personality to your profile."
+                />
+                <TextAreaField
+                  name="aboutMe"
+                  label="About me"
+                  placeholder="I spend too much time making coffee..."
+                />
+                <TextAreaField
+                  name="openingQues"
+                  label="Opening Question"
+                  placeholder="What's your favorite controversial food opinion?"
+                />
+                <DiscoveryField />
+                <OnboardingNav
+                  isSubmit
+                  isPending={isPending}
+                  onBack={() => {
+                    setDirection(-1);
+                    setStep(2);
+                  }}
+                  backText="Back to Step 2"
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </form>
       </FormProvider>
     </div>

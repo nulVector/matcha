@@ -2,6 +2,7 @@
 
 import { UserAvatar } from "@/components/shared/userAvatar";
 import { api } from "@/lib/axios";
+import { FriendRequestItem } from "@/types/models";
 import { Badge } from "@matcha/ui/components/badge";
 import { Button } from "@matcha/ui/components/button";
 import { EmptyState } from "@matcha/ui/components/emptyState";
@@ -16,12 +17,12 @@ import {
 import { Inbox, Send } from "lucide-react";
 import { useEffect, useState } from "react";
 import { RequestDetailsModal } from "./profileModals";
-import { FriendRequestItem } from "@/types/models";
 
 export function RequestsPane() {
   const queryClient = useQueryClient();
   const [view, setView] = useState<"incoming" | "outgoing">("incoming");
-  const [selectedRequest, setSelectedRequest] = useState<FriendRequestItem | null>(null);
+  const [selectedRequest, setSelectedRequest] =
+    useState<FriendRequestItem | null>(null);
 
   const { data: notifications } = useQuery({
     queryKey: ["notifications"],
@@ -38,10 +39,13 @@ export function RequestsPane() {
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: ["notifications"] });
       const previousNotifications = queryClient.getQueryData(["notifications"]);
-      queryClient.setQueryData(["notifications"], (old: { has_new_requests: boolean } | undefined) => {
-        if (!old) return old;
-        return { ...old, has_new_requests: false };
-      });
+      queryClient.setQueryData(
+        ["notifications"],
+        (old: { has_new_requests: boolean } | undefined) => {
+          if (!old) return old;
+          return { ...old, has_new_requests: false };
+        },
+      );
       return { previousNotifications };
     },
     onError: (err, variables, context) => {
@@ -80,14 +84,14 @@ export function RequestsPane() {
   useEffect(() => {
     if (selectedRequest) {
       const requestStillExists = requestsList.some(
-        (req: FriendRequestItem) => req.requestId === selectedRequest.requestId
+        (req: FriendRequestItem) => req.requestId === selectedRequest.requestId,
       );
       if (!requestStillExists) {
         setSelectedRequest(null);
       }
     }
   }, [requestsList, selectedRequest]);
-  
+
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 space-y-4 border-b border-border/50 pb-4 shrink-0">
@@ -133,11 +137,13 @@ export function RequestsPane() {
                   <Send className="size-8" />
                 )
               }
-              title={`No ${view} requests`}
+              title={
+                view === "incoming" ? "No pending requests" : "Nothing sent yet"
+              }
               description={
                 view === "incoming"
-                  ? "You're all caught up!"
-                  : "You haven't sent any requests."
+                  ? "You're all caught up! Check back later."
+                  : "When you reach out to someone new, your pending invites will appear here."
               }
             />
           </div>
@@ -183,7 +189,7 @@ export function RequestsPane() {
             onClick={() => fetchNextPage()}
             disabled={isFetchingNextPage}
           >
-            {isFetchingNextPage && <Loader inline className="size-3 mr-2" />}
+            {isFetchingNextPage && <Loader inline className="size-3 mr-1" />}
             Load more
           </Button>
         )}

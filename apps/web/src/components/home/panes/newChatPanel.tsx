@@ -7,8 +7,8 @@ import { Button } from "@matcha/ui/components/button";
 import { EmptyState } from "@matcha/ui/components/emptyState";
 import { Input } from "@matcha/ui/components/input";
 import { Loader } from "@matcha/ui/components/loader";
-import { cn } from "@matcha/ui/lib/utils";
 import { useInfiniteQuery } from "@tanstack/react-query";
+import { motion } from "framer-motion";
 import { ChevronLeft, Search, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -47,11 +47,11 @@ export function NewChatPanel({ isOpen, onClose }: NewChatPanelProps) {
   };
 
   return (
-    <div
-      className={cn(
-        "absolute inset-0 z-50 flex flex-col bg-background transition-transform duration-300 ease-in-out",
-        isOpen ? "translate-x-0" : "-translate-x-full",
-      )}
+    <motion.div
+      initial={false}
+      animate={{ x: isOpen ? "0%" : "-100%" }}
+      transition={{ type: "spring", bounce: 0.15, duration: 0.4 }}
+      className="absolute inset-0 z-50 flex flex-col bg-background shadow-2xl"
     >
       <div className="flex flex-col gap-3 p-4 border-b border-border/50 shrink-0 bg-background/95 backdrop-blur-md">
         <div className="flex items-center gap-2">
@@ -81,7 +81,7 @@ export function NewChatPanel({ isOpen, onClose }: NewChatPanelProps) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2 space-y-1 no-scrollbar bg-background">
+      <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-1 no-scrollbar bg-background">
         {isLoading && (
           <div className="flex justify-center mt-4">
             <Loader />
@@ -89,11 +89,11 @@ export function NewChatPanel({ isOpen, onClose }: NewChatPanelProps) {
         )}
 
         {!isLoading && friends.length === 0 && (
-          <div className="mt-10">
+          <div className="my-auto">
             <EmptyState
               icon={<Users className="size-8" />}
-              title="No friends yet"
-              description="Go to the matchmaking radar to connect with new people!"
+              title="No connections yet"
+              description="Head over to The Blend to meet new people."
             />
           </div>
         )}
@@ -134,11 +134,11 @@ export function NewChatPanel({ isOpen, onClose }: NewChatPanelProps) {
             onClick={() => fetchNextPage()}
             disabled={isFetchingNextPage}
           >
-            {isFetchingNextPage && <Loader inline className="size-3 mr-2" />}
+            {isFetchingNextPage && <Loader inline className="size-3 mr-1" />}
             Load more
           </Button>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }

@@ -1,11 +1,10 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import { QueryClient, useQueryClient } from "@tanstack/react-query";
-import { CachedMessage, EventType, SystemAction } from "@matcha/shared";
-import { usePathname } from "next/navigation";
-import { useRouter } from "next/navigation";
 import { useOutboxStore } from "@/store/useOutboxStore";
-import { useMe } from "./queries/useMe";
+import { CachedMessage, EventType, SystemAction } from "@matcha/shared";
 import { SocketMessage } from "@matcha/zod";
+import { QueryClient, useQueryClient } from "@tanstack/react-query";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useMe } from "./queries/useMe";
 
 interface MessagesQueryData {
   pages: {
@@ -419,7 +418,11 @@ export function useWebsocket() {
       if (process.env.NODE_ENV === 'development') {
         console.log(`WS out - ${traceId}_${type}`)
       }
-      socketRef.current.send(JSON.stringify({ type, payload, traceId }));
+      try {
+        socketRef.current.send(JSON.stringify({ type, payload, traceId }));
+      } catch (err) {
+        console.error("Failed to send WebSocket message:", err);
+      }
     } else {
       console.warn("Cannot send message, WebSocket is not open.");
     }

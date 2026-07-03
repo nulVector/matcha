@@ -54,7 +54,7 @@ export function UsernameSetting({ username }: { username: string }) {
             className="h-9 bg-muted/40 text-muted-foreground cursor-not-allowed focus-visible:ring-0 shadow-none border-transparent"
           />
           <p className="text-[11px] text-muted-foreground pl-1">
-            This is your unique identifier and cannot be changed.
+            Your unique Matcha handle.
           </p>
         </div>
       </AccordionContent>
@@ -88,9 +88,9 @@ export function AvatarSetting({
           disabled={isUpdating || avatarUrl === profile.avatarUrl}
         >
           {isUpdating ? (
-            <Loader inline className="size-4 mr-2" />
+            <Loader inline className="size-4 mr-1" />
           ) : (
-            <Save className="size-4 mr-2" />
+            <Save className="size-4 mr-1" />
           )}
           Save Avatar
         </Button>
@@ -135,9 +135,9 @@ export function LocationSetting({
           disabled={isUpdating || locationData.name === profile.location}
         >
           {isUpdating ? (
-            <Loader inline className="size-4 mr-2" />
+            <Loader inline className="size-4 mr-1" />
           ) : (
-            <Save className="size-4 mr-2" />
+            <Save className="size-4 mr-1" />
           )}
           Save Location
         </Button>
@@ -173,9 +173,9 @@ export function InterestSetting({
           disabled={isUpdating || !isInterestValid}
         >
           {isUpdating ? (
-            <Loader inline className="size-4 mr-2" />
+            <Loader inline className="size-4 mr-1" />
           ) : (
-            <Save className="size-4 mr-2" />
+            <Save className="size-4 mr-1" />
           )}
           Save Interests
         </Button>
@@ -184,8 +184,12 @@ export function InterestSetting({
   );
 }
 
-export function AboutMeSetting({ profile, updateProfile, isUpdating }: Omit<SettingsSectionProps, 'metadata'>) {
-  const [aboutMe, setAboutMe] = useState("");
+export function AboutMeSetting({
+  profile,
+  updateProfile,
+  isUpdating,
+}: Omit<SettingsSectionProps, "metadata">) {
+  const [aboutMe, setAboutMe] = useState(profile.aboutMe || "");
 
   return (
     <AccordionItem value="about">
@@ -196,7 +200,7 @@ export function AboutMeSetting({ profile, updateProfile, isUpdating }: Omit<Sett
         <Textarea
           value={aboutMe}
           onChange={(e) => setAboutMe(e.target.value)}
-          placeholder={profile.aboutMe || "Tell us about yourself..."}
+          placeholder="I spend too much time making coffee..."
           className="resize-none text-sm"
           minRows={3}
         />
@@ -204,12 +208,14 @@ export function AboutMeSetting({ profile, updateProfile, isUpdating }: Omit<Sett
           size="sm"
           className="w-full transition-all duration-200 active:scale-[0.98]"
           onClick={() => updateProfile({ aboutMe })}
-          disabled={isUpdating || aboutMe === "" || aboutMe === profile.aboutMe}
+          disabled={
+            isUpdating || aboutMe.trim() === "" || aboutMe === profile.aboutMe
+          }
         >
           {isUpdating ? (
-            <Loader inline className="size-4 mr-2" />
+            <Loader inline className="size-4 mr-1" />
           ) : (
-            <Save className="size-4 mr-2" />
+            <Save className="size-4 mr-1" />
           )}
           Save About Me
         </Button>
@@ -222,8 +228,8 @@ export function OpeningQuesSetting({
   profile,
   updateProfile,
   isUpdating,
-}: Omit<SettingsSectionProps, 'metadata'>) {
-  const [openingQues, setOpeningQues] = useState("");
+}: Omit<SettingsSectionProps, "metadata">) {
+  const [openingQues, setOpeningQues] = useState(profile.openingQues || "");
 
   return (
     <AccordionItem value="question">
@@ -234,7 +240,7 @@ export function OpeningQuesSetting({
         <Textarea
           value={openingQues}
           onChange={(e) => setOpeningQues(e.target.value)}
-          placeholder={profile.openingQues || "Ask an icebreaker..."}
+          placeholder="What's your favorite controversial food opinion?"
           className="resize-none text-sm"
           minRows={3}
         />
@@ -242,12 +248,16 @@ export function OpeningQuesSetting({
           size="sm"
           className="w-full transition-all duration-200 active:scale-[0.98]"
           onClick={() => updateProfile({ openingQues })}
-          disabled={isUpdating || openingQues === "" || openingQues === profile.openingQues}
+          disabled={
+            isUpdating ||
+            openingQues.trim() === "" ||
+            openingQues === profile.openingQues
+          }
         >
           {isUpdating ? (
-            <Loader inline className="size-4 mr-2" />
+            <Loader inline className="size-4 mr-1" />
           ) : (
-            <Save className="size-4 mr-2" />
+            <Save className="size-4 mr-1" />
           )}
           Save Question
         </Button>
@@ -256,7 +266,11 @@ export function OpeningQuesSetting({
   );
 }
 
-export function DiscoverySetting({ profile, updateProfile, isUpdating }: Omit<SettingsSectionProps, 'metadata'>) {
+export function DiscoverySetting({
+  profile,
+  updateProfile,
+  isUpdating,
+}: Omit<SettingsSectionProps, "metadata">) {
   return (
     <AccordionItem value="discovery">
       <AccordionTrigger className="text-sm font-medium">
@@ -350,7 +364,7 @@ export function PasswordSetting() {
           </p>
         )}
         {passwordSuccess && (
-          <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium animate-in fade-in">
+          <p className="text-xs text-primary font-medium animate-in fade-in">
             Password successfully updated!
           </p>
         )}
@@ -362,9 +376,9 @@ export function PasswordSetting() {
           disabled={isUpdatingPassword || !currentPassword || !newPassword}
         >
           {isUpdatingPassword ? (
-            <Loader inline className="size-4 mr-2" />
+            <Loader inline className="size-4 mr-1" />
           ) : (
-            <Save className="size-4 mr-2" />
+            <Save className="size-4 mr-1" />
           )}
           Update Password
         </Button>
@@ -378,7 +392,7 @@ export function DeactivateAccountAction() {
   const queryClient = useQueryClient();
   const [confirmText, setConfirmText] = useState("");
   const [disableError, setDisableError] = useState("");
-  const clearOutbox = useOutboxStore(state => state.clearOutbox);
+  const clearOutbox = useOutboxStore((state) => state.clearOutbox);
   const { key: deactivateKey, resetKey: resetDeactivateKey } = useIdempotency();
 
   const { mutate: deactivateProfile, isPending: isDeactivating } = useMutation({
@@ -392,24 +406,28 @@ export function DeactivateAccountAction() {
       router.push("/login");
     },
     onError: (err: AxiosError<{ message: string }>) => {
-      setDisableError(err.response?.data?.message || "Failed to deactivate account.");
+      setDisableError(
+        err.response?.data?.message || "Failed to deactivate account.",
+      );
     },
     onSettled: () => resetDeactivateKey(),
   });
 
   return (
-    <Dialog onOpenChange={(open) => {
-      if (!open) {
-        setDisableError("");
-        setConfirmText("");
-      }
-    }}>
+    <Dialog
+      onOpenChange={(open) => {
+        if (!open) {
+          setDisableError("");
+          setConfirmText("");
+        }
+      }}
+    >
       <DialogTrigger asChild>
         <Button
           variant="outline"
           className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/20 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-destructive/30 transition-all duration-200 active:scale-[0.98]"
         >
-          <ShieldAlert className="size-4 mr-2" />
+          <ShieldAlert className="size-4 mr-1" />
           Disable Account
         </Button>
       </DialogTrigger>
@@ -429,7 +447,8 @@ export function DeactivateAccountAction() {
           </div>
           <div className="flex flex-col gap-3">
             <label className="text-sm font-medium text-foreground">
-              Type <span className="font-bold select-all">DEACTIVATE</span> to confirm:
+              Type <span className="font-bold select-all">DEACTIVATE</span> to
+              confirm:
             </label>
             <Input
               value={confirmText}
@@ -476,7 +495,7 @@ export function DeactivateAccountAction() {
 export function LogoutActions() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const clearOutbox = useOutboxStore(state => state.clearOutbox);
+  const clearOutbox = useOutboxStore((state) => state.clearOutbox);
 
   const handleLogoutSuccess = () => {
     queryClient.clear();
@@ -503,19 +522,19 @@ export function LogoutActions() {
         disabled={isLoggingOut}
       >
         {isLoggingOut ? (
-          <Loader inline className="size-4 mr-2" />
+          <Loader inline className="size-4 mr-1" />
         ) : (
-          <LogOut className="size-4 mr-2" />
+          <LogOut className="size-4 mr-1" />
         )}
         Logout
       </Button>
       <Button
         variant="outline"
-        className="w-full text-muted-foreground hover:text-foreground transition-all duration-200 active:scale-[0.98]"
+        className="w-full text-foreground/85 hover:text-foreground transition-all duration-200 active:scale-[0.98]"
         onClick={() => logoutAll()}
         disabled={isLoggingOutAll}
       >
-        {isLoggingOutAll && <Loader inline className="size-4 mr-2" />}
+        {isLoggingOutAll && <Loader inline className="size-4 mr-1" />}
         Logout from all devices
       </Button>
     </>

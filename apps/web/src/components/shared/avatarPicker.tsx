@@ -36,12 +36,12 @@ export function AvatarPicker({ value, onChange, avatars }: AvatarPickerProps) {
           <Button
             variant="outline"
             size="sm"
-            className="w-48 justify-between bg-background shadow-xs hover:bg-muted/50 transition-all duration-200 active:scale-[0.98]"
+            className="w-48 justify-between bg-background shadow-xs hover:bg-muted/50 transition-all duration-200 active:scale-[0.98] [&[data-state=open]>svg]:rotate-180"
           >
             <span className="truncate">
               {value ? "Change avatar" : "Select an avatar"}
             </span>
-            <ChevronDown className="size-4 opacity-50 shrink-0" />
+            <ChevronDown className="size-4 opacity-50 shrink-0 transition-transform duration-200" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-64 p-0" align="center" sideOffset={8}>

@@ -1,30 +1,33 @@
-import { ThemeProvider } from "@/providers/themeProvider";
+import { ThemeToggle } from "@/components/themeToggle";
 import AuthProvider from "@/providers/authProvider";
 import QueryProvider from "@/providers/queryProvider";
+import { ThemeProvider } from "@/providers/themeProvider";
 import { TooltipProvider } from "@matcha/ui/components/tooltip";
 import "@matcha/ui/globals.css";
 import { cn } from "@matcha/ui/lib/utils";
-import { ThemeToggle } from "@/components/themeToggle";
-import { Inter, Geist_Mono } from "next/font/google";
+import { Geist, Ubuntu } from "next/font/google";
 
-const inter = Inter({
-  variable: "--font-inter",
+const ubuntu = Ubuntu({
+  variable: "--font-ubuntu-sans",
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+});
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body
         className={cn(
-          "min-h-screen font-sans antialiased",
-          inter.variable, 
-          geistMono.variable,
+          "min-h-screen font-sans antialiased selection:bg-primary selection:text-primary-foreground",
+          ubuntu.variable,
+          geistSans.variable,
         )}
       >
         <ThemeProvider>

@@ -17,10 +17,15 @@ let cachedDeviceId: string | null = null;
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     if (!cachedDeviceId) {
-      cachedDeviceId = localStorage.getItem('device_id');
-      if (!cachedDeviceId) {
+      try {
+        cachedDeviceId = localStorage.getItem('device_id');
+        if (!cachedDeviceId) {
+          cachedDeviceId = crypto.randomUUID();
+          localStorage.setItem('device_id', cachedDeviceId);
+        }
+      } catch (err) {
         cachedDeviceId = crypto.randomUUID();
-        localStorage.setItem('device_id', cachedDeviceId);
+        console.warn("localStorage is not accessible");
       }
     }
     config.headers['x-device-id'] = cachedDeviceId;

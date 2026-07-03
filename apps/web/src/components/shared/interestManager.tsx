@@ -4,12 +4,12 @@ import { InterestMetadata } from "@/types/models";
 import {
   closestCenter,
   DndContext,
+  DragEndEvent,
   KeyboardSensor,
   PointerSensor,
   TouchSensor,
   useSensor,
   useSensors,
-  DragEndEvent,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -87,7 +87,7 @@ function SortableInterestBadge({
       <button
         type="button"
         aria-label={`Remove ${id}`}
-        className="rounded-full hover:bg-foreground/10 p-1 ml-1.5 transition-all duration-200 active:scale-90 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        className="rounded-full hover:bg-foreground/10 p-1 ml-1.5 transition-all duration-200 active:scale-90 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 extend-touch-target"
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation();
@@ -165,9 +165,7 @@ export function InterestManager({
             <DialogDescription
               className={cn(
                 "text-sm font-medium transition-colors duration-200 mt-1",
-                !isInterestValid
-                  ? "text-destructive"
-                  : "text-emerald-600 dark:text-emerald-400",
+                !isInterestValid ? "text-destructive" : "text-foreground",
               )}
             >
               {!isInterestValid
@@ -178,7 +176,7 @@ export function InterestManager({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto space-y-5 py-2 pr-2">
+          <div className="flex-1 overflow-y-auto no-scrollbar space-y-5 py-2 pr-2">
             {Object.entries(categorizedInterests).map(([category, items]) => (
               <div key={category} className="space-y-3">
                 <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">
@@ -193,10 +191,10 @@ export function InterestManager({
                         type="button"
                         aria-pressed={isSelected}
                         className={cn(
-                          "inline-flex items-center rounded-full border px-3.5 py-1.5 text-sm transition-all duration-200 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                          "inline-flex items-center rounded-md border px-3.5 py-1.5 text-sm transition-all duration-200 active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
                           isSelected
-                            ? "border-transparent bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
-                            : "border-border bg-background text-foreground hover:bg-muted",
+                            ? "border-transparent bg-foreground text-background shadow-md hover:bg-foreground/90"
+                            : "border-border bg-secondary/80 text-secondary-foreground hover:bg-secondary/20",
                         )}
                         onClick={() => {
                           if (isSelected)
@@ -233,7 +231,7 @@ export function InterestManager({
             "space-y-3 p-4 rounded-xl border transition-colors duration-200",
             !isInterestValid
               ? "border-destructive/30 bg-destructive/5"
-              : "bg-muted/30",
+              : "bg-muted/20",
           )}
         >
           <p
@@ -242,8 +240,8 @@ export function InterestManager({
               !isInterestValid ? "text-destructive" : "text-muted-foreground",
             )}
           >
-            <GripHorizontal className="size-3.5 opacity-70" /> Drag to rank
-            priority
+            <GripHorizontal className="size-3.5 opacity-70" /> Drag to rank what
+            matters most to you.
           </p>
 
           <DndContext

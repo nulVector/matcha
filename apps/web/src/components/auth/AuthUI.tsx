@@ -1,7 +1,11 @@
+"use client";
+
 import { GoogleIcon } from "@/components/shared/icons";
 import { Button } from "@matcha/ui/components/button";
+import { Loader } from "@matcha/ui/components/loader";
 import { Separator } from "@matcha/ui/components/separator";
 import Link from "next/link";
+import { useState } from "react";
 
 interface AuthHeaderProps {
   title: string;
@@ -21,7 +25,9 @@ interface AuthFooterLinkProps {
 export function AuthHeader({ title, description }: AuthHeaderProps) {
   return (
     <div className="flex flex-col items-center gap-2 text-center">
-      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+        {title}
+      </h1>
       <p className="text-sm text-muted-foreground text-balance">
         {description}
       </p>
@@ -52,6 +58,13 @@ export function AuthError({ message }: { message?: string | null }) {
 }
 
 export function OAuthSection() {
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+  const handleGoogleLogin = () => {
+    setIsGoogleLoading(true);
+    window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/auth/google`;
+  };
+
   return (
     <div className="space-y-4">
       <div className="relative flex items-center gap-3 py-4">
@@ -65,13 +78,16 @@ export function OAuthSection() {
         type="button"
         variant="outline"
         size="lg"
-        className="w-full bg-background"
-        asChild
+        className="w-full bg-background text-foreground hover:bg-muted"
+        onClick={handleGoogleLogin}
+        disabled={isGoogleLoading}
       >
-        <a href={`${process.env.NEXT_PUBLIC_API_URL}/auth/google`}>
-          <GoogleIcon className="mr-2 size-4" />
-          Google
-        </a>
+        {isGoogleLoading ? (
+          <Loader inline className="mr-1 size-4" />
+        ) : (
+          <GoogleIcon className="mr-1 size-4" />
+        )}
+        Google
       </Button>
     </div>
   );

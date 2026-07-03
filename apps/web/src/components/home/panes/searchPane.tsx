@@ -59,28 +59,28 @@ export function SearchPane() {
             disabled={isSearching || searchInput.length < 5}
             className="h-9 px-4 w-25 transition-all"
           >
-            {isSearching && <Loader inline className="size-4 mr-2" />}
+            {isSearching && <Loader inline className="size-4 mr-1" />}
             Search
           </Button>
         </form>
       </div>
       <div className="flex-1 overflow-y-auto p-4 flex flex-col">
         {!searchResult && !searchError && !isSearching && (
-          <div className="m-auto">
+          <div className="my-auto">
             <EmptyState
               icon={<UserSearch className="size-8" />}
-              title="Search for friends"
-              description="Enter an exact username to find their profile."
+              title="Looking for someone?"
+              description="Enter their exact Matcha handle to pull up their profile."
             />
           </div>
         )}
 
         {searchError && (
-          <div className="m-auto">
+          <div className="my-auto">
             <EmptyState
-              icon={<Ghost className="size-8 text-destructive/50" />}
-              title="No user found"
-              description="They might not exist, or they have turned off discoverability."
+              icon={<Ghost className="size-8" />}
+              title="Couldn't find them"
+              description="Double-check the spelling, or they may have turned off their discoverability."
             />
           </div>
         )}
@@ -99,7 +99,6 @@ export function SearchPane() {
             />
             <h3 className="font-medium text-foreground">
               {searchResult.username}
-              {console.log(searchResult)}
             </h3>
           </button>
         )}

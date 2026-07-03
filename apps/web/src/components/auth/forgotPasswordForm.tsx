@@ -9,13 +9,13 @@ import {
   requestPasswordResetType,
 } from "@matcha/zod";
 import { useMutation } from "@tanstack/react-query";
+import { AxiosError } from "axios";
 import { MailCheck } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { EmailField } from "./AuthFields";
 import { AuthError, AuthFooterLink, AuthHeader } from "./AuthUI";
-import { AxiosError } from "axios";
 
 export function ForgotPasswordForm() {
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -77,8 +77,8 @@ export function ForgotPasswordForm() {
   return (
     <div className="flex flex-col gap-6">
       <AuthHeader
-        title="Reset Password"
-        description="Enter your email address and we'll send you a recovery link"
+        title="Reset your password"
+        description="Don't worry, it happens. We'll send a recovery link."
       />
 
       <FormProvider {...form}>
@@ -95,7 +95,7 @@ export function ForgotPasswordForm() {
               size="lg"
               disabled={isPending}
             >
-              {isPending && <Loader inline className="mr-2 size-4" />}
+              {isPending && <Loader inline className="mr-1 size-4" />}
               Send Reset Link
             </Button>
           </div>

@@ -26,7 +26,7 @@ function PasswordInput({
         onClick={() => setShowPassword((prev) => !prev)}
         className={cn(
           "absolute right-3 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground transition-all duration-200",
-          "hover:text-foreground active:scale-95 cursor-pointer",
+          "hover:text-foreground active:scale-95 cursor-pointer extend-touch-target",
           "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
           "disabled:cursor-not-allowed disabled:opacity-50"
         )}

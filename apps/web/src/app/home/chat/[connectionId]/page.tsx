@@ -19,6 +19,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { motion } from "framer-motion";
 import {
   AlertCircle,
   ArrowDown,
@@ -43,12 +44,12 @@ export default function ActiveChatPage() {
   const removeOutboxMessage = useOutboxStore((state) => state.removeMessage);
   const markMessageFailed = useOutboxStore((state) => state.markFailed);
 
-  const { 
-    data: history, 
+  const {
+    data: history,
     isLoading: isHistoryLoading,
     fetchNextPage,
     hasNextPage,
-    isFetchingNextPage
+    isFetchingNextPage,
   } = useInfiniteQuery({
     queryKey: ["messages", connectionId],
     queryFn: async ({ pageParam }) => {
@@ -100,12 +101,12 @@ export default function ActiveChatPage() {
     showScrollButton,
     unreadBelow,
   } = useChatScroll(
-    messages, 
+    messages,
     myId,
     () => {
       if (!isFetchingNextPage) fetchNextPage();
     },
-    hasNextPage
+    hasNextPage,
   );
 
   const matchStatusRef = useRef(matchData?.status);
@@ -121,7 +122,7 @@ export default function ActiveChatPage() {
 
   useEffect(() => {
     if (!chatPartner?.id || !connectionId) return;
-    
+
     sendMessage(EventType.VIEW_CHAT, {
       connectionId,
       receiverId: chatPartner.id,
@@ -142,17 +143,28 @@ export default function ActiveChatPage() {
           const newPages = [...old.pages];
           newPages[0] = {
             ...newPages[0],
-            matchData: { ...newPages[0].matchData, status: "ARCHIVED", expiresAt: null }
+            matchData: {
+              ...newPages[0].matchData,
+              status: "ARCHIVED",
+              expiresAt: null,
+            },
           };
           return { ...old, pages: newPages };
         });
-        api.delete(
-          `/connections/${connectionId}`, 
-          { headers: { "x-idempotency-key": skipKey } }
-        ).then(() => {
-          queryClient.invalidateQueries({ queryKey: ["connections"] });
-          queryClient.invalidateQueries({ queryKey: ["messages", connectionId] });
-        }).catch(console.error);
+        api
+          .delete(`/connections/${connectionId}`, {
+            headers: { "x-idempotency-key": skipKey },
+          })
+          .then(() => {
+            queryClient.invalidateQueries({ queryKey: ["connections"] });
+            queryClient.invalidateQueries({
+              queryKey: ["messages", connectionId],
+            });
+          })
+          .catch((err) => {
+            if (err.response?.status === 400) return;
+            console.error(err);
+          });
       } else {
         queryClient.invalidateQueries({ queryKey: ["messages", connectionId] });
         queryClient.invalidateQueries({ queryKey: ["connections"] });
@@ -177,152 +189,162 @@ export default function ActiveChatPage() {
         matchData={matchData || { id: connectionId, status: "LOADING" }}
       />
 
-      <div className="relative flex-1 overflow-hidden">
+      <div className="relative flex flex-col flex-1 overflow-hidden">
         <div className="absolute inset-0 z-0 pointer-events-none">
           <svg className="h-full w-full">
             <defs>
-              <pattern 
-                id="doodle-bg" 
+              <pattern
+                id="doodle-bg"
                 width="894"
                 height="590"
                 patternUnits="userSpaceOnUse"
                 patternTransform="scale(0.6)"
               >
-                <Doodle className="text-foreground/25 dark:text-muted-foreground/15" />
+                <Doodle className="text-foreground/20 dark:text-muted-foreground/20" />
               </pattern>
             </defs>
             <rect width="100%" height="100%" fill="url(#doodle-bg)" />
           </svg>
         </div>
-        <div
-          ref={scrollContainerRef}
-          onScroll={handleScroll}
-          className="relative z-10 h-full overflow-y-auto p-4 md:p-6 no-scrollbar [overflow-anchor:none]"
-        >
-          <div className="flex flex-col min-h-full pb-2">
-            <div className="flex-1" />
-            {isFetchingNextPage && (
-              <div className="flex justify-center py-4 mb-2">
-                <Loader inline className="size-5 text-muted-foreground" />
-              </div>
-            )}
-
-            {messages.map((msg: ChatMessage, index: number) => {
-              const isMe = msg.senderId === myId;
-              const prevMsg = messages[index - 1];
-              const isConsecutive = prevMsg && prevMsg.senderId === msg.senderId;
-
-              return (
-                <div
-                  key={msg.id}
-                  className={cn(
-                    "flex w-full",
-                    isMe ? "justify-end" : "justify-start",
-                    isConsecutive ? "mt-1" : "mt-4",
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "max-w-[85%] md:max-w-[70%] px-4 py-2 text-[15px] shadow-sm flex items-end gap-2.5",
-                      isMe
-                        ? "bg-primary text-primary-foreground rounded-2xl rounded-br-sm"
-                        : "bg-card text-card-foreground border border-border/50 rounded-2xl rounded-bl-sm",
-                      msg.status === "failed" && "opacity-80",
-                    )}
-                  >
-                    <span className="wrap-break-word whitespace-pre-wrap leading-relaxed">
-                      {msg.content}
-                    </span>
-
-                    {isMe && (
-                      <div className="shrink-0 -mb-0.5 -mr-1 flex items-center gap-1">
-                        {msg.isOutbox ? (
-                          msg.status === "pending" ? (
-                            <Check className="size-3.5 opacity-60" />
-                          ) : (
-                            <div className="flex items-center gap-1.5 ml-1">
-                              <button
-                                onClick={() => {
-                                  retryOutboxMessage(msg.id);
-                                  sendMessage(EventType.SEND_MESSAGE, {
-                                    connectionId,
-                                    receiverId: chatPartner?.id || "",
-                                    content: msg.content,
-                                  });
-                                  setTimeout(
-                                    () => markMessageFailed(msg.id),
-                                    5000,
-                                  );
-                                }}
-                                className="text-destructive hover:text-red-400 transition-colors active:scale-90 outline-none"
-                                title="Failed to send. Click to retry."
-                              >
-                                <AlertCircle className="size-4 drop-shadow-sm" />
-                              </button>
-
-                              <button
-                                onClick={() => removeOutboxMessage(msg.id)}
-                                className="text-primary-foreground/50 hover:text-primary-foreground transition-colors active:scale-90 outline-none"
-                                title="Delete message"
-                              >
-                                <Trash2 className="size-3.5" />
-                              </button>
-                            </div>
-                          )
-                        ) : (
-                          <CheckCheck
-                            className={cn(
-                              "size-4 transition-all duration-300",
-                              msg.isRead ? "opacity-100" : "opacity-40",
-                            )}
-                          />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-            <div ref={bottomRef} className="h-1 shrink-0" />
-          </div>
-        </div>
-
-        {showScrollButton && (
-          <div className="absolute bottom-4 right-4 z-20 animate-in fade-in zoom-in-95 duration-200">
-            <div className="relative">
-              {unreadBelow > 0 && (
-                <div className="absolute -top-1.5 -right-1.5 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground shadow-sm ring-2 ring-background animate-in zoom-in duration-200">
-                  {unreadBelow > 99 ? "99+" : unreadBelow}
+        <div className="absolute inset-0 z-1 h-full w-full backdrop-blur-[2px] pointer-events-none" />
+        <div className="relative z-10 flex-1 flex flex-col overflow-hidden">
+          <div
+            ref={scrollContainerRef}
+            onScroll={handleScroll}
+            className="relative z-10 flex-1 overflow-y-auto p-4 lg:p-6 no-scrollbar [overflow-anchor:none]"
+          >
+            <div className="flex flex-col min-h-full pb-2">
+              <div className="flex-1" />
+              {isFetchingNextPage && (
+                <div className="flex justify-center py-4 mb-2">
+                  <Loader inline className="size-5 text-muted-foreground" />
                 </div>
               )}
 
-              <Button
-                size="icon"
-                onClick={scrollToBottom}
-                aria-label="Scroll to bottom"
-                className="size-10 rounded-full shadow-lg bg-background text-foreground border border-border/50 hover:bg-muted transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              >
-                <ArrowDown className="size-5" />
-              </Button>
+              {messages.map((msg: ChatMessage, index: number) => {
+                const isMe = msg.senderId === myId;
+                const prevMsg = messages[index - 1];
+                const isConsecutive =
+                  prevMsg && prevMsg.senderId === msg.senderId;
+
+                return (
+                  <motion.div
+                    layout="position"
+                    initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    transition={{ duration: 0.2, ease: "easeOut" }}
+                    key={msg.id}
+                    className={cn(
+                      "flex w-full",
+                      isMe ? "justify-end" : "justify-start",
+                      isConsecutive ? "mt-1" : "mt-4",
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "max-w-[85%] lg:max-w-[70%] px-4 py-2 text-[15px] shadow-sm flex items-end gap-2.5",
+                        isMe
+                          ? "bg-primary/95 dark:bg-primary text-primary-foreground rounded-2xl rounded-br-sm"
+                          : "bg-card text-card-foreground border border-border/50 rounded-2xl rounded-bl-sm",
+                        msg.status === "failed" && "opacity-80",
+                      )}
+                    >
+                      <span className="wrap-break-word whitespace-pre-wrap leading-relaxed">
+                        {msg.content}
+                      </span>
+
+                      {isMe && (
+                        <div className="shrink-0 -mb-0.5 -mr-1 flex items-center gap-1">
+                          {msg.isOutbox ? (
+                            msg.status === "pending" ? (
+                              <Check className="size-3.5 opacity-60" />
+                            ) : (
+                              <div className="flex items-center gap-1.5 ml-1">
+                                <button
+                                  onClick={() => {
+                                    retryOutboxMessage(msg.id);
+                                    sendMessage(EventType.SEND_MESSAGE, {
+                                      connectionId,
+                                      receiverId: chatPartner?.id || "",
+                                      content: msg.content,
+                                    });
+                                    setTimeout(
+                                      () => markMessageFailed(msg.id),
+                                      5000,
+                                    );
+                                  }}
+                                  className="text-destructive hover:text-destructive/80 transition-colors active:scale-90 outline-none"
+                                  title="Failed to send. Click to retry."
+                                >
+                                  <AlertCircle className="size-4 drop-shadow-sm" />
+                                </button>
+
+                                <button
+                                  onClick={() => removeOutboxMessage(msg.id)}
+                                  className="text-primary-foreground/50 hover:text-primary-foreground transition-colors active:scale-90 outline-none"
+                                  title="Delete message"
+                                >
+                                  <Trash2 className="size-3.5" />
+                                </button>
+                              </div>
+                            )
+                          ) : (
+                            <CheckCheck
+                              className={cn(
+                                "size-4 transition-all duration-300",
+                                msg.isRead ? "opacity-100" : "opacity-40",
+                              )}
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
+              <div ref={bottomRef} className="h-1 shrink-0" />
             </div>
           </div>
-        )}
-      </div>
-      {partnerStatus === "OFFLINE" && matchData?.status === "MATCHED" && (
-        <div className="bg-destructive/10 border-t border-destructive/20 px-4 py-2 flex items-center justify-center gap-2 text-sm text-destructive font-medium shrink-0 animate-in slide-in-from-bottom-2">
-          <Loader inline className="size-4 text-destructive" />
-          Partner lost connection. Waiting for them to return...
+
+          {showScrollButton && (
+            <div className="absolute bottom-2 right-4 lg:right-6 z-30 animate-in fade-in zoom-in-95 duration-200">
+              <div className="relative">
+                {unreadBelow > 0 && (
+                  <div className="absolute -top-1.5 -right-1.5 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground shadow-sm ring-2 ring-background animate-in zoom-in duration-200">
+                    {unreadBelow > 99 ? "99+" : unreadBelow}
+                  </div>
+                )}
+
+                <Button
+                  size="icon"
+                  onClick={scrollToBottom}
+                  aria-label="Scroll to bottom"
+                  className="size-10 rounded-full shadow-lg bg-background text-foreground border border-border/50 hover:bg-muted transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                >
+                  <ArrowDown className="size-5" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
-      )}
-      <MessageInput
-        connectionId={connectionId}
-        receiverId={chatPartner?.id || "unknown"}
-        targetUser={chatPartner}
-        isMatched={matchData?.status === "MATCHED"}
-        isArchived={
-          matchData?.status === "ARCHIVED" || matchData?.status === "ENDED"
-        }
-      />
+        <div className="relative z-20 flex flex-col shrink-0">
+          {partnerStatus === "OFFLINE" && matchData?.status === "MATCHED" && (
+            <div className="bg-destructive/10 border-t border-destructive/20 px-4 py-2 flex items-center justify-center gap-2 text-sm text-destructive font-medium shrink-0 animate-in slide-in-from-bottom-2">
+              <Loader inline className="size-4 text-destructive" />
+              Partner lost connection. Waiting for them to return...
+            </div>
+          )}
+          <MessageInput
+            connectionId={connectionId}
+            receiverId={chatPartner?.id || "unknown"}
+            targetUser={chatPartner}
+            isMatched={matchData?.status === "MATCHED"}
+            isArchived={
+              matchData?.status === "ARCHIVED" || matchData?.status === "ENDED"
+            }
+          />
+        </div>
+      </div>
     </div>
   );
 }

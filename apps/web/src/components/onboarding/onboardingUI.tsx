@@ -3,7 +3,6 @@
 import { Button } from "@matcha/ui/components/button";
 import { Loader } from "@matcha/ui/components/loader";
 import { cn } from "@matcha/ui/lib/utils";
-import React from "react";
 
 interface OnboardingProgressProps {
   step: 1 | 2 | 3;
@@ -28,16 +27,19 @@ export function OnboardingProgress({ step }: OnboardingProgressProps) {
       <div
         className={cn(
           "h-full bg-primary transition-all duration-500 ease-in-out",
-          step === 1 ? "w-1/3" : step === 2 ? "w-2/3" : "w-full"
+          step === 1 ? "w-1/3" : step === 2 ? "w-2/3" : "w-full",
         )}
       />
     </div>
   );
 }
 
-export function OnboardingHeader({ title, description }: OnboardingHeaderProps) {
+export function OnboardingHeader({
+  title,
+  description,
+}: OnboardingHeaderProps) {
   return (
-    <div className="text-center md:text-left">
+    <div className="text-center lg:text-left">
       <h2 className="text-2xl font-semibold tracking-tight text-foreground">
         {title}
       </h2>
@@ -63,7 +65,7 @@ export function OnboardingNav({
         onClick={isSubmit ? undefined : onNext}
         disabled={isPending}
       >
-        {isPending && <Loader inline className="mr-2 size-4" />}
+        {isPending && <Loader inline className="mr-1 size-4" />}
         {isSubmit ? "Complete Setup" : "Continue"}
       </Button>
 

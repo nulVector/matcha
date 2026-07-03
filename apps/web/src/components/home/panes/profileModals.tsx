@@ -31,7 +31,10 @@ function SharedProfileInfo({
   profile,
   extraBadge,
 }: {
- profile: Pick<UserSettingsProfile, "username" | "avatarUrl" | "aboutMe" | "interest">;
+  profile: Pick<
+    UserSettingsProfile,
+    "username" | "avatarUrl" | "aboutMe" | "interest"
+  >;
   extraBadge?: React.ReactNode;
 }) {
   return (
@@ -128,7 +131,7 @@ export function SearchProfileModal({
     ) {
       return (
         <Button
-          className="w-full"
+          className="w-full align-middle"
           onClick={() => {
             onClose();
             if (relationship.connectionId) {
@@ -136,7 +139,7 @@ export function SearchProfileModal({
             }
           }}
         >
-          <MessageSquare className="size-4 mr-2" />
+          <MessageSquare className="size-4 mr-1" />
           Message
         </Button>
       );
@@ -146,14 +149,14 @@ export function SearchProfileModal({
       if (relationship.iAmTheSender) {
         return (
           <Button className="w-full" disabled variant="secondary">
-            <Check className="size-4 mr-2" />
+            <Check className="size-4 mr-1" />
             Request Sent
           </Button>
         );
       } else {
         return (
           <Button className="w-full" disabled variant="outline">
-            <Inbox className="size-4 mr-2" />
+            <Inbox className="size-4 mr-1" />
             They sent you a request
           </Button>
         );
@@ -167,9 +170,9 @@ export function SearchProfileModal({
         disabled={isSending}
       >
         {isSending ? (
-          <Loader inline className="size-4 mr-2" />
+          <Loader inline className="size-4 mr-1" />
         ) : (
-          <UserPlus className="size-4 mr-2" />
+          <UserPlus className="size-4 mr-1" />
         )}
         Send Friend Request
       </Button>
@@ -241,7 +244,9 @@ export function RequestDetailsModal({
       queryClient.invalidateQueries({ queryKey: ["connections"] });
       queryClient.invalidateQueries({ queryKey: ["messages"] });
       if (targetUsername) {
-        queryClient.invalidateQueries({ queryKey: ["userProfile", targetUsername] });
+        queryClient.invalidateQueries({
+          queryKey: ["userProfile", targetUsername],
+        });
       }
       onClose();
     },
@@ -257,7 +262,9 @@ export function RequestDetailsModal({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["requests"] });
       if (targetUsername) {
-        queryClient.invalidateQueries({ queryKey: ["userProfile", targetUsername] });
+        queryClient.invalidateQueries({
+          queryKey: ["userProfile", targetUsername],
+        });
       }
       onClose();
     },
@@ -283,9 +290,9 @@ export function RequestDetailsModal({
               disabled={isHandling}
             >
               {isHandling ? (
-                <Loader inline className="size-4 mr-2" />
+                <Loader inline className="size-4 mr-1" />
               ) : (
-                <Check className="size-4 mr-2" />
+                <Check className="size-4 mr-1" />
               )}
               Accept
             </Button>
@@ -301,9 +308,9 @@ export function RequestDetailsModal({
               disabled={isHandling}
             >
               {isHandling ? (
-                <Loader inline className="size-4 mr-2" />
+                <Loader inline className="size-4 mr-1" />
               ) : (
-                <XIcon className="size-4 mr-2" />
+                <XIcon className="size-4 mr-1" />
               )}
               Reject
             </Button>
@@ -318,10 +325,10 @@ export function RequestDetailsModal({
             {isCanceling ? (
               <Loader
                 inline
-                className="size-4 mr-2 text-destructive-foreground"
+                className="size-4 mr-1 text-destructive-foreground"
               />
             ) : (
-              <UserMinus className="size-4 mr-2" />
+              <UserMinus className="size-4 mr-1" />
             )}
             Cancel Request
           </Button>
@@ -336,7 +343,7 @@ export function RequestDetailsModal({
               router.push(`/home/chat/${request.connectionId}`);
             }}
           >
-            <MessageSquare className="size-4 mr-2" />
+            <MessageSquare className="size-4 mr-1" />
             Go to Archived Chat
           </Button>
         )}
@@ -367,7 +374,7 @@ export function RequestDetailsModal({
               extraBadge={
                 <Badge
                   variant="secondary"
-                  className="text-xs font-normal bg-muted text-muted-foreground"
+                  className="text-xs font-normal bg-muted text-muted-foreground pb-0.5"
                 >
                   Origin: {request?.origin}
                 </Badge>

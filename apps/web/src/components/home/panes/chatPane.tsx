@@ -3,6 +3,7 @@
 import { UserAvatar } from "@/components/shared/userAvatar";
 import { useIdempotency } from "@/hooks/useIdempotency";
 import { api } from "@/lib/axios";
+import { ConnectionItem } from "@/types/models";
 import { Badge } from "@matcha/ui/components/badge";
 import { Button } from "@matcha/ui/components/button";
 import {
@@ -22,6 +23,11 @@ import {
 import { EmptyState } from "@matcha/ui/components/emptyState";
 import { Input } from "@matcha/ui/components/input";
 import { Loader } from "@matcha/ui/components/loader";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@matcha/ui/components/tooltip";
 import { cn } from "@matcha/ui/lib/utils";
 import {
   useInfiniteQuery,
@@ -41,7 +47,6 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { NewChatPanel } from "./newChatPanel";
-import { ConnectionItem } from "@/types/models";
 
 export function ChatPane() {
   const params = useParams();
@@ -50,7 +55,8 @@ export function ChatPane() {
   const queryClient = useQueryClient();
   const [view, setView] = useState<"FRIEND" | "ARCHIVED">("FRIEND");
   const [searchQuery, setSearchQuery] = useState("");
-  const [connectionToDelete, setConnectionToDelete] = useState<ConnectionItem | null>(null);
+  const [connectionToDelete, setConnectionToDelete] =
+    useState<ConnectionItem | null>(null);
   const [isNewChatOpen, setIsNewChatOpen] = useState(false);
   const { key: deleteKey, resetKey: resetDeleteKey } = useIdempotency();
 
@@ -84,15 +90,18 @@ export function ChatPane() {
         { headers: { "x-idempotency-key": deleteKey } },
       );
     },
-    onSuccess: (_,connectionId) => {
+    onSuccess: (_, connectionId) => {
       setConnectionToDelete(null);
       queryClient.invalidateQueries({ queryKey: ["connections"] });
-      queryClient.setQueryData(["unreadCounts"], (old: Record<string, number> | undefined) => {
-        if (!old) return old;
-        const newCounts = { ...old };
-        newCounts[connectionId] = 0;
-        return newCounts;
-      });
+      queryClient.setQueryData(
+        ["unreadCounts"],
+        (old: Record<string, number> | undefined) => {
+          if (!old) return old;
+          const newCounts = { ...old };
+          newCounts[connectionId] = 0;
+          return newCounts;
+        },
+      );
       queryClient.removeQueries({ queryKey: ["messages", connectionId] });
     },
     onSettled: () => resetDeleteKey(),
@@ -109,15 +118,25 @@ export function ChatPane() {
       <div className="p-4 space-y-4 border-b border-border/50 pb-4 shrink-0">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-semibold tracking-tight">Messages</h2>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsNewChatOpen(true)}
-            className="size-9 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-all duration-200 active:scale-[0.98]"
-            aria-label="New Chat"
-          >
-            <Edit className="size-4.5" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setIsNewChatOpen(true)}
+                className="relative flex size-12 items-center justify-center rounded-xl transition-all duration-200 text-muted-foreground hover:bg-muted hover:text-foreground mr-12 lg:mr-0"
+                aria-label="New Chat"
+              >
+                <Edit className="size-5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent
+              side="bottom"
+              sideOffset={4}
+              className="hidden lg:block"
+            >
+              <p>New Chat</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
@@ -145,29 +164,35 @@ export function ChatPane() {
           ) : (
             <MessageSquare className="size-4 opacity-70" />
           )}
-          {view === "FRIEND" ? "View Archived" : "View Active Chats"}
+          {view === "FRIEND" ? "View Archived Chats" : "View Active Chats"}
         </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2 space-y-1 no-scrollbar">
-        {isLoading && <Loader className="mt-4" />}
+      <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-1 no-scrollbar">
+        {isLoading && <Loader className="mt-4 self-center" />}
 
         {!isLoading && connections.length === 0 && (
-          <EmptyState
-            icon={
-              view === "FRIEND" ? (
-                <MessageSquare className="size-8" />
-              ) : (
-                <Archive className="size-8" />
-              )
-            }
-            title={`No ${view.toLowerCase()} chats`}
-            description={
-              view === "FRIEND"
-                ? "Go to the matchmaking radar to find new people!"
-                : "You have no archived conversations."
-            }
-          />
+          <div className="my-auto">
+            <EmptyState
+              icon={
+                view === "FRIEND" ? (
+                  <MessageSquare className="size-8" />
+                ) : (
+                  <Archive className="size-8" />
+                )
+              }
+              title={
+                view === "FRIEND"
+                  ? "It's quiet in here"
+                  : "No missed connections"
+              }
+              description={
+                view === "FRIEND"
+                  ? "Head over to The Blend to meet new people."
+                  : "Matches you skip or run out of time with will rest here for 5 days before fading away."
+              }
+            />
+          </div>
         )}
 
         {!isLoading &&
@@ -202,7 +227,7 @@ export function ChatPane() {
                     username={conn.username}
                     className={cn(
                       "size-12 transition-all duration-300",
-                      !conn.isActive && "grayscale opacity-50 border-dashed"
+                      !conn.isActive && "grayscale opacity-50 border-dashed",
                     )}
                   />
                 </div>
@@ -211,12 +236,14 @@ export function ChatPane() {
                     <p
                       className={cn(
                         "text-sm truncate transition-colors",
-                        !conn.isActive 
+                        !conn.isActive
                           ? "italic text-muted-foreground/70"
                           : unreadCount > 0
                             ? "font-semibold text-foreground"
                             : "font-medium text-muted-foreground",
-                        isActiveChat && conn.isActive && "text-foreground font-semibold",
+                        isActiveChat &&
+                          conn.isActive &&
+                          "text-foreground font-semibold",
                       )}
                     >
                       {conn.username}
@@ -242,7 +269,7 @@ export function ChatPane() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="size-8 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-all duration-200 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                      className="size-8 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-all duration-200 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 extend-touch-target"
                       aria-label="Chat options"
                     >
                       <MoreVertical className="size-4" />
@@ -253,7 +280,7 @@ export function ChatPane() {
                       className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer"
                       onClick={() => setConnectionToDelete(conn)}
                     >
-                      <Trash2 className="size-4 mr-2" />
+                      <Trash2 className="size-4 mr-1" />
                       Delete Chat
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -271,7 +298,7 @@ export function ChatPane() {
             onClick={() => fetchNextPage()}
             disabled={isFetchingNextPage}
           >
-            {isFetchingNextPage && <Loader inline className="mr-2 size-3" />}
+            {isFetchingNextPage && <Loader inline className="mr-1 size-3" />}
             Load more
           </Button>
         )}
@@ -303,17 +330,18 @@ export function ChatPane() {
             <Button
               variant="destructive"
               onClick={() => {
-                if (connectionToDelete) deleteChat(connectionToDelete.connectionId);
+                if (connectionToDelete)
+                  deleteChat(connectionToDelete.connectionId);
               }}
               disabled={isDeleting}
             >
               {isDeleting ? (
                 <Loader
                   inline
-                  className="mr-2 size-4 text-destructive-foreground"
+                  className="mr-1 size-4 text-destructive-foreground"
                 />
               ) : (
-                <Trash2 className="size-4 mr-2" />
+                <Trash2 className="size-4 mr-1" />
               )}
               Yes, Delete
             </Button>

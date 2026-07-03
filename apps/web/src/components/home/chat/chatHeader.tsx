@@ -28,6 +28,7 @@ import {
 } from "@matcha/ui/components/tooltip";
 import { cn } from "@matcha/ui/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AnimatePresence, motion, type Variants } from "framer-motion";
 import {
   AlarmClock,
   Check,
@@ -41,6 +42,28 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+
+const typingContainer: Variants = {
+  initial: { opacity: 0 },
+  animate: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.15,
+    },
+  },
+};
+
+const typingDot: Variants = {
+  initial: { y: 0 },
+  animate: {
+    y: [0, -3, 0],
+    transition: {
+      duration: 0.6,
+      repeat: Infinity,
+      ease: "easeInOut",
+    },
+  },
+};
 
 export function ChatHeader({
   connectionId,
@@ -82,6 +105,7 @@ export function ChatHeader({
   const [timeLeft, setTimeLeft] = useState<string>("00:00");
   const [iRequestedExtend, setIRequestedExtend] = useState(false);
   const [iRequestedAdd, setIRequestedAdd] = useState(false);
+  const [showLeaveWarning, setShowLeaveWarning] = useState(false);
 
   useEffect(() => {
     if (!isMatched || !matchData?.expiresAt) return;
@@ -110,9 +134,15 @@ export function ChatHeader({
     if (matchData.iRequestedExtend) setIRequestedExtend(true);
     if (matchData.iRequestedConvert) setIRequestedAdd(true);
     if (matchData.partnerRequested) {
-      const currentReq = queryClient.getQueryData(["pending_request", connectionId]);
+      const currentReq = queryClient.getQueryData([
+        "pending_request",
+        connectionId,
+      ]);
       if (currentReq !== matchData.partnerRequested) {
-        queryClient.setQueryData(["pending_request", connectionId], matchData.partnerRequested);
+        queryClient.setQueryData(
+          ["pending_request", connectionId],
+          matchData.partnerRequested,
+        );
       }
     }
   }, [matchData, connectionId, isMatched, queryClient]);
@@ -132,7 +162,9 @@ export function ChatHeader({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["connections"] });
       if (targetUser?.username) {
-        queryClient.invalidateQueries({ queryKey: ["userProfile", targetUser.username] });
+        queryClient.invalidateQueries({
+          queryKey: ["userProfile", targetUser.username],
+        });
       }
       router.push("/home");
     },
@@ -160,7 +192,7 @@ export function ChatHeader({
   });
 
   const { mutate: extendChat, isPending: isExtending } = useMutation({
-    mutationFn: async ( { action }: { action: "ACCEPT" | "REJECT" }) =>
+    mutationFn: async ({ action }: { action: "ACCEPT" | "REJECT" }) =>
       await api.patch(
         `/connections/${connectionId}/extend`,
         { action },
@@ -176,7 +208,7 @@ export function ChatHeader({
   });
 
   const { mutate: convertChat, isPending: isConverting } = useMutation({
-    mutationFn: async ({ action } : { action: "ACCEPT" | "REJECT" }) =>
+    mutationFn: async ({ action }: { action: "ACCEPT" | "REJECT" }) =>
       await api.patch(
         `/connections/${connectionId}/convert`,
         { action },
@@ -218,9 +250,9 @@ export function ChatHeader({
           disabled={isUnfriending}
         >
           {isUnfriending ? (
-            <Loader inline className="size-4 mr-2" />
+            <Loader inline className="size-4 mr-1" />
           ) : (
-            <UserMinus className="size-4 mr-2" />
+            <UserMinus className="size-4 mr-1" />
           )}
           Unfriend
         </Button>
@@ -231,14 +263,14 @@ export function ChatHeader({
       if (relationship.iAmTheSender) {
         return (
           <Button className="w-full mt-2" disabled variant="secondary">
-            <Check className="size-4 mr-2" />
+            <Check className="size-4 mr-1" />
             Request Sent
           </Button>
         );
       } else {
         return (
           <Button className="w-full mt-2" disabled variant="outline">
-            <Inbox className="size-4 mr-2" />
+            <Inbox className="size-4 mr-1" />
             They sent you a request
           </Button>
         );
@@ -256,9 +288,9 @@ export function ChatHeader({
           disabled={isSending}
         >
           {isSending ? (
-            <Loader inline className="size-4 mr-2" />
+            <Loader inline className="size-4 mr-1" />
           ) : (
-            <UserPlus className="size-4 mr-2" />
+            <UserPlus className="size-4 mr-1" />
           )}
           Send Friend Request
         </Button>
@@ -275,8 +307,14 @@ export function ChatHeader({
           <Button
             variant="ghost"
             size="icon"
-            className="md:hidden mr-2 shrink-0 transition-all duration-200 active:scale-[0.98]"
-            onClick={() => router.push("/home")}
+            className="lg:hidden mr-2 shrink-0 transition-all duration-200 active:scale-[0.98] extend-touch-target"
+            onClick={() => {
+              if (isMatched) {
+                setShowLeaveWarning(true);
+              } else {
+                router.push("/home");
+              }
+            }}
             aria-label="Back to messages"
           >
             <ChevronLeft className="size-6" />
@@ -289,17 +327,17 @@ export function ChatHeader({
                 username={targetUser?.username}
                 className={cn(
                   "size-10 transition-all duration-300",
-                  isDeactivated && "grayscale opacity-50 border-dashed"
+                  isDeactivated && "grayscale opacity-50 border-dashed",
                 )}
               />
-              <div className="hidden flex-col justify-center sm:flex">
+              <div className="hidden flex-col justify-center sm:flex relative">
                 <div className="flex items-center gap-2">
                   <span
                     className={cn(
                       "font-semibold text-base leading-none transition-colors",
                       isDeactivated
                         ? "text-muted-foreground/70 italic"
-                        : "text-foreground group-hover:text-primary"
+                        : "text-foreground group-hover:text-primary",
                     )}
                   >
                     {targetUser?.username}
@@ -310,11 +348,34 @@ export function ChatHeader({
                     </span>
                   )}
                 </div>
-                {isTyping && !isDeactivated && (
-                  <span className="text-xs font-medium text-primary animate-pulse mt-1">
-                    typing...
-                  </span>
-                )}
+                <AnimatePresence>
+                  {isTyping && !isDeactivated && (
+                    <motion.div
+                      key="typing-indicator"
+                      variants={typingContainer}
+                      initial="initial"
+                      animate="animate"
+                      exit={{ opacity: 0, transition: { duration: 0.15 } }}
+                      className="absolute top-full left-0 flex items-center gap-1 mt-2 h-3"
+                    >
+                      <span className="text-xs font-medium text-primary tracking-wide mr-0.5">
+                        typing
+                      </span>
+                      <motion.div
+                        variants={typingDot}
+                        className="size-1 rounded-full bg-primary"
+                      />
+                      <motion.div
+                        variants={typingDot}
+                        className="size-1 rounded-full bg-primary"
+                      />
+                      <motion.div
+                        variants={typingDot}
+                        className="size-1 rounded-full bg-primary"
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </PopoverTrigger>
             <PopoverContent align="start" className="w-80 p-4 space-y-4">
@@ -357,7 +418,7 @@ export function ChatHeader({
       </header>
 
       {isMatched && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 rounded-full border bg-background/85 backdrop-blur-md p-1.5 shadow-sm animate-in fade-in slide-in-from-top-4 duration-300">
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20 flex items-center gap-4 rounded-full border bg-background/85 backdrop-blur-md p-1.5 shadow-sm animate-in fade-in slide-in-from-top-4 duration-300">
           <Badge
             variant="secondary"
             className="h-8 px-3 gap-1.5 text-sm font-medium bg-muted/50 hover:bg-muted/50"
@@ -371,7 +432,7 @@ export function ChatHeader({
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-8 rounded-full hover:bg-muted transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                className="size-8 rounded-full hover:bg-muted transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 extend-touch-target"
                 disabled={
                   iRequestedExtend || pendingRequest === "EXTEND" || isExtending
                 }
@@ -385,7 +446,7 @@ export function ChatHeader({
                 )}
               </Button>
             </TooltipTrigger>
-            <TooltipContent>
+            <TooltipContent className="hidden lg:block">
               <p>Extend Chat (+30m)</p>
             </TooltipContent>
           </Tooltip>
@@ -395,7 +456,7 @@ export function ChatHeader({
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-8 rounded-full hover:bg-muted text-primary transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                className="size-8 rounded-full hover:bg-muted text-primary transition-all duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 extend-touch-target"
                 disabled={
                   iRequestedAdd || pendingRequest === "CONVERT" || isConverting
                 }
@@ -409,7 +470,7 @@ export function ChatHeader({
                 )}
               </Button>
             </TooltipTrigger>
-            <TooltipContent>
+            <TooltipContent className="hidden lg:block">
               <p>Add Friend</p>
             </TooltipContent>
           </Tooltip>
@@ -432,7 +493,7 @@ export function ChatHeader({
             queryClient.setQueryData(["pending_request", connectionId], null);
         }}
       >
-        <DialogContent 
+        <DialogContent
           className="sm:max-w-md [&>button]:hidden"
           onInteractOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
@@ -463,10 +524,10 @@ export function ChatHeader({
               {isExtending ? (
                 <Loader
                   inline
-                  className="mr-2 size-4 text-primary-foreground"
+                  className="mr-1 size-4 text-primary-foreground"
                 />
               ) : (
-                <AlarmClock className="mr-2 size-4" />
+                <AlarmClock className="mr-1 size-4" />
               )}
               Accept Extension
             </Button>
@@ -481,7 +542,7 @@ export function ChatHeader({
             queryClient.setQueryData(["pending_request", connectionId], null);
         }}
       >
-        <DialogContent 
+        <DialogContent
           className="sm:max-w-md [&>button]:hidden"
           onInteractOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
@@ -513,10 +574,10 @@ export function ChatHeader({
               {isConverting ? (
                 <Loader
                   inline
-                  className="mr-2 size-4 text-primary-foreground"
+                  className="mr-1 size-4 text-primary-foreground"
                 />
               ) : (
-                <UserPlus className="mr-2 size-4" />
+                <UserPlus className="mr-1 size-4" />
               )}
               Accept Request
             </Button>
@@ -568,6 +629,42 @@ export function ChatHeader({
               }}
             >
               Find New Match
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showLeaveWarning} onOpenChange={setShowLeaveWarning}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">
+              Abandon Match?
+            </DialogTitle>
+            <DialogDescription className="mt-2 text-balance">
+              Leaving this screen will permanently end your match with{" "}
+              <span className="font-semibold text-foreground">
+                {targetUser?.username}
+              </span>
+              . Are you sure you want to leave?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex w-full flex-col-reverse sm:flex-row gap-3 mt-4 sm:justify-end">
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto min-w-24"
+              onClick={() => setShowLeaveWarning(false)}
+            >
+              Stay
+            </Button>
+            <Button
+              variant="destructive"
+              className="w-full sm:w-auto min-w-24"
+              onClick={() => {
+                setShowLeaveWarning(false);
+                router.push("/home");
+              }}
+            >
+              Yes, Leave
             </Button>
           </DialogFooter>
         </DialogContent>

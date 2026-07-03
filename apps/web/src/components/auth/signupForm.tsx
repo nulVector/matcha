@@ -7,11 +7,11 @@ import { Button } from "@matcha/ui/components/button";
 import { Loader } from "@matcha/ui/components/loader";
 import { signupSchema, signupType } from "@matcha/zod";
 import { useMutation } from "@tanstack/react-query";
+import { AxiosError } from "axios";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormProvider, useForm } from "react-hook-form";
 import { EmailField, PasswordField } from "./AuthFields";
 import { AuthError, AuthFooterLink, AuthHeader, OAuthSection } from "./AuthUI";
-import { AxiosError } from "axios";
 
 export function SignupForm() {
   const router = useRouter();
@@ -60,15 +60,15 @@ export function SignupForm() {
   return (
     <div className="flex flex-col gap-6">
       <AuthHeader
-        title="Create an Account"
-        description="Enter your email below to join Matcha"
+        title="Get started on Matcha"
+        description="Join to find others with shared interests."
       />
       <FormProvider {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <div className="space-y-4">
             <AuthError message={errorMessage} />
             <EmailField disabled={isPending} />
-            <PasswordField disabled={isPending} />
+            <PasswordField disabled={isPending} showStrengthMeter={true} />
             <PasswordField
               name="confirmPassword"
               label="Confirm Password"
@@ -83,7 +83,7 @@ export function SignupForm() {
               size="lg"
               disabled={isPending}
             >
-              {isPending && <Loader inline className="mr-2 size-4" />}
+              {isPending && <Loader inline className="mr-1 size-4" />}
               Sign Up
             </Button>
 

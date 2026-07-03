@@ -6,13 +6,13 @@ import { Button } from "@matcha/ui/components/button";
 import { Loader } from "@matcha/ui/components/loader";
 import { resetPasswordSchema, resetPasswordType } from "@matcha/zod";
 import { useMutation } from "@tanstack/react-query";
+import { AxiosError } from "axios";
 import { ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormProvider, useForm } from "react-hook-form";
 import { PasswordField } from "./AuthFields";
 import { AuthError, AuthHeader } from "./AuthUI";
-import { AxiosError } from "axios";
 
 export function ResetPasswordForm() {
   const searchParams = useSearchParams();
@@ -75,8 +75,8 @@ export function ResetPasswordForm() {
   return (
     <div className="flex flex-col gap-6">
       <AuthHeader
-        title="Create New Password"
-        description="Please enter your new strong password below"
+        title="Create your new password"
+        description="You're almost back in. Set a new password to continue."
       />
 
       <FormProvider {...form}>
@@ -89,6 +89,7 @@ export function ResetPasswordForm() {
               name="password"
               label="New Password"
               description="Must be at least 8 characters, containing numbers, upper and lowercase letters."
+              showStrengthMeter={true}
               disabled={isPending}
             />
             <PasswordField
@@ -105,7 +106,7 @@ export function ResetPasswordForm() {
               size="lg"
               disabled={isPending}
             >
-              {isPending && <Loader inline className="mr-2 size-4" />}
+              {isPending && <Loader inline className="mr-1 size-4" />}
               Reset Password
             </Button>
           </div>
