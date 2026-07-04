@@ -6,7 +6,6 @@ import {
   initiateProfileSchema,
   requestHandleSchema,
   sendRequestSchema,
-  updateProfileSchema,
   userIdSchema,
   usernameCheckSchema,
   vibeCheck

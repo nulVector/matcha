@@ -101,7 +101,7 @@ export function NewChatPanel({ isOpen, onClose }: NewChatPanelProps) {
         {!isLoading && friends.length > 0 && filteredFriends.length === 0 && (
           <div className="py-8 text-center px-4">
             <p className="text-sm text-muted-foreground">
-              No friends found matching "{searchQuery}"
+              No friends found matching &quot;{searchQuery}&quot;
             </p>
           </div>
         )}

@@ -166,7 +166,7 @@ export function MessageInput({
                     {targetUser.username} asked:
                   </span>
                   <p className="italic text-muted-foreground mt-1.5 leading-relaxed text-pretty">
-                    "{targetUser.openingQues}"
+                    &quot;{targetUser.openingQues}&quot;
                   </p>
                 </PopoverContent>
               </Popover>

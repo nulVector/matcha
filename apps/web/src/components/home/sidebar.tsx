@@ -32,7 +32,6 @@ interface NavButtonProps {
 }
 
 const NavButton = ({
-  tab,
   icon: Icon,
   label,
   hasNotification,

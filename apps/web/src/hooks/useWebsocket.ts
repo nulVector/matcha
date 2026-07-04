@@ -311,7 +311,7 @@ export function useWebsocket() {
             });
             break;
 
-          case EventType.NOTIFICATION_UPDATE:
+          case EventType.NOTIFICATION_UPDATE: {
             const category = payload.category?.toUpperCase();
             if (category === "NEW_FRIEND_REQUEST") {
               queryClient.setQueryData(["notifications"], (old: { has_new_requests: boolean } | undefined) => {
@@ -321,6 +321,7 @@ export function useWebsocket() {
               queryClient.invalidateQueries({ queryKey: ["requests"] });
             }
             break;
+          }
 
           default:
             console.warn("Unhandled WebSocket event:", type);
@@ -363,7 +364,7 @@ export function useWebsocket() {
       }
     };
     socketRef.current = ws;
-  }, [queryClient]);
+  }, [queryClient, acknowledgeMessage, router]);
 
   useEffect(() => {
     connect();

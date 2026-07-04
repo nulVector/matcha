@@ -92,9 +92,10 @@ export const cronWorker = new Worker(
             }
             break;
           }
-          default:
-            const exhaustiveCheck: never = task;
+          default: {
+            const _exhaustiveCheck: never = task;
             throw new Error(`[CronWorker] Unknown job name encountered: ${job.name}`);
+          }
         }
       });
     } finally {

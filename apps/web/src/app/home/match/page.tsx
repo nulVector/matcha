@@ -38,7 +38,7 @@ export default function MatchmakingPage() {
       queryClient.setQueryData(["auto_queue"], null);
       setIsQueued(true);
     }
-  }, []);
+  }, [queryClient]);
   
   useEffect(() => {
     return () => {
@@ -50,7 +50,7 @@ export default function MatchmakingPage() {
         ).catch(console.error);
       }
     };
-  }, []);
+  }, [leaveKey]);
 
   const { data: match } = useQuery<MatchState | null>({
     queryKey: ["currentMatch"],
@@ -198,7 +198,7 @@ export default function MatchmakingPage() {
               Stop searching?
             </DialogTitle>
             <DialogDescription className="mt-2 text-balance">
-              You're currently looking for a match. If you leave now, you'll lose your spot. Are you sure?
+              You&apos;re currently looking for a match. If you leave now, you&apos;ll lose your spot. Are you sure?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex w-full flex-col-reverse sm:flex-row gap-3 mt-4 sm:justify-end">

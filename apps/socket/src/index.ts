@@ -85,7 +85,7 @@ server.on('upgrade',async (request,socket,head)=>{
     wss.handleUpgrade(request,socket,head,(ws)=>{
       wss.emit('connection',ws,request,userSession,jwt_payload);
     })
-  } catch (err) {
+  } catch (_err) {
     socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
     socket.destroy();
     return;

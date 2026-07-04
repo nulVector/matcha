@@ -95,9 +95,10 @@ export const taskWorker = new Worker(
             );
             break;
           }
-          default:
-            const exhaustiveCheck: never = task;
+          default: {
+            const _exhaustiveCheck: never = task;
             throw new Error(`TaskWorker Unknown job name encountered: ${job.name}`);
+          }
         }
       });
     } finally {

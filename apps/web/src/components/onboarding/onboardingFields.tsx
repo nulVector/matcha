@@ -170,7 +170,7 @@ export function UsernameField({ status, setStatus }: UsernameFieldProps) {
                   Need a username?
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Let's find a name that fits your vibe.
+                  Let&apos;s find a name that fits your vibe.
                 </div>
               </div>
               <div className="flex gap-2">

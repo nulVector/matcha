@@ -1,4 +1,3 @@
-import Redis from 'ioredis';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { UserState } from '../../common';
 import { MatchManager } from '../match';

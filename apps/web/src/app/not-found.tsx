@@ -28,7 +28,7 @@ export default function NotFoundPage() {
           404
         </h1>
         <p className="max-w-md text-base md:text-lg text-muted-foreground text-balance mb-4">
-          We couldn't find the page you're looking for.
+          We couldn&apos;t find the page you&apos;re looking for.
         </p>
 
         <Button

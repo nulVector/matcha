@@ -7,7 +7,7 @@ export interface AppError extends Error {
   statusCode?: number;
   meta?: { target?: string[] };
 }
-export const globalErrorHandler = (err: AppError ,req: Request,res: Response,next: NextFunction) => {
+export const globalErrorHandler = (err: AppError ,req: Request,res: Response, _next: NextFunction) => {
   logger.error(
     { err, ...err.context }, 
     err.message || "An internal server error occurred"

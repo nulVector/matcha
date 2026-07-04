@@ -15,7 +15,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { Inbox, Send } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { RequestDetailsModal } from "./profileModals";
 
 export function RequestsPane() {
@@ -80,7 +80,7 @@ export function RequestsPane() {
       getNextPageParam: (lastPage) => lastPage.nextCursor,
     });
 
-  const requestsList = data?.pages.flatMap((page) => page.data) || [];
+  const requestsList = useMemo(() => data?.pages.flatMap((page) => page.data) || [], [data?.pages]);
   useEffect(() => {
     if (selectedRequest) {
       const requestStillExists = requestsList.some(

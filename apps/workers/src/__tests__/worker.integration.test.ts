@@ -23,7 +23,6 @@ let matchClient: RedisClient;
 let closeRedisConnections: () => Promise<void>;
 
 let dbBufferQueue: Queue;
-let cronQueue: Queue;
 let taskQueue: Queue;
 let dlqQueue: Queue;
 let QueueName: typeof QueueNameEnum;
@@ -57,7 +56,6 @@ describe('Worker Integration Tests', () => {
     
     const queuePackage = await import('@matcha/queue');
     dbBufferQueue = queuePackage.dbBufferQueue;
-    cronQueue = queuePackage.cronQueue;
     taskQueue = queuePackage.taskQueue;
     dlqQueue = queuePackage.dlqQueue;
 
@@ -266,34 +264,36 @@ describe('Worker Integration Tests', () => {
 
   describe('The Dead-Letter Queue (DLQ) Monitor', () => {
     it('should catch a job that exhausts all retries and move it to the DLQ', async () => {
-      return new Promise<void>(async (resolve, reject) => {
-        const { Worker } = await import('bullmq');
-        let executionCount = 0;
-        
-        const doomedWorker = new Worker(QueueName.TASK, async () => {
-          executionCount++;
-          throw new Error('This job is doomed to fail');
-        }, { connection: queueConnection });
+      return new Promise<void>((resolve, reject) => {
+        (async () => {
+          const { Worker } = await import('bullmq');
+          let executionCount = 0;
+          
+          const doomedWorker = new Worker(QueueName.TASK, async () => {
+            executionCount++;
+            throw new Error('This job is doomed to fail');
+          }, { connection: queueConnection });
 
-        dlqEvents.on('added', async ({ jobId }) => {
-          try {
-            expect(executionCount).toBe(2); 
-            const deadJob = await dlqQueue.getJob(jobId);
-            expect(deadJob).toBeDefined();
-            expect(deadJob?.data.originalQueue).toBe(QueueName.TASK);
-            expect(deadJob?.data.error).toContain('This job is doomed to fail');
+          dlqEvents.on('added', async ({ jobId }) => {
+            try {
+              expect(executionCount).toBe(2); 
+              const deadJob = await dlqQueue.getJob(jobId);
+              expect(deadJob).toBeDefined();
+              expect(deadJob?.data.originalQueue).toBe(QueueName.TASK);
+              expect(deadJob?.data.error).toContain('This job is doomed to fail');
 
-            await doomedWorker.close();
-            resolve();
-          } catch (err) {
-            await doomedWorker.close();
-            reject(err);
-          }
-        });
-        await taskQueue.add('test_doomed_job', { foo: 'bar' }, { 
-          attempts: 2,
-          backoff: { type: 'fixed', delay: 0 } 
-        });
+              await doomedWorker.close();
+              resolve();
+            } catch (err) {
+              await doomedWorker.close();
+              reject(err);
+            }
+          });
+          await taskQueue.add('test_doomed_job', { foo: 'bar' }, { 
+            attempts: 2,
+            backoff: { type: 'fixed', delay: 0 } 
+          });
+        })().catch(reject);
       });
     });
   });

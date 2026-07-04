@@ -152,7 +152,7 @@ export const getChatHistory = async (req:Request,res:Response,next:NextFunction)
       } as CachedMessage));
     }
     else {
-      let messages = await chatManager.getMessages(connectionId);
+      const messages = await chatManager.getMessages(connectionId);
       if (!messages || messages.length === 0) {
         if (connectionStatus === "MATCHED") {
           orderedMessages = [];

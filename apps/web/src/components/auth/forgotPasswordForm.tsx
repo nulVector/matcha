@@ -60,7 +60,7 @@ export function ForgotPasswordForm() {
             <span className="font-medium text-foreground">
               {form.getValues("email")}
             </span>
-            , we've sent instructions to reset your password.
+            , we&apos;ve sent instructions to reset your password.
           </p>
         </div>
         <Button className="w-full mt-4" size="lg" asChild>

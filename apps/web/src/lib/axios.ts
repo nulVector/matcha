@@ -23,7 +23,7 @@ api.interceptors.request.use((config) => {
           cachedDeviceId = crypto.randomUUID();
           localStorage.setItem('device_id', cachedDeviceId);
         }
-      } catch (err) {
+      } catch (_err) {
         cachedDeviceId = crypto.randomUUID();
         console.warn("localStorage is not accessible");
       }

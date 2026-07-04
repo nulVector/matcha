@@ -39,7 +39,7 @@ export async function pingRedisConnections(): Promise<boolean> {
       pubClient.ping()
     ]);
     return results.every(res => res === 'PONG');
-  } catch (err) {
+  } catch (_err) {
     return false;
   }
 }

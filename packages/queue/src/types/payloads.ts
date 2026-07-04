@@ -27,17 +27,12 @@ export interface HandleDroppedMatchPayload {
 export interface ProcessMessageBatchPayload {
   batchSize?: number;
 }
-export interface ProcessReadBatchPayload {
-}
+export type ProcessReadBatchPayload = Record<string, never>;
 
 // CRON QUEUE PAYLOADS
-export interface CleanupArchiveChatsPayload {
-}
-export interface SweepMatchQueuePayload {
-}
-export interface ArchiveExpiredMatchesPayload {
-
-}
+export type CleanupArchiveChatsPayload = Record<string, never>;
+export type SweepMatchQueuePayload = Record<string, never>;
+export type ArchiveExpiredMatchesPayload = Record<string, never>;
  
 export type TaskQueueJob = 
   | { name: JobName.PROFILE_INIT; data: ProfileInitPayload }

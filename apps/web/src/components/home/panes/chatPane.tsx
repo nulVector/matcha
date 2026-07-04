@@ -44,13 +44,12 @@ import {
   Trash2,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useState } from "react";
 import { NewChatPanel } from "./newChatPanel";
 
 export function ChatPane() {
   const params = useParams();
-  const router = useRouter();
   const activeConnectionId = params?.connectionId as string | undefined;
   const queryClient = useQueryClient();
   const [view, setView] = useState<"FRIEND" | "ARCHIVED">("FRIEND");
@@ -200,7 +199,7 @@ export function ChatPane() {
           filteredConnections.length === 0 && (
             <div className="py-8 text-center px-4">
               <p className="text-sm text-muted-foreground">
-                No conversations found matching "{searchQuery}"
+                No conversations found matching &quot;{searchQuery}&quot;
               </p>
             </div>
           )}

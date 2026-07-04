@@ -138,6 +138,7 @@ export default function ActiveChatPage() {
     );
     return () => {
       if (matchStatusRef.current === "MATCHED") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         queryClient.setQueryData(["messages", connectionId], (old: any) => {
           if (!old || !old.pages || !old.pages[0]) return old;
           const newPages = [...old.pages];
@@ -171,7 +172,7 @@ export default function ActiveChatPage() {
       }
       sendMessage(EventType.LEAVE_CHAT, { connectionId });
     };
-  }, [connectionId, chatPartner?.id]);
+  }, [connectionId, chatPartner?.id, lastMessageId, queryClient, sendMessage, skipKey]);
 
   if (isHistoryLoading || isMeLoading || !myId) {
     return (

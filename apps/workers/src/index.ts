@@ -87,7 +87,8 @@ async function bootstrap() {
         queueLengthGauge.labels(queue.name, 'active').set(counts.active ?? 0);
         queueLengthGauge.labels(queue.name, 'delayed').set(counts.delayed ?? 0);
         queueLengthGauge.labels(queue.name, 'failed').set(counts.failed ?? 0);
-      } catch (e) {
+      } catch (_e) {
+        // Ignored intentionally
       }
     }
   }, 15000);

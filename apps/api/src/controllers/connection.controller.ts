@@ -7,7 +7,7 @@ import { logger, traceStorage } from "@matcha/logger";
 import { chatManager, matchManager, userConnectionManager, userDetailManager } from "../services/redis";
 
 async function getSafeMatchInfo(connectionId: string) {
-  let matchInfo = await matchManager.getMatchInfo(connectionId);
+  const matchInfo = await matchManager.getMatchInfo(connectionId);
   if (matchInfo) return matchInfo;
   const connection = await prisma.connection.findUnique({
     where: { id: connectionId },
