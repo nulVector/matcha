@@ -8,7 +8,9 @@
     "build": "tsc",
     "start": "node ./dist/index.js",
     "dev": "tsc & nodemon ./dist/index.js",
-    "clean": "rimraf dist .turbo"
+    "clean": "rimraf dist .turbo",
+    "lint": "eslint . --max-warnings 0",
+    "check-types": "tsc --noEmit"
   },
   "dependencies": {
     "@bull-board/api": "^6.20.3",
@@ -34,6 +36,7 @@
     "zod": "^4.2.1"
   },
   "devDependencies": {
+    "@matcha/eslint-config": "workspace:*",
     "@matcha/queue": "workspace:*",
     "@matcha/shared": "workspace:*",
     "@matcha/typescript-config": "workspace:*",
@@ -47,6 +50,7 @@
     "@types/passport-jwt": "^4.0.1",
     "@types/passport-local": "^1.0.38",
     "@types/supertest": "^7.2.0",
+    "eslint": "^9.39.1",
     "supertest": "^7.2.2"
   }
 }

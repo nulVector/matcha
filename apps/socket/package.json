@@ -8,15 +8,19 @@
     "build": "tsc",
     "start": "node ./dist/index.js",
     "dev": "tsc & nodemon ./dist/index.js",
-    "clean": "rimraf dist .turbo"
+    "clean": "rimraf dist .turbo",
+    "lint": "eslint . --max-warnings 0",
+    "check-types": "tsc --noEmit"
   },
   "devDependencies": {
+    "@matcha/eslint-config": "workspace:*",
     "@matcha/shared": "workspace:*",
     "@matcha/prisma": "workspace:*",
     "@matcha/typescript-config": "workspace:*",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.3.0",
-    "@types/ws": "^8.18.1"
+    "@types/ws": "^8.18.1",
+    "eslint": "^9.39.1"
   },
   "dependencies": {
     "@matcha/logger": "workspace:*",

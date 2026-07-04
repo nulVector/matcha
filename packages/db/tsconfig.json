@@ -4,6 +4,7 @@
     "outDir": "./dist",
     "module": "CommonJS",
     "moduleResolution": "Node",
+    "ignoreDeprecations": "6.0"
   },
   "include": ["src/**/*", "prisma.config.ts"],
   "exclude": ["node_modules", "dist", ".turbo"]

@@ -14,11 +14,15 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc -w",
-    "clean": "rimraf dist .turbo"
+    "clean": "rimraf dist .turbo",
+    "lint": "eslint . --max-warnings 0",
+    "check-types": "tsc --noEmit"
   },
   "devDependencies": {
     "@matcha/shared": "workspace:*",
-    "@matcha/typescript-config": "workspace:*"
+    "@matcha/eslint-config": "workspace:*",
+    "@matcha/typescript-config": "workspace:*",
+    "eslint": "^9.39.1"
   },
   "dependencies": {
     "zod": "^4.2.1"

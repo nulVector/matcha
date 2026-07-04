@@ -18,7 +18,9 @@
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:seed": "ts-node prisma/seed.ts",
-    "clean": "rimraf dist .turbo"
+    "clean": "rimraf dist .turbo",
+    "lint": "eslint . --max-warnings 0",
+    "check-types": "tsc --noEmit"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.2.0",
@@ -27,10 +29,12 @@
     "prisma": "^7.2.0"
   },
   "devDependencies": {
+    "@matcha/eslint-config": "workspace:*",
     "@matcha/typescript-config": "workspace:*",
     "@matcha/shared": "workspace:*",
     "@types/node": "^25.0.3",
     "@types/pg": "^8.16.0",
+    "eslint": "^9.39.1",
     "ts-node": "^10.9.2"
   }
 }

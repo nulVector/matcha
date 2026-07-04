@@ -9,7 +9,9 @@
     "start": "node ./dist/index.js",
     "dev": "tsc & nodemon ./dist/index.js",
     "clean": "rimraf dist .turbo",
-    "queue:clean-dlq": "ts-node src/scripts/cleanDlq.ts"
+    "queue:clean-dlq": "ts-node src/scripts/cleanDlq.ts",
+    "lint": "eslint . --max-warnings 0",
+    "check-types": "tsc --noEmit"
   },
   "dependencies": {
     "@matcha/emails": "workspace:*",
@@ -25,7 +27,9 @@
     "ts-node": "^10.9.2"
   },
   "devDependencies": {
+    "@matcha/eslint-config": "workspace:*",
     "@matcha/shared": "workspace:*",
-    "@matcha/typescript-config": "workspace:*"
+    "@matcha/typescript-config": "workspace:*",
+    "eslint": "^9.39.1"
   }
 }

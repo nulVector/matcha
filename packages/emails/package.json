@@ -6,7 +6,9 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "dev": "email dev --port 3005"
+    "dev": "email dev --port 3005",
+    "lint": "eslint . --max-warnings 0",
+    "check-types": "tsc --noEmit"
   },
   "dependencies": {
     "@react-email/render": "^2.0.8",
@@ -15,9 +17,11 @@
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "@matcha/eslint-config": "workspace:*",
     "@matcha/typescript-config": "workspace:*",
     "@react-email/ui": "6.1.1",
     "@types/react": "19.2.2",
-    "@types/react-dom": "19.2.2"
+    "@types/react-dom": "19.2.2",
+    "eslint": "^9.39.1"
   }
 }
