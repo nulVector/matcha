@@ -348,15 +348,17 @@ export function useWebsocket() {
       };
 
       if (event.code === 1006) {
-        fetch('/api/v1/users/me')
-          .then((res) => {
-            if (res.status === 401) {
-              window.location.href = '/login?expired=true';
-            } else {
-              scheduleReconnect();
-            }
-          })
-          .catch(() => scheduleReconnect());
+        import("@/lib/axios").then(({ api }) => {
+          api.get('/users/me')
+            .then(() => scheduleReconnect())
+            .catch((err) => {
+              if (err.response?.status === 401) {
+                window.location.href = '/login?expired=true';
+              } else {
+                scheduleReconnect();
+              }
+            });
+        });
         return;
       }
       if (event.code !== 1000 && event.code !== 1008 && event.code !== 1001) {

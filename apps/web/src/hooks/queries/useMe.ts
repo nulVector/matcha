@@ -11,7 +11,7 @@ export function useMe(options?: UseMeOptions) {
     queryKey: ["me"],
     queryFn: async () => {
       const res = await api.get("/users/me");
-      return res.data.data; 
+      return res.data?.data ?? null;
     },
     enabled: options?.enabled ?? true,
     retry: options?.retry, 

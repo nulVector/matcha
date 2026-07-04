@@ -30,7 +30,6 @@ import type { updateProfileType } from "@matcha/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AxiosError } from "axios";
 import { LogOut, Save, ShieldAlert } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export interface SettingsSectionProps {
@@ -388,7 +387,6 @@ export function PasswordSetting() {
 }
 
 export function DeactivateAccountAction() {
-  const router = useRouter();
   const queryClient = useQueryClient();
   const [confirmText, setConfirmText] = useState("");
   const [disableError, setDisableError] = useState("");
@@ -403,7 +401,7 @@ export function DeactivateAccountAction() {
     onSuccess: () => {
       queryClient.clear();
       clearOutbox();
-      router.push("/login");
+      window.location.href = "/login";
     },
     onError: (err: AxiosError<{ message: string }>) => {
       setDisableError(
@@ -493,14 +491,13 @@ export function DeactivateAccountAction() {
 }
 
 export function LogoutActions() {
-  const router = useRouter();
   const queryClient = useQueryClient();
   const clearOutbox = useOutboxStore((state) => state.clearOutbox);
 
   const handleLogoutSuccess = () => {
     queryClient.clear();
     clearOutbox();
-    router.push("/login");
+    window.location.href = "/login";
   };
 
   const { mutate: logout, isPending: isLoggingOut } = useMutation({
