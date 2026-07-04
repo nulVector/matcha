@@ -84,11 +84,20 @@ export const cronWorker = new Worker(
           }
           case JobName.SWEEP_MATCH_QUEUE: {
             const usersInQueue = await matchManager.getUsersInQueue(); 
-            for (const userId of usersInQueue) {
-              const isOnline = await userConnectionManager.checkUserStatus(userId);
-              if (!isOnline) {
-                await matchManager.leaveQueue(userId, UserState.IDLE);
+            if (usersInQueue.length === 0) break;
+            const CHUNK_SIZE = 500;
+            for (let i = 0; i < usersInQueue.length; i += CHUNK_SIZE) {
+              const chunk = usersInQueue.slice(i, i + CHUNK_SIZE);
+              const statuses = await Promise.all(
+                chunk.map(id => userConnectionManager.checkUserStatus(id))
+              );
+              const offlineUsers = chunk.filter((_, index) => !statuses[index]);
+              if (offlineUsers.length > 0) {
+                await Promise.all(
+                  offlineUsers.map(id => matchManager.leaveQueue(id, UserState.IDLE))
+                );
               }
+              await new Promise(resolve => setTimeout(resolve, 5));
             }
             break;
           }
