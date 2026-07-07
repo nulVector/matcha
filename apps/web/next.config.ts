@@ -2,7 +2,6 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@matcha/ui", "@matcha/shared", "@matcha/zod"],
-  allowedDevOrigins: ["10.86.237.73"],
   async rewrites() {
     return [
       {

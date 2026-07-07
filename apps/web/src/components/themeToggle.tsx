@@ -9,15 +9,21 @@ import {
 import { AnimatePresence, motion } from "framer-motion";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
+import { usePathname } from "next/navigation";
 import * as React from "react";
 
 export function ThemeToggle() {
   const { setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
+  const pathname = usePathname();
 
   React.useEffect(() => {
     setMounted(true);
   }, []);
+
+  if (pathname === "/") {
+    return null;
+  }
 
   const isDark = resolvedTheme === "dark";
 
