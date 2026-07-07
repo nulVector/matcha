@@ -220,7 +220,7 @@ export function FeatureSection({
           >
             <div className="max-w-[85%] px-3 py-2 text-sm shadow-sm bg-neutral-900 border border-white/10 text-neutral-100 rounded-2xl rounded-bl-sm">
               <span className="leading-relaxed">
-                Haha respect. I'm a tabs guy but I'll let it slide.
+                Haha respect. I&apos;m a tabs guy but I&apos;ll let it slide.
               </span>
             </div>
           </motion.div>
@@ -240,8 +240,7 @@ export function FeatureSection({
               Bojack asked:
             </span>
             <p className="italic text-neutral-300 mt-1 text-pretty leading-relaxed">
-              &quot;You love coding &amp; weightlifting. Tabs or spaces between
-              sets?&quot;
+              &quot;You love coding &amp; weightlifting. Tabs or spaces between sets?&quot;
             </p>
             <div className="absolute -bottom-2 right-6 size-4 bg-neutral-800 border-b border-r border-white/10 rotate-45" />
           </motion.div>
@@ -300,7 +299,7 @@ export function FeatureSection({
           className="absolute top-35 md:top-auto md:bottom-20 left-1/2 -translate-x-1/2 md:translate-x-0 md:left-[105%] z-50 w-48 lg:w-56 p-3 lg:p-4 rounded-2xl bg-neutral-950/95 md:bg-white/5 backdrop-blur-2xl md:backdrop-blur-sm border border-white/10 md:border-white/20 shadow-2xl md:shadow-xl"
         >
           <div className="text-xs lg:text-sm font-bold text-white mb-1">
-            The "What If" Archive
+            The &quot;What If&quot; Archive
           </div>
           <div className="text-[10px] lg:text-xs text-neutral-300">
             Ran out of time? Find your missed connections waiting here for 5

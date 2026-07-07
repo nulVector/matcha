@@ -50,7 +50,8 @@ export default function MatchmakingPage() {
         ).catch(console.error);
       }
     };
-  }, [leaveKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { data: match } = useQuery<MatchState | null>({
     queryKey: ["currentMatch"],
@@ -157,13 +158,15 @@ export default function MatchmakingPage() {
               <div className="relative flex items-center justify-center size-32 mb-8">
                 <motion.div
                   className="absolute size-16 rounded-full bg-primary/30"
-                  animate={{ scale: [1, 2.5, 4], opacity: [0.8, 0.3, 0] }}
-                  transition={{ duration: 2.5, repeat: Infinity, ease: "easeOut", delay: 0 }}
+                  initial={{ scale: 1, opacity: 0 }}
+                  animate={{ scale: [1, 2.5, 4], opacity: [0, 0.6, 0] }}
+                  transition={{ duration: 2.5, repeat: Infinity, times: [0, 0.1, 1], ease: "easeOut", delay: 0 }}
                 />
                 <motion.div
                   className="absolute size-16 rounded-full bg-primary/30"
-                  animate={{ scale: [1, 2.5, 4], opacity: [0.8, 0.3, 0] }}
-                  transition={{ duration: 2.5, repeat: Infinity, ease: "easeOut", delay: 1.25 }}
+                  initial={{ scale: 1, opacity: 0 }}
+                  animate={{ scale: [1, 2.5, 4], opacity: [0, 0.6, 0] }}
+                  transition={{ duration: 2.5, repeat: Infinity, times: [0, 0.1, 1], ease: "easeOut", delay: 1.25 }}
                 />
                 <div className="relative size-16 rounded-full bg-primary flex items-center justify-center shadow-lg">
                   <Radar className="size-8 text-primary-foreground animate-spin-ccw" />
