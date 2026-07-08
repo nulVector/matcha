@@ -8,19 +8,19 @@ scrape_configs:
     metrics_path: '/metrics'
     bearer_token: '${PROMETHEUS_TOKEN}'
     static_configs:
-      - targets: ['host.docker.internal:3001']
+      - targets: ['api:3001']
 
   - job_name: 'socket-server'
     metrics_path: '/metrics'
     bearer_token: '${PROMETHEUS_TOKEN}'
     static_configs:
-      - targets: ['host.docker.internal:8080']
+      - targets: ['socket:8080']
 
   - job_name: 'worker-nodes'
     metrics_path: '/metrics'
     bearer_token: '${PROMETHEUS_TOKEN}'
     static_configs:
-      - targets: ['host.docker.internal:3002']
+      - targets: ['workers:3002']
 
   - job_name: 'redis'
     static_configs:
