@@ -18,11 +18,12 @@ RUN npx turbo run build --filter=@matcha/prisma --filter=workers
 FROM node:20-slim AS runner
 
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
-RUN rm -rf /usr/local/lib/node_modules/npm && rm -f /usr/local/bin/npm && rm -f /usr/local/bin/npx
 
 WORKDIR /app
 
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /app/packages/shared/package.json ./packages/shared/package.json
 COPY --from=builder /app/packages/db/node_modules ./packages/db/node_modules
 COPY --from=builder /app/packages/db/dist ./packages/db/dist
 COPY --from=builder /app/packages/db/package.json ./packages/db/package.json

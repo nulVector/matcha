@@ -1,7 +1,5 @@
 FROM node:20-slim AS builder
 
-RUN apt-get update && apt-get install -y libc6-compat && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
 RUN npm install -g pnpm@9.0.0 turbo
 
@@ -33,6 +31,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /app/packages/shared/package.json ./packages/shared/package.json
 COPY --from=builder /app/apps/web/public ./apps/web/public
 COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static

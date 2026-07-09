@@ -14,7 +14,6 @@
   },
   "devDependencies": {
     "@matcha/eslint-config": "workspace:*",
-    "@matcha/shared": "workspace:*",
     "@matcha/prisma": "workspace:*",
     "@matcha/typescript-config": "workspace:*",
     "@types/jsonwebtoken": "^9.0.10",
@@ -25,6 +24,7 @@
   "dependencies": {
     "@matcha/logger": "workspace:*",
     "@matcha/redis": "workspace:*",
+    "@matcha/shared": "workspace:*",
     "@matcha/queue": "workspace:*",
     "@matcha/zod": "workspace:*",
     "@paralleldrive/cuid2": "^3.3.0",

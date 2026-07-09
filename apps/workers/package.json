@@ -19,6 +19,7 @@
     "@matcha/prisma": "workspace:*",
     "@matcha/queue": "workspace:*",
     "@matcha/redis": "workspace:*",
+    "@matcha/shared": "workspace:*",
     "@paralleldrive/cuid2": "^3.3.0",
     "bullmq": "^5.70.1",
     "ioredis": "^5.9.2",
@@ -28,7 +29,6 @@
   },
   "devDependencies": {
     "@matcha/eslint-config": "workspace:*",
-    "@matcha/shared": "workspace:*",
     "@matcha/typescript-config": "workspace:*",
     "eslint": "^9.39.1"
   }

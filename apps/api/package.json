@@ -18,6 +18,7 @@
     "@matcha/logger": "workspace:*",
     "@matcha/prisma": "workspace:*",
     "@matcha/redis": "workspace:*",
+    "@matcha/shared": "workspace:*",
     "@matcha/zod": "workspace:*",
     "@paralleldrive/cuid2": "^3.3.0",
     "bcrypt": "^6.0.0",
@@ -38,7 +39,6 @@
   "devDependencies": {
     "@matcha/eslint-config": "workspace:*",
     "@matcha/queue": "workspace:*",
-    "@matcha/shared": "workspace:*",
     "@matcha/typescript-config": "workspace:*",
     "@types/bcrypt": "^6.0.0",
     "@types/cookie-parser": "^1.4.10",
