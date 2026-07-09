@@ -13,9 +13,7 @@ RUN pnpm install --frozen-lockfile
 
 COPY apps/socket/ ./apps/socket/
 
-RUN pnpm --filter @matcha/shared run build
-RUN pnpm --filter @matcha/prisma run build
-RUN pnpm --filter socket run build
+RUN npx turbo run build --filter=@matcha/prisma --filter=socket
 
 FROM node:20-slim AS runner
 

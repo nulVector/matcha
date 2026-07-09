@@ -13,9 +13,7 @@ RUN pnpm install --frozen-lockfile
 
 COPY apps/api/ ./apps/api/
 
-RUN pnpm --filter @matcha/shared run build
-RUN pnpm --filter @matcha/prisma run build
-RUN pnpm --filter api run build
+RUN npx turbo run build --filter=@matcha/prisma --filter=api
 
 FROM node:20-slim AS runner
 

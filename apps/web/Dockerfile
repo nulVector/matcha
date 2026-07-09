@@ -19,9 +19,7 @@ ARG NEXT_PUBLIC_WS_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
 
-RUN pnpm --filter @matcha/shared run build
-RUN pnpm --filter @matcha/prisma run build
-RUN pnpm --filter web run build
+RUN npx turbo run build --filter=@matcha/prisma --filter=web
 
 FROM node:20-slim AS runner
 
