@@ -13,6 +13,7 @@ RUN pnpm install --frozen-lockfile
 
 COPY apps/api/ ./apps/api/
 
+RUN pnpm --filter @matcha/shared run build
 RUN pnpm --filter @matcha/prisma run build
 RUN pnpm --filter api run build
 
