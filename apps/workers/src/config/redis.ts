@@ -7,6 +7,7 @@ import {
   UserConnectionManager,
   UserDetailManager
 } from "@matcha/redis";
+import { logger } from "@matcha/logger";
 
 const connectionString = process.env.REDIS_URL;
 if(!connectionString) {
@@ -58,3 +59,8 @@ const workerOptions: RedisOptions = {
 }
 
 export const workerConnection = new Redis(connectionString, workerOptions);
+
+workerConnection.on('error', (err: any) => {
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET') return;
+  logger.error({ err }, "Worker Redis connection error");
+});

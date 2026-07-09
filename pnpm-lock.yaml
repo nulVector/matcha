@@ -504,6 +504,9 @@ importers:
 
   packages/queue:
     dependencies:
+      '@matcha/logger':
+        specifier: workspace:*
+        version: link:../logger
       bullmq:
         specifier: ^5.70.1
         version: 5.70.1
