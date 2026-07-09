@@ -48,6 +48,7 @@ export async function pingRedisConnections(): Promise<boolean> {
 const workerOptions: RedisOptions = {
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
+  keepAlive: 10000,
   retryStrategy(times) {
     return Math.min(times * 50, 2000);
   },

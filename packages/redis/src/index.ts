@@ -25,6 +25,7 @@ export function createRedisClient(connectionString: string, type: RedisClientTyp
   const options: RedisOptions = {
     maxRetriesPerRequest: null,
     enableReadyCheck: type !== "PUBSUB_SUB",
+    keepAlive: 10000,
     retryStrategy(times) {
       return Math.min(times * 50, 2000);
     },
