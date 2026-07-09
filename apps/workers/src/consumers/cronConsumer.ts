@@ -123,6 +123,7 @@ cronWorker.on("failed", (job, err) => {
   });
 });
 
-cronWorker.on("error", (err) => {
-  logger.error({ err }, "Cron Worker Error");
+cronWorker.on("error", (err: any) => {
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET') return;
+  logger.error({ err }, "Task Worker Error");
 });

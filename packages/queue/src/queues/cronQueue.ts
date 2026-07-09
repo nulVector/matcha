@@ -14,3 +14,8 @@ export const cronQueue = new Queue(QueueName.CRON, {
     },
   },
 });
+
+cronQueue.on('error', (err: any) => {
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET') return;
+  console.error(`[taskQueue Error]`, err);
+});

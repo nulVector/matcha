@@ -9,3 +9,8 @@ export const dlqQueue = new Queue(QueueName.DLQ, {
     removeOnFail: false,
   },
 });
+
+dlqQueue.on('error', (err: any) => {
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET') return;
+  console.error(`[taskQueue Error]`, err);
+});

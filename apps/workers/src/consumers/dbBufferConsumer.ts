@@ -159,6 +159,7 @@ dbBufferWorker.on("failed", (job, err) => {
   });
 });
 
-dbBufferWorker.on("error", (err) => {
-  logger.error({ err }, "DbBuffer Worker Error");
+dbBufferWorker.on("error", (err: any) => {
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET') return;
+  logger.error({ err }, "Task Worker Error");
 });

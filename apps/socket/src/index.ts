@@ -493,3 +493,12 @@ async function gracefulShutdown(signal: string) {
 
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
+process.on('uncaughtException', (err: any) => {
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET') {
+    logger.debug({ code: err.code }, "Intercepted unhandled stream error (Redis drop). App continuing.");
+    return;
+  }
+  logger.fatal({ err }, "Uncaught Exception");
+  process.exit(1);
+});

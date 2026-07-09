@@ -18,3 +18,8 @@ export const dbBufferQueue = new Queue(QueueName.DB_BUFFER, {
     },
   },
 });
+
+dbBufferQueue.on('error', (err: any) => {
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET') return;
+  console.error(`[taskQueue Error]`, err);
+});

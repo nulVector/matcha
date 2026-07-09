@@ -19,3 +19,8 @@ export const taskQueue = new Queue(QueueName.TASK, {
     },
   },
 });
+
+taskQueue.on('error', (err: any) => {
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET') return;
+  console.error(`[taskQueue Error]`, err);
+});
