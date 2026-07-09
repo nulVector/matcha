@@ -44,6 +44,9 @@ importers:
       '@matcha/redis':
         specifier: workspace:*
         version: link:../../packages/redis
+      '@matcha/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@matcha/zod':
         specifier: workspace:*
         version: link:../../packages/zod
@@ -99,9 +102,6 @@ importers:
       '@matcha/queue':
         specifier: workspace:*
         version: link:../../packages/queue
-      '@matcha/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@matcha/typescript-config':
         specifier: workspace:*
         version: link:../../packages/config/typescript
@@ -193,6 +193,9 @@ importers:
       '@matcha/redis':
         specifier: workspace:*
         version: link:../../packages/redis
+      '@matcha/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@matcha/zod':
         specifier: workspace:*
         version: link:../../packages/zod
@@ -215,9 +218,6 @@ importers:
       '@matcha/prisma':
         specifier: workspace:*
         version: link:../../packages/db
-      '@matcha/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@matcha/typescript-config':
         specifier: workspace:*
         version: link:../../packages/config/typescript
@@ -339,6 +339,9 @@ importers:
       '@matcha/redis':
         specifier: workspace:*
         version: link:../../packages/redis
+      '@matcha/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@paralleldrive/cuid2':
         specifier: ^3.3.0
         version: 3.3.0
@@ -361,9 +364,6 @@ importers:
       '@matcha/eslint-config':
         specifier: workspace:*
         version: link:../../packages/config/eslint
-      '@matcha/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@matcha/typescript-config':
         specifier: workspace:*
         version: link:../../packages/config/typescript
