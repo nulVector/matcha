@@ -41,7 +41,7 @@ jobs:
             docker compose -f docker-compose.prod.yml build
             docker compose -f docker-compose.prod.yml up -d postgres redis
             sleep 10
-            docker compose -f docker-compose.prod.yml run --rm workers npx prisma db push --schema=packages/db/prisma/schema.prisma
-            docker compose -f docker-compose.prod.yml run --rm workers node packages/db/dist/prisma/seed.js
+            docker compose -f docker-compose.prod.yml run --env-file .env --rm workers npx prisma db push --schema=packages/db/prisma/schema.prisma
+            docker compose -f docker-compose.prod.yml run --env-file .env --rm workers node packages/db/dist/prisma/seed.js
             docker compose -f docker-compose.prod.yml up -d
             docker image prune -af --filter "until=24h"
