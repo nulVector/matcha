@@ -34,8 +34,12 @@ COPY --from=builder /app/packages/db/src ./packages/db/src
 COPY --from=builder /app/apps/workers/dist ./apps/workers/dist
 COPY --from=builder /app/apps/workers/package.json ./apps/workers/package.json
 
+COPY --from=builder /app/apps/workers/entrypoint.sh ./apps/workers/entrypoint.sh
+RUN chmod +x ./apps/workers/entrypoint.sh
+
 ENV NODE_ENV=production
 ENV NODE_OPTIONS="--max-old-space-size=2048"
 
 USER node
-CMD ["node", "apps/workers/dist/index.js"]
+
+CMD ["./apps/workers/entrypoint.sh"]
