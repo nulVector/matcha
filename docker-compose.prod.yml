@@ -60,7 +60,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 1.5G
     logging: *default-logging
     networks:
       - matcha_net
@@ -100,7 +100,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 3G
+          memory: 2G
     logging: *default-logging
     networks:
       - matcha_net

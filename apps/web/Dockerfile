@@ -1,6 +1,6 @@
 FROM node:20-slim AS builder
 
-RUN apt-get update && apt-get install -y libc6-compat openssl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y libc6-compat && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 RUN npm install -g pnpm@9.0.0 turbo
@@ -13,10 +13,19 @@ RUN pnpm install --frozen-lockfile
 
 COPY apps/web/ ./apps/web/
 
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_WS_URL
+
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
+
 RUN pnpm --filter @matcha/prisma run build
 RUN pnpm --filter web run build
 
 FROM node:20-slim AS runner
+
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+RUN rm -rf /usr/local/lib/node_modules/npm && rm -f /usr/local/bin/npm && rm -f /usr/local/bin/npx
 
 WORKDIR /app
 
