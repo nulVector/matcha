@@ -80,14 +80,10 @@ app.use("/api/v1",mainRouter);
 let server: Server;
 async function bootstrap() {
   try {
-    try {
-      await matchManager.createIndex();
-      await bloomManager.reserve('bf:usernames', 0.001, 100000);
-      await bloomManager.reserve('bf:matches', 0.01, 5000000);
-    } catch (redisInitErr: any) {
-      logger.warn({ err: redisInitErr.message }, "Redis initialization delayed.");
-    }
-
+    await matchManager.createIndex();
+    await bloomManager.reserve('bf:usernames', 0.001, 100000);
+    await bloomManager.reserve('bf:matches', 0.01, 5000000);
+    
     server = app.listen(PORT, '0.0.0.0', 8192, () => {
       logger.info(`API listening on port ${PORT}`);
     });
@@ -127,12 +123,3 @@ async function gracefulShutdown(signal: string) {
 
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-
-process.on('uncaughtException', (err: any) => {
-  if (err.code === 'EPIPE' || err.code === 'ECONNRESET') {
-    logger.debug({ code: err.code }, "Intercepted unhandled stream error (Redis drop). App continuing.");
-    return;
-  }
-  logger.fatal({ err }, "Uncaught Exception");
-  process.exit(1);
-});

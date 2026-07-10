@@ -29,11 +29,12 @@ services:
     image: redis/redis-stack-server:latest
     container_name: matcha-redis
     restart: always
-    command: ["redis-server", "--maxmemory", "4gb", "--maxmemory-policy", "allkeys-lru"]
+    environment:
+      - "REDIS_ARGS=--requirepass ${REDIS_PASSWORD} --maxmemory 4gb --maxmemory-policy noeviction"
     volumes:
       - redis_prod_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -173,7 +174,7 @@ services:
     container_name: redis-exporter
     restart: always
     environment:
-      - REDIS_ADDR=redis://redis:6379
+      - REDIS_ADDR=redis://:${REDIS_PASSWORD}@redis:6379
     depends_on:
       redis:
         condition: service_healthy

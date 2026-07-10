@@ -36,10 +36,6 @@ export function startDlqMonitor() {
         logger.error({ err, jobId }, "Error processing failed job for DLQ");
       }
     });
-    events.on("error", (err: any) => {
-      if (err.code === 'EPIPE' || err.code === 'ECONNRESET') return;
-      logger.error({ err, queue: name }, "QueueEvents monitor error");
-    });
     eventListeners.push(events);
   });
   logger.info("DLQ Monitor actively watching for permanent failures.");

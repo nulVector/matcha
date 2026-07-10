@@ -1,4 +1,3 @@
-import { logger } from "@matcha/logger";
 import Redis, { RedisOptions } from "ioredis";
 
 const connectionString = process.env.REDIS_URL;
@@ -20,8 +19,3 @@ const redisOptions: RedisOptions = {
   },
 };
 export const queueConnection = new Redis(connectionString, redisOptions);
-
-queueConnection.on('error', (err: any) => {
-  if (err.code === 'EPIPE' || err.code === 'ECONNRESET') return;
-  logger.error({ err }, "queueConnection Error");
-});

@@ -1,7 +1,6 @@
 import { Queue } from "bullmq";
 import { queueConnection } from "../config/connection";
 import { QueueName } from "../constant/keys";
-import { logger } from "@matcha/logger";
 
 export const taskQueue = new Queue(QueueName.TASK, {
   connection: queueConnection,
@@ -19,9 +18,4 @@ export const taskQueue = new Queue(QueueName.TASK, {
       count: 1000,
     },
   },
-});
-
-taskQueue.on('error', (err: any) => {
-  if (err.code === 'EPIPE' || err.code === 'ECONNRESET') return;
-  logger.error({ err }, "taskQueue Error");
 });

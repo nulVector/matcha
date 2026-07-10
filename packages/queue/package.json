@@ -27,7 +27,6 @@
     "eslint": "^9.39.1"
   },
   "dependencies": {
-    "@matcha/logger": "workspace:*",
     "bullmq": "^5.70.1",
     "ioredis": "^5.9.2"
   }

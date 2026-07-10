@@ -35,16 +35,12 @@ export function createRedisClient(connectionString: string, type: RedisClientTyp
       return false;
     }
   };
-  if (type === "PUBSUB_SUB") {
-    options.enableReadyCheck = false;
-  }
   const client = new Redis(connectionString, options);
 
   client.on("error", (err: any) => {
-    if (err.code === "EPIPE" || err.code === "ECONNRESET" || (err.message && err.message.includes("Connection is closed"))) {
-      return
+    if (err.message && !err.message.includes("Connection is closed")) {
+      logger.error({ err, clientType: type }, `Redis ${type} connection error`);
     }
-    logger.error({ err, clientType: type }, `Redis ${type} connection error`);
   });
   client.on("connect", () => {
     logger.info(`Redis ${type} connected successfully.`);

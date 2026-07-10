@@ -117,7 +117,6 @@ taskWorker.on("failed", (job, err) => {
   });
 });
 
-taskWorker.on("error", (err: any) => {
-  if (err.code === 'EPIPE' || err.code === 'ECONNRESET') return;
+taskWorker.on("error", (err) => {
   logger.error({ err }, "Task Worker Error");
 });
