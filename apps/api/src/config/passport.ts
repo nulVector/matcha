@@ -20,6 +20,7 @@ export const configurePassport = (passport:PassportStatic) =>{
     clientID,
     clientSecret,
     callbackURL: '/api/v1/auth/google/callback',
+    proxy: true,
     scope: ['profile', 'email']
   }, async (accessToken, refreshToken, profile, done) => {
     try {
