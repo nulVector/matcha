@@ -141,8 +141,13 @@ export function useWebsocket() {
     if (socketRef.current?.readyState === WebSocket.OPEN 
       || socketRef.current?.readyState === WebSocket.CONNECTING ) return;
     intentionalDisconnectRef.current = false;
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/api/ws`;
+    let wsUrl = "";
+    if (process.env.NEXT_PUBLIC_WS_URL) {
+      wsUrl = process.env.NEXT_PUBLIC_WS_URL.replace(/^http/, "ws");
+    } else {
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      wsUrl = `${protocol}//${window.location.host}/api/ws`;
+    }
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
