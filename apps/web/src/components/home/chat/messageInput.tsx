@@ -146,7 +146,7 @@ export function MessageInput({
             />
 
             {isMatched && targetUser?.openingQues && (
-              <Popover>
+              <Popover defaultOpen={true}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="ghost"

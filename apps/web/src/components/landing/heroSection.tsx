@@ -4,6 +4,7 @@ import { AnimatedMatchaIcon } from "@/components/shared/animatedMatchaIcon";
 import { Button } from "@matcha/ui/components/button";
 import { motion, MotionValue, Transition, useTransform } from "framer-motion";
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 
 const smoothTransition: Transition = {
   type: "spring",
@@ -71,6 +72,15 @@ export function HeroSection({
             >
               <Link href="/login">I have an account</Link>
             </Button>
+          </motion.div>
+          <motion.div
+            style={{ opacity: fadeOutOpacity }}
+            className="absolute bottom-4 md:bottom-10 flex flex-col items-center gap-2 text-neutral-400 pointer-events-auto"
+          >
+            <span className="text-xs sm:text-sm font-semibold uppercase tracking-widest">
+              Scroll down
+            </span>
+            <ChevronDown className="size-6 animate-bounce text-primary" />
           </motion.div>
         </>
       )}

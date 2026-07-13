@@ -145,6 +145,17 @@
   }
 }
 
+::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--muted-foreground);
+  border: 5px solid transparent; 
+  background-clip: content-box; 
+  border-radius: 10px;
+}
+
 @utility no-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;

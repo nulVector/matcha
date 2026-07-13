@@ -172,7 +172,8 @@ export default function ActiveChatPage() {
       }
       sendMessage(EventType.LEAVE_CHAT, { connectionId });
     };
-  }, [connectionId, chatPartner?.id, lastMessageId, queryClient, sendMessage, skipKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectionId, chatPartner?.id]);
 
   if (isHistoryLoading || isMeLoading || !myId) {
     return (

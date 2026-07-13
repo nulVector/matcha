@@ -33,8 +33,6 @@ ENV HOSTNAME="0.0.0.0"
 
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /app/packages/shared/package.json ./packages/shared/package.json
-COPY --from=builder /app/packages/logger/dist ./packages/logger/dist
-COPY --from=builder /app/packages/logger/package.json ./packages/logger/package.json
 COPY --from=builder /app/packages/ui ./packages/ui
 COPY --from=builder /app/apps/web/public ./apps/web/public
 COPY --from=builder /app/apps/web/.next/standalone ./

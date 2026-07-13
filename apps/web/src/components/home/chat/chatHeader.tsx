@@ -471,7 +471,7 @@ export function ChatHeader({
               </Button>
             </TooltipTrigger>
             <TooltipContent className="hidden lg:block">
-              <p>Add Friend</p>
+              <p>Add as Friend</p>
             </TooltipContent>
           </Tooltip>
 
