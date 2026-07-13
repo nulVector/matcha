@@ -17,7 +17,7 @@ RUN npx turbo run build --filter=@matcha/prisma --filter=api
 
 FROM node:20-slim AS runner
 
-RUN apt-get update && apt-get upgrade -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 RUN rm -rf /usr/local/lib/node_modules/npm && rm -f /usr/local/bin/npm && rm -f /usr/local/bin/npx
 
 WORKDIR /app

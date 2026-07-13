@@ -17,7 +17,7 @@ RUN npx turbo run build --filter=@matcha/prisma --filter=workers
 
 FROM node:20-slim AS runner
 
-RUN apt-get update && apt-get upgrade -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -27,12 +27,9 @@ COPY --from=builder /app/apps/workers/node_modules ./apps/workers/node_modules
 COPY --from=builder /app/apps/workers/dist ./apps/workers/dist
 COPY --from=builder /app/apps/workers/package.json ./apps/workers/package.json
 
-COPY --from=builder /app/apps/workers/entrypoint.sh ./apps/workers/entrypoint.sh
-RUN chmod +x ./apps/workers/entrypoint.sh
-
 ENV NODE_ENV=production
 ENV NODE_OPTIONS="--max-old-space-size=2048"
 
 USER node
 
-CMD ["./apps/workers/entrypoint.sh"]
+CMD ["node", "apps/workers/dist/index.js"]

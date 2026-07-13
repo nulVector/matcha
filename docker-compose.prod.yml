@@ -26,7 +26,7 @@ services:
       - matcha_net
 
   redis:
-    image: redis/redis-stack-server:latest
+    image: redis/redis-stack-server:7.4.0-v8
     container_name: matcha-redis
     restart: always
     environment:
@@ -46,6 +46,21 @@ services:
     networks:
       - matcha_net
 
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/workers/Dockerfile
+    container_name: matcha-migrate
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["sh", "-c", "cd packages/db && npx prisma migrate deploy && node dist/prisma/seed.js"]
+    networks:
+      - matcha_net
+    restart: "no"
+    logging: *default-logging
+
   api:
     build:
       context: .
@@ -58,6 +73,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     deploy:
       resources:
         limits:
@@ -78,6 +95,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     deploy:
       resources:
         limits:
@@ -98,6 +117,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     deploy:
       resources:
         limits:
@@ -128,7 +149,7 @@ services:
       - matcha_net
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.13.1
     container_name: prometheus
     restart: always
     volumes:
@@ -147,7 +168,7 @@ services:
       - matcha_net
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:13.1.0
     container_name: grafana
     restart: always
     env_file: .env
@@ -170,7 +191,7 @@ services:
       - matcha_net
 
   redis-exporter:
-    image: oliver006/redis_exporter:latest
+    image: oliver006/redis_exporter:v1.86.0
     container_name: redis-exporter
     restart: always
     environment:
@@ -187,7 +208,7 @@ services:
       - matcha_net
 
   postgres-exporter:
-    image: prometheuscommunity/postgres-exporter:latest
+    image: prometheuscommunity/postgres-exporter:v0.20.1
     container_name: postgres-exporter
     restart: always
     env_file: .env
@@ -205,7 +226,7 @@ services:
       - matcha_net
 
   node-exporter:
-    image: prom/node-exporter:latest
+    image: prom/node-exporter:v1.12.0
     container_name: node-exporter
     restart: always
     pid: host
@@ -222,7 +243,7 @@ services:
       - matcha_net
 
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared:2026.7.1
     container_name: cloudflare-tunnel
     restart: always
     command: tunnel --no-autoupdate run
