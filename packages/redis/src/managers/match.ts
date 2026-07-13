@@ -111,6 +111,7 @@ export class MatchManager {
       'locationLongitude'
     );
     if (queueStatus !== UserState.QUEUED) return null;
+    if (!latStr || !longStr) return null;
     const vectorBuffer = await this.redis.hgetBuffer(key, 'embedding');
     if (!vectorBuffer) return null;
     const alignedBuffer = vectorBuffer.buffer.slice(
@@ -121,8 +122,8 @@ export class MatchManager {
     return {
       queueStatus,
       queuedAt: queuedAtStr ? parseInt(queuedAtStr, 10) : Date.now(),
-      lat: parseFloat(latStr || "0"),
-      long: parseFloat(longStr || "0"),
+      lat: parseFloat(latStr),
+      long: parseFloat(longStr),
       searcherVector
     };
   }

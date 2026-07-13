@@ -41,12 +41,19 @@ export const joinQueue = async (req:Request,res:Response,next:NextFunction) => {
         select: { locationLatitude: true, locationLongitude: true, interest: true }
       });
       if (profile) {
-        await matchManager.updateMatchProfile(
-          profileId,
-          profile.locationLatitude,
-          profile.locationLongitude,
-          profile.interest
-        );
+        await Promise.all([
+          matchManager.updateMatchProfile(
+            profileId,
+            profile.locationLatitude,
+            profile.locationLongitude,
+            profile.interest
+          ),
+          userDetailManager.cacheProfile(profileId, {
+            locationLatitude: profile.locationLatitude,
+            locationLongitude: profile.locationLongitude,
+            interest: profile.interest
+          })
+        ]);
       }
     }
     await matchManager.addToQueue(profileId);

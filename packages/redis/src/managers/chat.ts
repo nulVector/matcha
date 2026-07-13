@@ -52,7 +52,15 @@ export class ChatManager {
   }
   async getMessages(connectionId:string){
     const rawMessages = await this.redis.lrange(`chat:${connectionId}`, 0, -1);
-    return rawMessages.map((msg) => JSON.parse(msg) as CachedMessage);
+    const parsedMessages: CachedMessage[] = [];
+    for (const msg of rawMessages) {
+      try {
+        parsedMessages.push(JSON.parse(msg) as CachedMessage);
+      } catch (err) {
+        // Ignored intentionally
+      }
+    }
+    return parsedMessages;
   }
   async hideChat(connectionId:string) {
     await this.redis.set(`chat:hidden:${connectionId}`,"1");

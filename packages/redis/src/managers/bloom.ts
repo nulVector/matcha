@@ -15,32 +15,21 @@ export class BloomFilterManager {
       throw err;
     }
   }
+
   async add(key:string,item:string) {
     const result = (await this.redis.call(
       'BF.ADD',key,item
     )) as number;
     return result === 1;
   }
-  // async addMany(key: string, items: string[]): Promise<boolean[]> {
-  //   if (items.length === 0) return [];
-  //   const results = (await this.redis.call(
-  //     'BF.MADD', key, ...items
-  //   )) as number[];
-  //   return results.map(r => r === 1);
-  // }
+
   async exists(key:string,item:string) {
     const result = (await this.redis.call(
       'BF.EXISTS',key,item
     )) as number;
     return result === 1;
   }
-  // async existsMulti(key: string, items: string[]): Promise<boolean[]> {
-  //   if (items.length === 0) return [];
-  //   const results = (await this.redis.call(
-  //     'BF.MEXISTS', key, ...items
-  //   )) as number[];
-  //   return results.map(r => r === 1);
-  // }
+  
   private getPairKey(id1: string, id2: string): string {
     const [u1, u2] = getDeterministicIds(id1, id2);
     return `${u1}:${u2}`;
