@@ -30,13 +30,13 @@ describe('MatchManager Integration Tests', () => {
   });
 
   it('should find the closest match using HNSW vector search', async () => {
-    await matchManager.updateMatchProfile('searcher', 28.7041, 77.1025, ['gaming', 'movies']);
+    await matchManager.updateMatchProfile('searcher', 28.7041, 77.1025, ['co-op gaming', 'film & cinema']);
     await matchClient.hset('user:profile:searcher', { locationLatitude: '28.7041', locationLongitude: '77.1025' });
     await matchManager.addToQueue('searcher');
-    await matchManager.updateMatchProfile('perfect_match', 28.7041, 77.1025, ['gaming', 'movies']);
+    await matchManager.updateMatchProfile('perfect_match', 28.7041, 77.1025, ['co-op gaming', 'film & cinema']);
     await matchClient.hset('user:profile:perfect_match', { locationLatitude: '28.7041', locationLongitude: '77.1025' });
     await matchManager.addToQueue('perfect_match');
-    await matchManager.updateMatchProfile('bad_match', 10.1632, 76.6413, ['travel', 'fitness']);
+    await matchManager.updateMatchProfile('bad_match', 10.1632, 76.6413, ['backpacking', 'weightlifting']);
     await matchClient.hset('user:profile:bad_match', { locationLatitude: '10.1632', locationLongitude: '76.6413' });
     await matchManager.addToQueue('bad_match');
     const searcher = await matchManager.getSearcherProfile('searcher');
