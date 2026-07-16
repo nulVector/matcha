@@ -49,6 +49,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+      JWT_SECRET: "dummy_test_secret"
+      GOOGLE_CLIENT_ID: "dummy_client_id"
+      GOOGLE_CLIENT_SECRET: "dummy_client_secret"
+      RESEND_API_KEY: "re_123456789"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -102,6 +106,9 @@ jobs:
           push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            NEXT_PUBLIC_API_URL=http://localhost:3001/api/v1
+            NEXT_PUBLIC_WS_URL=ws://localhost:8080
 
   deploy:
     name: Deploy to Production
