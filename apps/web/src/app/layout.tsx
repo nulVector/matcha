@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { ThemeToggle } from "@/components/themeToggle";
 import AuthProvider from "@/providers/authProvider";
 import QueryProvider from "@/providers/queryProvider";
@@ -17,6 +18,29 @@ const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
+
+export const metadata: Metadata = {
+  metadataBase: new URL("https://trymatcha.in"),
+  title: {
+    default: "Matcha — Stop swiping. Meet Matcha.",
+    template: "%s | Matcha",
+  },
+  description:
+    "Skip the ghosting. Drop into live chats with people who share your energy, matched by interests and location — not endless swiping.",
+  openGraph: {
+    title: "Matcha",
+    description: "Stop swiping. Meet Matcha.",
+    url: "https://trymatcha.in",
+    siteName: "Matcha",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Matcha",
+    description: "Stop swiping. Meet Matcha.",
+  },
+  
+};
 
 export default function RootLayout({
   children,

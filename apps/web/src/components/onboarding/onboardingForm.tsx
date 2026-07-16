@@ -220,6 +220,7 @@ export function OnboardingForm() {
                   name="openingQues"
                   label="Opening Question"
                   placeholder="What's your favorite controversial food opinion?"
+                  infoText="An instant icebreaker shown to your match to help kick off the conversation naturally."
                 />
                 <DiscoveryField />
                 <OnboardingNav

@@ -14,6 +14,11 @@ import { Button } from "@matcha/ui/components/button";
 import { Field, FieldError, FieldLabel } from "@matcha/ui/components/field";
 import { Input } from "@matcha/ui/components/input";
 import { Loader } from "@matcha/ui/components/loader";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@matcha/ui/components/popover";
 import { SegmentedControl } from "@matcha/ui/components/segmentedControl";
 import {
   Select,
@@ -26,7 +31,7 @@ import { Textarea } from "@matcha/ui/components/textarea";
 import { cn } from "@matcha/ui/lib/utils";
 import { initiateProfileType } from "@matcha/zod";
 import { motion, type Variants } from "framer-motion";
-import { CheckCircle2, Search, Sparkles, XCircle } from "lucide-react";
+import { CheckCircle2, Info, Search, Sparkles, XCircle } from "lucide-react";
 import { useState } from "react";
 import { Controller, useFormContext } from "react-hook-form";
 
@@ -313,12 +318,14 @@ interface TextAreaFieldProps {
   name: keyof initiateProfileType;
   label: string;
   placeholder: string;
+  infoText?: string;
 }
 
 export function TextAreaField({
   name,
   label,
   placeholder,
+  infoText,
 }: TextAreaFieldProps) {
   const { control } = useFormContext<initiateProfileType>();
 
@@ -328,9 +335,31 @@ export function TextAreaField({
       control={control}
       render={({ field, fieldState }) => (
         <Field data-invalid={fieldState.invalid}>
-          <FieldLabel htmlFor={field.name} className="text-sm">
-            {label}
-          </FieldLabel>
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <FieldLabel htmlFor={field.name} className="text-sm mb-0">
+              {label}
+            </FieldLabel>
+            {infoText && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground outline-none transition-colors rounded-full focus-visible:ring-[3px] focus-visible:ring-ring/50 extend-touch-target"
+                  >
+                    <Info className="size-3" />
+                    <span className="sr-only">More info about {label}</span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-50 text-sm p-4 text-pretty leading-relaxed shadow-lg rounded-xl"
+                  side="top"
+                  align="center"
+                >
+                  {infoText}
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
           <Textarea
             {...field}
             id={field.name}
@@ -355,7 +384,29 @@ export function DiscoveryField() {
       control={control}
       render={({ field }) => (
         <div className="space-y-2">
-          <FieldLabel className="text-sm">Profile Discovery Status</FieldLabel>
+          <div className="flex items-center gap-1.5">
+            <FieldLabel className="text-sm">
+              Profile Discovery Status
+            </FieldLabel>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground outline-none transition-colors rounded-full focus-visible:ring-[3px] focus-visible:ring-ring/50 extend-touch-target"
+                >
+                  <Info className="size-3" />
+                  <span className="sr-only">More info about discovery</span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent 
+                className="w-50 text-sm p-4 text-pretty leading-relaxed shadow-lg rounded-xl" 
+                side="top" 
+                align="center"
+              >
+                Controls if others can look up your handle and send friend requests.
+              </PopoverContent>
+            </Popover>
+          </div>
           <SegmentedControl<boolean>
             value={field.value as boolean}
             onChange={field.onChange}

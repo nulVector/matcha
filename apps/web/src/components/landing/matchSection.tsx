@@ -112,7 +112,7 @@ export function MatchSection({
             className="absolute size-24 rounded-full bg-primary/20 border border-primary/20"
           />
 
-          <div className="relative size-26 rounded-full bg-neutral-950/50 backdrop-blur-md border border-white/10 flex items-center justify-center z-10 shadow-[0_0_40px_rgba(var(--color-primary),0.1)]">
+          <div className="relative size-26 rounded-full bg-neutral-950/50 backdrop-blur-md border border-white/10 flex items-center justify-center z-10 shadow-[0_0_40px] shadow-primary/10">
             <div className="size-4 bg-primary rounded-full shadow-[0_0_20px_var(--color-primary)] animate-pulse" />
           </div>
 

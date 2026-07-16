@@ -1,6 +1,11 @@
 import { OnboardingForm } from "@/components/onboarding/onboardingForm";
+import type { Metadata } from "next";
 import Image from "next/image";
 import bgImage from "./../../../public/background.jpeg";
+
+export const metadata: Metadata = {
+  title: "Complete Profile",
+};
 
 export default function OnboardingPage() {
   return (

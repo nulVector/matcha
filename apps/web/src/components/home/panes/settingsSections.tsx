@@ -27,7 +27,7 @@ import { PasswordInput } from "@matcha/ui/components/passwordInput";
 import { SegmentedControl } from "@matcha/ui/components/segmentedControl";
 import { Textarea } from "@matcha/ui/components/textarea";
 import type { updateProfileType } from "@matcha/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { AxiosError } from "axios";
 import { LogOut, Save, ShieldAlert } from "lucide-react";
 import { useState } from "react";
@@ -387,7 +387,6 @@ export function PasswordSetting() {
 }
 
 export function DeactivateAccountAction() {
-  const queryClient = useQueryClient();
   const [confirmText, setConfirmText] = useState("");
   const [disableError, setDisableError] = useState("");
   const clearOutbox = useOutboxStore((state) => state.clearOutbox);
@@ -399,7 +398,6 @@ export function DeactivateAccountAction() {
         headers: { "x-idempotency-key": deactivateKey },
       }),
     onSuccess: () => {
-      queryClient.clear();
       clearOutbox();
       window.location.href = "/login";
     },
@@ -491,11 +489,9 @@ export function DeactivateAccountAction() {
 }
 
 export function LogoutActions() {
-  const queryClient = useQueryClient();
   const clearOutbox = useOutboxStore((state) => state.clearOutbox);
 
   const handleLogoutSuccess = () => {
-    queryClient.clear();
     clearOutbox();
     window.location.href = "/login";
   };

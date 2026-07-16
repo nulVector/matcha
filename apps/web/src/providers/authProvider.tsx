@@ -52,5 +52,5 @@ export default function AuthProvider({
     if (isUnauthorized) return <Loader fullScreen />;
   }
 
-  return <>{children}</>;
+  return children;
 }

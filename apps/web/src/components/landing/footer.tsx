@@ -35,7 +35,7 @@ export function Footer() {
         <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
           <Button
             size="lg"
-            className="w-auto sm:min-w-56 px-4 rounded-full h-16 text-lg sm:text-xl font-bold shadow-[0_0_40px_rgba(var(--color-primary),0.3)] hover:shadow-[0_0_60px_rgba(var(--color-primary),0.5)] transition-shadow duration-300"
+            className="w-auto sm:min-w-56 px-4 rounded-full h-16 text-lg sm:text-xl font-bold shadow-[0_0_40px] shadow-primary/30 hover:shadow-[0_0_60px] hover:shadow-primary/50 transition-shadow duration-300"
             asChild
           >
             <Link href="/signup">Drop into The Blend</Link>
@@ -53,13 +53,12 @@ export function Footer() {
       </motion.div>
 
       <div className="absolute bottom-8 w-full flex justify-center gap-6 text-neutral-500 text-sm z-10">
-        <Link href="/privacy" className="hover:text-neutral-300 transition-colors">
-          Privacy
-        </Link>
-        <Link href="/terms" className="hover:text-neutral-300 transition-colors">
-          Terms
-        </Link>
-        <Link href="/contact" className="hover:text-neutral-300 transition-colors">
+        <Link 
+          href="https://x.com/nulVector_exe" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="hover:text-neutral-300 transition-colors"
+        >
           Contact
         </Link>
       </div>
