@@ -1,9 +1,7 @@
 config:
   target: "ws://127.0.0.1:8080"
   processor: "../helpers/index.ts"
-  http:
-    pool: 100
-
+  
   environments:
     smoke:
       phases:
@@ -115,3 +113,4 @@ scenarios:
           function: "setupUser"
       - function: "joinMatchmakingQueue"
       - think: 2 
+      - function: "cleanupSession"

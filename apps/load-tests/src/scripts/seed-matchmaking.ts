@@ -7,6 +7,7 @@ import {
   RedisClient
 } from '@matcha/redis';
 import { createId } from '@paralleldrive/cuid2';
+import { MASTER_INTERESTS_LIST } from '@matcha/shared';
 
 const REDIS_URL = process.env.REDIS_URL;
 if (!REDIS_URL) {
@@ -24,10 +25,6 @@ const TOTAL_USERS = 20000;
 const BATCH_SIZE = 1000;
 const BENGALURU_LAT = 12.9716;
 const BENGALURU_LNG = 77.5946;
-const INTEREST_POOL = [
-  'coding', 'movies', 'gym', 'anime', 'traveling', 
-  'street food', 'photography', 'f1', 'badminton', 'pc gaming', 
-];
 
 async function seedData() {
   console.time('MatchmakingSeedDuration');
@@ -44,7 +41,7 @@ async function seedData() {
       const userProfileId = createId();
       queueBatch.push(`${userId},${userProfileId}`); 
       const numInterests = Math.floor(Math.random() * 8) + 3;
-      const shuffledInterests = [...INTEREST_POOL].sort(() => 0.5 - Math.random());
+      const shuffledInterests = [...MASTER_INTERESTS_LIST].sort(() => 0.5 - Math.random());
       const userInterests = shuffledInterests.slice(0, numInterests);
       
       dbUser.push({

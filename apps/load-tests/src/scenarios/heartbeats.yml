@@ -1,8 +1,6 @@
 config:
   target: "ws://127.0.0.1:8080"
   processor: "../helpers/auth-hooks.ts" 
-  http:
-    pool: 100
   
   environments:
     smoke:

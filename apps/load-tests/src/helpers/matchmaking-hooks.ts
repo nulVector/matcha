@@ -10,7 +10,7 @@ setGlobalDispatcher(agent);
 export async function joinMatchmakingQueue(context: ArtilleryContext, events: unknown) {
   try {
     const { token } = context.vars;
-    const API_URL = process.env.API_URL || 'http://127.0.0.1:8080';
+    const API_URL = process.env.API_URL || 'http://127.0.0.1:3001';
     const idempotencyKey = createId();
 
     const response = await fetch(`${API_URL}/api/v1/connections/queue/join`, {

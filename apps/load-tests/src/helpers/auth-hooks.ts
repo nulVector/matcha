@@ -31,11 +31,7 @@ export function setupUser(params: RequestParams, context: ArtilleryContext, done
       throw new Error("Malformed user data popped from Redis!");
     }
     const sessionId = createId();
-    const sessionData = {
-      userId,
-      userProfileId: profileId,
-      hasPassword: true
-    };
+    
     await authManager.cacheSession(userId, sessionId, profileId, true);
     
     const token = jwt.sign(
@@ -67,7 +63,7 @@ export function cleanupSession(context: ArtilleryContext, events: unknown, done:
   Promise.resolve().then(async () => {
     const { userId, sessionId } = context.vars;
     if (userId && sessionId) {
-      await sessionClient.del(`session:${userId}:${sessionId}`);
+      await authManager.invalidateSession(userId, sessionId);
     }
     done();
   }).catch((err) => {

@@ -56,7 +56,7 @@ export class ChatManager {
     for (const msg of rawMessages) {
       try {
         parsedMessages.push(JSON.parse(msg) as CachedMessage);
-      } catch (err) {
+      } catch (_err) {
         // Ignored intentionally
       }
     }
