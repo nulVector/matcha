@@ -72,6 +72,8 @@ export class MatchManager {
     const tx = this.redis.multi();
     tx.hset(key,{
       geo:geoString,
+      locationLatitude: String(lat),
+      locationLongitude: String(long),
       embedding:vectorBuffer,
     })
     tx.expire(key,60*60*24);
