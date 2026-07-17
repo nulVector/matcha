@@ -5,6 +5,12 @@ import basicAuth from 'express-basic-auth';
 import { taskQueue, dbBufferQueue, cronQueue, dlqQueue } from '@matcha/queue';
 import { RequestHandler } from 'express';
 
+const username = process.env.ADMIN_USERNAME;
+const password = process.env.ADMIN_PASSWORD;
+if(!username || !password){
+  throw new Error("Environment variables not available");
+}
+
 export const serverAdapter = new ExpressAdapter();
 serverAdapter.setBasePath('/admin/queues/dashboard');
 createBullBoard({
@@ -18,7 +24,7 @@ createBullBoard({
 });
 export const adminAuth: RequestHandler = basicAuth({
   users: {
-    [process.env.ADMIN_USERNAME || 'admin']: process.env.ADMIN_PASSWORD || 'supersecret'
+    [username]: password
   },
   challenge: true,
   unauthorizedResponse: 'Unauthorized: Invalid Admin Credentials'
