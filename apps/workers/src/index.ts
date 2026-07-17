@@ -136,3 +136,13 @@ bootstrap().catch((err: any) => {
   logger.error({ err }, "Failed to bootstrap worker node:");
   process.exit(1);
 });
+
+process.on('uncaughtException', (err) => {
+  logger.fatal({ err }, 'Uncaught Exception detected. Initiating graceful shutdown.');
+  gracefulShutdown('uncaughtException');
+});
+
+process.on('unhandledRejection', (err) => {
+  logger.fatal({ err }, 'Unhandled Promise Rejection detected. Initiating graceful shutdown.');
+  gracefulShutdown('unhandledRejection');
+});
