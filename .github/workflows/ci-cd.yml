@@ -150,9 +150,11 @@ jobs:
             set -e
             cd /home/ubuntu/matcha
             echo "$PROD_ENV_FILE" > .env
+            docker builder prune -af
+            docker image prune -af
             docker compose -f docker-compose.prod.yml build
             docker compose -f docker-compose.prod.yml up -d postgres redis
             sleep 10 
             docker compose -f docker-compose.prod.yml up --exit-code-from migrate migrate
             docker compose -f docker-compose.prod.yml up -d
-            docker image prune -af --filter "until=24h"
+            docker system prune -f
