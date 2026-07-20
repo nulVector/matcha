@@ -5,6 +5,7 @@ import { EventType, getDeterministicIds } from "@matcha/shared";
 import { createId } from "@paralleldrive/cuid2";
 import { bloomManager, chatManager, matchManager } from "../config/redis";
 import { vectorMatchesLockedCounter, vectorSearchDurationHistogram, workerMatchChunkDurationHistogram } from "../config/metrics";
+import { env } from "../config/env";
 
 interface MatchConstraints {
   radiusKm: number;
@@ -13,7 +14,7 @@ interface MatchConstraints {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 let isRunning = false;
 let loopPromise: Promise<void> | null = null;
-const MATCH_EXPIRY_MS = process.env.ARTILLERY_TEST === "true" ? 1 * 60 * 1000 : 5 * 60 * 1000;
+const MATCH_EXPIRY_MS = env.ARTILLERY_TEST === "true" ? 1 * 60 * 1000 : 5 * 60 * 1000;
 
 function getMatchConstraints(waitTimeMs: number): MatchConstraints {
   if (waitTimeMs > 30000) return { radiusKm: 3000, maxScore: 1.0 };

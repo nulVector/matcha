@@ -1,6 +1,7 @@
 "use client";
 
 import { GoogleIcon } from "@/components/shared/icons";
+import { env } from "@/env";
 import { Button } from "@matcha/ui/components/button";
 import { Loader } from "@matcha/ui/components/loader";
 import { Separator } from "@matcha/ui/components/separator";
@@ -62,7 +63,7 @@ export function OAuthSection() {
 
   const handleGoogleLogin = () => {
     setIsGoogleLoading(true);
-    window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/auth/google`;
+    window.location.href = `${env.NEXT_PUBLIC_API_URL}/auth/google`;
   };
 
   return (

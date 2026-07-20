@@ -3,11 +3,9 @@ import jwt from 'jsonwebtoken';
 import { COOKIE_OPTIONS } from "../constant/cookie";
 import { authManager } from "../services/redis";
 import { logger } from "@matcha/logger";
+import { env } from "../config/env";
 
-const jwtSecret = process.env.JWT_SECRET;
-if (!jwtSecret){
-  throw new Error("Environment variables not available");
-}
+const jwtSecret = env.JWT_SECRET;
 
 const REFRESH_THRESHOLD = 60 * 60 * 24 * 2;
 

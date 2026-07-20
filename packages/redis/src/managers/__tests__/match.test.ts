@@ -2,13 +2,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { UserState } from '../../common';
 import { MatchManager } from '../match';
 import { createRedisClient, type RedisClient } from '../../index';
+import { env } from '../../config/env';
 
 describe('MatchManager Integration Tests', () => {
   let matchClient: RedisClient;
   let matchManager: MatchManager;
 
   beforeAll(() => {
-    matchClient = createRedisClient(process.env.REDIS_URL!, "MATCH");
+    matchClient = createRedisClient(env.REDIS_URL, "MATCH");
     matchManager = new MatchManager(matchClient);
   });
   afterAll(async () => {

@@ -35,6 +35,9 @@ importers:
       '@bull-board/express':
         specifier: ^6.20.3
         version: 6.20.3
+      '@matcha/env':
+        specifier: workspace:*
+        version: link:../../packages/env
       '@matcha/logger':
         specifier: workspace:*
         version: link:../../packages/logger
@@ -144,6 +147,9 @@ importers:
 
   apps/load-tests:
     dependencies:
+      '@matcha/env':
+        specifier: workspace:*
+        version: link:../../packages/env
       '@matcha/prisma':
         specifier: workspace:*
         version: link:../../packages/db
@@ -184,6 +190,9 @@ importers:
 
   apps/socket:
     dependencies:
+      '@matcha/env':
+        specifier: workspace:*
+        version: link:../../packages/env
       '@matcha/logger':
         specifier: workspace:*
         version: link:../../packages/logger
@@ -248,6 +257,9 @@ importers:
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.72.1(react@19.2.4))
+      '@matcha/env':
+        specifier: workspace:*
+        version: link:../../packages/env
       '@matcha/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -327,6 +339,9 @@ importers:
       '@matcha/emails':
         specifier: workspace:*
         version: link:../../packages/emails
+      '@matcha/env':
+        specifier: workspace:*
+        version: link:../../packages/env
       '@matcha/logger':
         specifier: workspace:*
         version: link:../../packages/logger
@@ -411,6 +426,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@matcha/env':
+        specifier: workspace:*
+        version: link:../env
       '@prisma/adapter-pg':
         specifier: ^7.2.0
         version: 7.2.0
@@ -480,8 +498,27 @@ importers:
         specifier: ^9.39.1
         version: 9.39.4(jiti@2.6.1)
 
+  packages/env:
+    dependencies:
+      zod:
+        specifier: ^4.2.1
+        version: 4.2.1
+    devDependencies:
+      '@matcha/eslint-config':
+        specifier: workspace:*
+        version: link:../config/eslint
+      '@matcha/typescript-config':
+        specifier: workspace:*
+        version: link:../config/typescript
+      eslint:
+        specifier: ^9.39.1
+        version: 9.39.4(jiti@2.6.1)
+
   packages/logger:
     dependencies:
+      '@matcha/env':
+        specifier: workspace:*
+        version: link:../env
       pino:
         specifier: ^10.3.1
         version: 10.3.1
@@ -504,6 +541,9 @@ importers:
 
   packages/queue:
     dependencies:
+      '@matcha/env':
+        specifier: workspace:*
+        version: link:../env
       bullmq:
         specifier: ^5.70.1
         version: 5.70.1
@@ -523,6 +563,9 @@ importers:
 
   packages/redis:
     dependencies:
+      '@matcha/env':
+        specifier: workspace:*
+        version: link:../env
       '@matcha/logger':
         specifier: workspace:*
         version: link:../logger
@@ -5818,10 +5861,6 @@ packages:
 
   js-yaml@3.14.2:
     resolution: {integrity: sha512-PMSmkqxr106Xa156c2M265Z+FTrPl+oxd/rgOQy2tijQeK5TxQ43psO1ZCwhVOSdnn+RzkzlRz/eY4BgJBYVpg==}
-    hasBin: true
-
-  js-yaml@4.1.0:
-    resolution: {integrity: sha512-wpxZs9NoxZaJESJGIZTyDEaYpl0FKSA+FB9aJiyemKhMwkxQg63h4T1KJgUGHpTqPDNRcmmYLugrRjJlBtWvRA==}
     hasBin: true
 
   js-yaml@4.3.0:
@@ -13273,7 +13312,7 @@ snapshots:
     dependencies:
       env-paths: 2.2.1
       import-fresh: 3.3.1
-      js-yaml: 4.1.0
+      js-yaml: 4.3.0
       parse-json: 5.2.0
     optionalDependencies:
       typescript: 5.9.2
@@ -14795,10 +14834,6 @@ snapshots:
       argparse: 1.0.10
       esprima: 4.0.1
 
-  js-yaml@4.1.0:
-    dependencies:
-      argparse: 2.0.1
-
   js-yaml@4.3.0:
     dependencies:
       argparse: 2.0.1
@@ -15024,7 +15059,7 @@ snapshots:
 
   matcher-collection@1.1.2:
     dependencies:
-      minimatch: 3.1.2
+      minimatch: 3.1.5
 
   math-intrinsics@1.1.0: {}
 

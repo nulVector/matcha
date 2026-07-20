@@ -8,11 +8,9 @@ import {
 } from '@matcha/redis';
 import { createId } from '@paralleldrive/cuid2';
 import { MASTER_INTERESTS_LIST } from '@matcha/shared';
+import { env } from '../config/env';
 
-const REDIS_URL = process.env.REDIS_URL;
-if (!REDIS_URL) {
-  throw new Error("Missing Environment variable.");
-}
+const REDIS_URL = env.REDIS_URL;
 
 const cacheClient: RedisClient = createRedisClient(REDIS_URL, "CACHE");
 const matchClient: RedisClient = createRedisClient(REDIS_URL, "MATCH");

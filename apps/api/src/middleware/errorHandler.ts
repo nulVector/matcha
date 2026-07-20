@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { logger } from "@matcha/logger";
+import { env } from "../config/env";
 
 export interface AppError extends Error {
   context?: Record<string, unknown>;
@@ -39,6 +40,6 @@ export const globalErrorHandler = (err: AppError ,req: Request,res: Response, _n
   res.status(statusCode).json({
     status: "error",
     message: err.message || "An internal server error occurred",
-    stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+    stack: env.NODE_ENV === "development" ? err.stack : undefined,
   });
 };

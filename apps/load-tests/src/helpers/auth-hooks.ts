@@ -1,12 +1,10 @@
 import jwt from 'jsonwebtoken';
 import { createId } from '@paralleldrive/cuid2';
 import { createRedisClient, AuthManager, RedisClient } from '@matcha/redis';
+import { env } from '../config/env';
 
-const REDIS_URL = process.env.REDIS_URL;
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!REDIS_URL || !JWT_SECRET) {
-  throw new Error("Missing Environment variable.");
-}
+const REDIS_URL = env.REDIS_URL;
+const JWT_SECRET = env.JWT_SECRET;
 const systemClient: RedisClient = createRedisClient(REDIS_URL, "SYSTEM");
 const sessionClient: RedisClient = createRedisClient(REDIS_URL, "SESSION");
 const authManager = new AuthManager(sessionClient);

@@ -15,9 +15,10 @@ import { bloomManager, closeRedisConnections, matchManager } from "./services/re
 import { traceMiddleware } from "./middleware/trace";
 import { metricsAuth, metricsMiddleware } from "./middleware/metrics";
 import { getMetrics } from "./controllers/metrics.controller";
+import { env } from "./config/env";
 
 const app = express();
-const PORT = Number(process.env.API_PORT) || 3001;
+const PORT = env.API_PORT;
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -34,9 +35,7 @@ app.use(express.json());
 app.use(traceMiddleware);
 app.use(metricsMiddleware);
 
-const allowedOrigins = process.env.CLIENT_URL 
-  ? process.env.CLIENT_URL.split(',').map(url => url.trim())
-  : ["http://localhost:3000"];
+const allowedOrigins = env.CLIENT_URL.split(',').map(url => url.trim());
 app.use(cors({
     credentials:true,
     origin:(origin, callback) => {
@@ -66,7 +65,7 @@ app.use(pinoHttp({
       statusCode: res.statusCode,
     })
   },
-  autoLogging: process.env.ARTILLERY_TEST === 'true' ? false : {
+  autoLogging: env.ARTILLERY_TEST === 'true' ? false : {
     ignore: (req) => req.url === '/health' || req.url === '/metrics'
   }
 }));

@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ChatManager } from '../chat';
 import { createRedisClient, type RedisClient } from '../../index';
 import type { CachedMessage } from '@matcha/shared';
+import { env } from '../../config/env';
 
 describe('ChatManager Integration Tests', () => {
   let cacheClient: RedisClient;
@@ -11,8 +12,8 @@ describe('ChatManager Integration Tests', () => {
   const receiverId = 'receiver_1';
 
   beforeAll(() => {
-    cacheClient = createRedisClient(process.env.REDIS_URL!, 'CACHE');
-    pubClient = createRedisClient(process.env.REDIS_URL!, 'PUBSUB_PUB');
+    cacheClient = createRedisClient(env.REDIS_URL, 'CACHE');
+    pubClient = createRedisClient(env.REDIS_URL, 'PUBSUB_PUB');
     chatManager = new ChatManager(cacheClient, pubClient);
   });
 

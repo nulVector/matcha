@@ -5,6 +5,9 @@ import { QueryClient, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useMe } from "./queries/useMe";
+import { env } from "@/env";
+
+const WS_URL = env.NEXT_PUBLIC_WS_URL.replace(/^http/, "ws");
 
 interface MessagesQueryData {
   pages: {
@@ -141,14 +144,7 @@ export function useWebsocket() {
     if (socketRef.current?.readyState === WebSocket.OPEN 
       || socketRef.current?.readyState === WebSocket.CONNECTING ) return;
     intentionalDisconnectRef.current = false;
-    let wsUrl = "";
-    if (process.env.NEXT_PUBLIC_WS_URL) {
-      wsUrl = process.env.NEXT_PUBLIC_WS_URL.replace(/^http/, "ws");
-    } else {
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      wsUrl = `${protocol}//${window.location.host}/api/ws`;
-    }
-    const ws = new WebSocket(wsUrl);
+    const ws = new WebSocket(WS_URL);
 
     ws.onopen = () => {
       setIsConnected(true);
@@ -423,9 +419,6 @@ export function useWebsocket() {
   ) => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       const traceId = crypto.randomUUID();
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`WS out - ${traceId}_${type}`)
-      }
       try {
         socketRef.current.send(JSON.stringify({ type, payload, traceId }));
       } catch (err) {

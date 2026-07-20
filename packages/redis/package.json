@@ -29,6 +29,7 @@
   },
   "dependencies": {
     "ioredis": "^5.9.2",
+    "@matcha/env": "workspace:*",
     "@matcha/logger": "workspace:*"
   }
 }

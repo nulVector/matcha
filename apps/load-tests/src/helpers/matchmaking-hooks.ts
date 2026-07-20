@@ -1,6 +1,9 @@
 import { createId } from '@paralleldrive/cuid2';
 import { Agent, setGlobalDispatcher } from 'undici';
 import type { ArtilleryContext } from './auth-hooks';
+import { env } from '../config/env';
+
+const API_URL = env.API_URL;
 
 const agent = new Agent({
   connections: 200,
@@ -10,7 +13,6 @@ setGlobalDispatcher(agent);
 export async function joinMatchmakingQueue(context: ArtilleryContext, events: unknown) {
   try {
     const { token } = context.vars;
-    const API_URL = process.env.API_URL || 'http://127.0.0.1:3001';
     const idempotencyKey = createId();
 
     const response = await fetch(`${API_URL}/api/v1/connections/queue/join`, {

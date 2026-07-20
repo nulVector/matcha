@@ -6,16 +6,18 @@ import type {
   BloomFilterManager 
 } from '@matcha/redis';
 
+const dbUrl = inject('databaseUrl');
+const redisUrl = inject('redisUrl');
+
+process.env.DATABASE_URL = dbUrl;
+process.env.REDIS_URL = redisUrl;
+
 let prisma: PrismaClient;
 let testRedisClient: RedisClient;
 let matchManager: MatchManager;
 let bloomManager: BloomFilterManager;
 
 beforeAll(async () => {
-  const dbUrl = inject('databaseUrl');
-  const redisUrl = inject('redisUrl');
-  process.env.DATABASE_URL = dbUrl;
-  process.env.REDIS_URL = redisUrl;
   const { default: prismaClient } = await import('@matcha/prisma');
   const { 
     createRedisClient, 

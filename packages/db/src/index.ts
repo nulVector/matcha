@@ -1,19 +1,11 @@
 import { PrismaClient } from "./generated/prisma/client";
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
-
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  throw new Error("DATABASE_URL is missing from environment variables!");
-}
-
-const poolSize = process.env.DATABASE_POOL_SIZE 
-  ? parseInt(process.env.DATABASE_POOL_SIZE, 10) 
-  : 10;
+import { env } from "./env";
 
 const pool = new pg.Pool({ 
-  connectionString,
-  max: poolSize,
+  connectionString: env.DATABASE_URL,
+  max: env.DATABASE_POOL_SIZE,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
 });
@@ -39,7 +31,7 @@ declare global {
 
 const prisma = globalThis.prisma ?? prismaClientSingleton();
 
-if (process.env.NODE_ENV !== 'production') globalThis.prisma = prisma;
+if (env.NODE_ENV !== 'production') globalThis.prisma = prisma;
 
 export * from "./generated/prisma/client";
 export * from "./generated/prisma/enums";

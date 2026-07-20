@@ -15,6 +15,7 @@
   "dependencies": {
     "@bull-board/api": "^6.20.3",
     "@bull-board/express": "^6.20.3",
+    "@matcha/env": "workspace:*",
     "@matcha/logger": "workspace:*",
     "@matcha/prisma": "workspace:*",
     "@matcha/redis": "workspace:*",

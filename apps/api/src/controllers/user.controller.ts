@@ -11,15 +11,13 @@ import { logger, traceStorage } from '@matcha/logger';
 import { getDeterministicIds, EventType, SystemAction } from '@matcha/shared';
 import { authManager, bloomManager, chatManager, matchManager, metadataManager, notificationManager, userConnectionManager, userDetailManager } from '../services/redis';
 import { userOnboardingFailureCounter } from '../config/metrics';
+import { env } from '../config/env';
 
 type LocationMetadata = { id: string; name: string; latitude: number; longitude: number };
 type InterestMetadata = { id: string; name: string };
 type AvatarMetadata = { id: string; url: string; };
 
-const jwtSecret = process.env.JWT_SECRET;
-if (!jwtSecret) {
-  throw new Error("Environment variables not available");
-}
+const jwtSecret = env.JWT_SECRET;
 
 export const checkUsername = async (req:Request,res:Response,next:NextFunction) =>{
   try{

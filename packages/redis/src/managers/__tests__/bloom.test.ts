@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { BloomFilterManager } from '../bloom';
 import { createRedisClient, type RedisClient } from '../../index';
+import { env } from '../../config/env';
 
 describe('BloomFilterManager Integration Tests', () => {
   let bloomClient: RedisClient;
@@ -8,7 +9,7 @@ describe('BloomFilterManager Integration Tests', () => {
   const testKey = 'test:bloom:pairs';
 
   beforeAll(async () => {
-    bloomClient = createRedisClient(process.env.REDIS_URL!, 'CACHE');
+    bloomClient = createRedisClient(env.REDIS_URL, 'CACHE');
     bloomManager = new BloomFilterManager(bloomClient);
   });
   beforeEach(async () => {

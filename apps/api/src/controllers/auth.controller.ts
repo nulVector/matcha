@@ -12,11 +12,10 @@ import { TaskProducer } from "@matcha/queue";
 import { logger, traceStorage } from "@matcha/logger";
 import { authManager, chatManager } from "../services/redis";
 import { userRegistrationCounter } from "../config/metrics";
+import { env } from "../config/env";
 
-const jwtSecret = process.env.JWT_SECRET;
-if (!jwtSecret){
-  throw new Error("Environment variables not available");
-}
+const jwtSecret = env.JWT_SECRET;
+const frontendUrl = env.CLIENT_URL;
 
 export const signup = async (req:Request, res:Response,next:NextFunction) =>{
   try{
@@ -84,7 +83,6 @@ export const googleAuthCallback = async (req: Request, res: Response, next: Next
       sessionId: sessionId
     }, jwtSecret, { expiresIn: '7d' });
     res.cookie("token", token, COOKIE_OPTIONS);
-    const frontendUrl = process.env.CLIENT_URL || "http://localhost:3000";
     const redirectUrl = user.profile ? `${frontendUrl}/home` : `${frontendUrl}/onboarding`;
     res.redirect(redirectUrl);
   } catch (err: any) {
@@ -103,7 +101,6 @@ export const requestResetPassword = async (req:Request,res:Response,next:NextFun
     if (user) {
       const resetToken = crypto.randomBytes(32).toString('hex');
       await authManager.setResetToken(resetToken, user.id);
-      const frontendUrl = process.env.CLIENT_URL || 'http://localhost:3000';
       const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
       const traceId = traceStorage.getStore()?.traceId;
       logger.info({ email }, "Dispatching password reset email to queue");

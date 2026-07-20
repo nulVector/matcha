@@ -4,15 +4,16 @@ import { createId } from '@paralleldrive/cuid2';
 import jwt from 'jsonwebtoken';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
+import { env } from '../config/env.js';
 
 let prisma: PrismaClient;
 let serverAuthManager: AuthManager;
 let serverUserConnectionManager: UserConnectionManager;
 let closeServerRedis: () => Promise<void>;
 let testPubClient: RedisClient;
-const WS_PORT = 8081;
+const WS_PORT = env.WS_PORT; 
 const WS_URL = `ws://localhost:${WS_PORT}`;
-const JWT_SECRET = process.env.JWT_SECRET || 'test_secret';
+const JWT_SECRET = env.JWT_SECRET;
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function waitForRedisState(checkFn: () => Promise<boolean>, maxWaitMs = 2000) {
@@ -27,8 +28,6 @@ async function waitForRedisState(checkFn: () => Promise<boolean>, maxWaitMs = 20
 describe('WebSocket Integration Tests', () => {
 
   beforeAll(async () => {
-    process.env.WS_PORT = WS_PORT.toString();
-
     const prismaModule = await import('@matcha/prisma');
     prisma = prismaModule.default as unknown as PrismaClient;
 
@@ -38,7 +37,7 @@ describe('WebSocket Integration Tests', () => {
     closeServerRedis = redisModule.closeRedisConnections;
 
     const { createRedisClient } = await import('@matcha/redis');
-    testPubClient = createRedisClient(process.env.REDIS_URL!, "PUBSUB_PUB");
+    testPubClient = createRedisClient(env.REDIS_URL, "PUBSUB_PUB");
 
     await import('../index.js');
     await sleep(500);

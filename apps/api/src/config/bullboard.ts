@@ -4,12 +4,10 @@ import { ExpressAdapter } from '@bull-board/express';
 import basicAuth from 'express-basic-auth';
 import { taskQueue, dbBufferQueue, cronQueue, dlqQueue } from '@matcha/queue';
 import { RequestHandler } from 'express';
+import { env } from './env';
 
-const username = process.env.ADMIN_USERNAME;
-const password = process.env.ADMIN_PASSWORD;
-if(!username || !password){
-  throw new Error("Environment variables not available");
-}
+const username = env.ADMIN_USERNAME;
+const password = env.ADMIN_PASSWORD;
 
 export const serverAdapter = new ExpressAdapter();
 serverAdapter.setBasePath('/admin/queues/dashboard');

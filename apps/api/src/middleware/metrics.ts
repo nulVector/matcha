@@ -1,9 +1,10 @@
 import { NextFunction, Request, Response } from 'express';
 import { httpRequestDurationMicroseconds } from '../config/metrics';
+import { env } from '../config/env';
 
 export const metricsAuth = (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
-  const expectedToken = process.env.PROMETHEUS_TOKEN;
+  const expectedToken = env.PROMETHEUS_TOKEN;
 
   if (!expectedToken || authHeader !== `Bearer ${expectedToken}`) {
     res.status(401).send("Unauthorized");

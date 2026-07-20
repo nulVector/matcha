@@ -8,6 +8,7 @@ import { validate } from "../middleware/validate";
 import passport from "passport";
 import { authGuard } from "../middleware/authGuard";
 import { profileGuard } from "../middleware/profileGuard";
+import { env } from "../config/env";
 const authRouter: Router = Router();
 
 authRouter.post(
@@ -35,7 +36,7 @@ authRouter.get(
   "/google/callback",
   passport.authenticate("google", { 
     session: false, 
-    failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3000'}/login?error=GoogleAuthFailed` 
+    failureRedirect: `${env.CLIENT_URL}/login?error=GoogleAuthFailed` 
   }),
   googleAuthCallback
 );

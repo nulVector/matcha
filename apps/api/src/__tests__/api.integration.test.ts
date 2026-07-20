@@ -6,6 +6,7 @@ import type { PrismaClient, ConnectionStatus as ConnectionStatusEnum } from '@ma
 import type { AuthManager, BloomFilterManager, MatchManager, RedisClient } from '@matcha/redis';
 import { getDeterministicIds } from '@matcha/shared';
 import type { Express, Router } from 'express';
+import { env } from '../config/env.js';
 
 let app: Express;
 let authManager: AuthManager;
@@ -16,7 +17,7 @@ let closeRedisConnections: () => Promise<void>;
 let prisma: PrismaClient;
 let ConnectionStatus: typeof ConnectionStatusEnum;
 
-const JWT_SECRET = process.env.JWT_SECRET || 'test_secret';
+const JWT_SECRET = env.JWT_SECRET;
 
 describe('API Integration Tests', () => {
   

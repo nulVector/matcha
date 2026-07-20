@@ -16,6 +16,7 @@
     "test:real-world": "artillery run src/scenarios/real-world.yml"
   },
   "dependencies": {
+    "@matcha/env": "workspace:*",
     "@matcha/prisma": "workspace:*",
     "@matcha/redis": "workspace:*",
     "@matcha/shared": "workspace:*",

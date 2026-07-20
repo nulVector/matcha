@@ -23,6 +23,7 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@matcha/env": "workspace:*",
     "@prisma/adapter-pg": "^7.2.0",
     "@prisma/client": "^7.2.0",
     "pg": "^8.16.3",

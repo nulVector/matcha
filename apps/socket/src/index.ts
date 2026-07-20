@@ -10,6 +10,7 @@ import { JwtPayload, UserSession, EventType, SystemAction, CachedMessage, Messag
 import { socketMessageSchema } from '@matcha/zod';
 import { authManager, chatManager, closeRedisConnections, matchManager, subClient, userConnectionManager, userDetailManager } from './services/redis';
 import { broadcastDurationHistogram, concurrentConnectionsGauge, connectionTerminationCounter, eventProcessingCounter, socketRegistry } from './config/metrics';
+import { env } from './config/env';
 
 interface AuthenticatedWebSocket extends WebSocket {
   isAlive: boolean;
@@ -17,12 +18,15 @@ interface AuthenticatedWebSocket extends WebSocket {
   sessionId: string;
   exp: number;
 }
+const PORT = env.WS_PORT;
+const JWT_SECRET = env.JWT_SECRET;
+const PROMETHEUS_TOKEN = env.PROMETHEUS_TOKEN;
+const IS_TEST_ENV = env.ARTILLERY_TEST === 'true';
 
 const server = createServer(async (req, res) => {
   if (req.url === '/metrics' && req.method === 'GET') {
     const authHeader = req.headers.authorization;
-    const expectedToken = process.env.PROMETHEUS_TOKEN;
-    if (!expectedToken || authHeader !== `Bearer ${expectedToken}`) {
+    if (authHeader !== `Bearer ${PROMETHEUS_TOKEN}`) {
       res.writeHead(401);
       return res.end("Unauthorized")
     }
@@ -44,13 +48,8 @@ const server = createServer(async (req, res) => {
   res.end("WebSocket Server Running");
 });
 const wss = new WebSocketServer({noServer:true});
-const jwtSecret = process.env.JWT_SECRET;
-const PORT = Number(process.env.WS_PORT) || 8080;
 const localSockets = new Map<string,Set<WebSocket>>();
 
-if(!jwtSecret){
-  throw new Error("Environment variables not availble");
-}
 const parseCookies = (cookieString:string) => {
   if (!cookieString) return {};
   return cookieString.split(';').reduce((res,items)=>{
@@ -66,7 +65,7 @@ server.on('upgrade',async (request,socket,head)=>{
     const cookies = parseCookies(request.headers.cookie || "");
     let token = cookies.token;
     // For passing cookies during Artillery testing
-    if (!token && process.env.ARTILLERY_TEST === "true") {
+    if (!token && IS_TEST_ENV) {
       const url = new URL(request.url || "", `http://${request.headers.host}`);
       token = url.searchParams.get('token') || undefined;
     }
@@ -75,7 +74,7 @@ server.on('upgrade',async (request,socket,head)=>{
       socket.destroy();
       return;
     }
-    const jwt_payload = jwt.verify(token,jwtSecret) as JwtPayload;
+    const jwt_payload = jwt.verify(token,JWT_SECRET) as JwtPayload;
     const userSession = await authManager.getSession(jwt_payload.id, jwt_payload.sessionId);
     if (!userSession){
       socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");

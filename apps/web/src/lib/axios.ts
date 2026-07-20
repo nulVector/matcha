@@ -1,9 +1,7 @@
+import { env } from '@/env';
 import axios from 'axios';
 
-const api_url = process.env.NEXT_PUBLIC_API_URL;
-if(!api_url) {
-  throw new Error("Environment variable not found")
-}
+const api_url = env.NEXT_PUBLIC_API_URL;
 
 export let serverTimeOffset = 0;
 export const getServerTime = () => Date.now() + serverTimeOffset;

@@ -1,12 +1,18 @@
 import { pino, LoggerOptions } from "pino";
 import { AsyncLocalStorage } from "async_hooks";
+import { serverEnvSchema } from "@matcha/env";
+
+const env = serverEnvSchema.pick({
+  NODE_ENV: true,
+  LOG_LEVEL: true,
+}).parse(process.env);
 
 export const traceStorage = new AsyncLocalStorage<{ traceId: string }>();
 
-const isDev = process.env.NODE_ENV !== "production";
+const isDev = env.NODE_ENV !== "production";
 
 const options: LoggerOptions = {
-  level: process.env.LOG_LEVEL || "info",
+  level: env.LOG_LEVEL,
   mixin() {
     const store = traceStorage.getStore();
     return store?.traceId ? { traceId: store.traceId } : {};

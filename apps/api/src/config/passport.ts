@@ -7,13 +7,11 @@ import { Strategy as LocalStrategy } from "passport-local";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { authManager } from "../services/redis";
 import { userRegistrationCounter } from "./metrics";
+import { env } from "./env";
 
-const jwtSecret = process.env.JWT_SECRET;
-const clientID = process.env.GOOGLE_CLIENT_ID;
-const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-if(!jwtSecret || !clientID || !clientSecret){
-  throw new Error("Environment variables not availble");
-}
+const jwtSecret = env.JWT_SECRET;
+const clientID = env.GOOGLE_CLIENT_ID;
+const clientSecret = env.GOOGLE_CLIENT_SECRET;
 
 export const configurePassport = (passport:PassportStatic) =>{
   passport.use(new GoogleStrategy({

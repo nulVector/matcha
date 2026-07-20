@@ -22,6 +22,7 @@
     "eslint": "^9.39.1"
   },
   "dependencies": {
+    "@matcha/env": "workspace:*",
     "@matcha/logger": "workspace:*",
     "@matcha/redis": "workspace:*",
     "@matcha/shared": "workspace:*",

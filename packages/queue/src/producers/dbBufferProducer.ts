@@ -1,8 +1,9 @@
 import { dbBufferQueue } from "../queues/dbBufferQueue";
 import { JobName } from "../constant/keys";
 import { ProcessMessageBatchPayload } from "../types/payloads";
+import { env } from "../config/env";
 
-const IS_TEST = process.env.ARTILLERY_TEST === "true";
+const IS_TEST = env.ARTILLERY_TEST === "true";
 const BATCH_SIZE = IS_TEST ? 5000 : 1000;
 const INTERVAL_MS = IS_TEST ? 2000 : 5000;
 

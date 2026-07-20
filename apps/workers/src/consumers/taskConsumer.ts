@@ -9,7 +9,9 @@ import { EventType, SystemAction } from "@matcha/shared";
 import { createId } from "@paralleldrive/cuid2";
 import { bloomManager, chatManager, matchManager, userConnectionManager, workerConnection } from "../config/redis";
 import { jobDurationHistogram } from "../config/metrics";
-const resend = new Resend(process.env.RESEND_API_KEY);
+import { env } from "../config/env";
+
+const resend = new Resend(env.RESEND_API_KEY);
 
 export const taskWorker = new Worker(
   QueueName.TASK, 

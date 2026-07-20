@@ -7,11 +7,9 @@ import {
   AuthManager,
   RedisClient
 } from "@matcha/redis";
+import { env } from "../config/env";
 
-const connectionString = process.env.REDIS_URL;
-if (!connectionString) {
-  throw new Error("Environment variables not availble");
-}
+const connectionString = env.REDIS_URL;
 
 export const sessionClient: RedisClient = createRedisClient(connectionString, "SESSION");
 export const cacheClient: RedisClient = createRedisClient(connectionString, "CACHE");

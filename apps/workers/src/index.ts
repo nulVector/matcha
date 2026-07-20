@@ -9,12 +9,15 @@ import http from "http";
 import { CronProducer, cronQueue, DbBufferProducer, dbBufferQueue, dlqQueue, taskQueue } from "@matcha/queue";
 import { startDlqMonitor, stopDlqMonitor } from "./consumers/dlqMonitor";
 import { queueLengthGauge, workerRegistry } from "./config/metrics";
+import { env } from "./config/env";
+
+const PORT = env.WORKER_SERVER_PORT;
+const PROMETHEUS_TOKEN = env.PROMETHEUS_TOKEN;
 
 const server = http.createServer(async (req, res) => {
   if (req.url === '/metrics' && req.method === 'GET') {
     const authHeader = req.headers.authorization;
-    const expectedToken = process.env.PROMETHEUS_TOKEN;
-    if (!expectedToken || authHeader !== `Bearer ${expectedToken}`) {
+    if (authHeader !== `Bearer ${PROMETHEUS_TOKEN}`) {
       res.writeHead(401);
       return res.end("Unauthorized")
     }
@@ -53,7 +56,6 @@ let queueMetricsInterval: NodeJS.Timeout;
 
 async function bootstrap() {
   logger.info("Starting Matcha Worker Node.");
-  const PORT = process.env.WORKER_SERVER_PORT || 3002;
   server.listen(PORT, () => {
     logger.info(`Worker Health Check server listening on port ${PORT}`);
   });
