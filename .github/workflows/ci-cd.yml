@@ -56,6 +56,14 @@ jobs:
       GOOGLE_CLIENT_ID: "dummy_client_id"
       GOOGLE_CLIENT_SECRET: "dummy_client_secret"
       RESEND_API_KEY: "re_123456789"
+      API_URL: "http://127.0.0.1:3001"
+      CLIENT_URL: "http://localhost:3000"
+      PROMETHEUS_TOKEN: "dummy_prometheus_token"
+      ADMIN_USERNAME: "admin"
+      ADMIN_PASSWORD: "adminpassword"
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "password"
+      POSTGRES_DB: "matcha_test"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
