@@ -1,135 +1,157 @@
-# Turborepo starter
+# Matcha
 
-This Turborepo starter is maintained by the Turborepo core team.
+Live: [trymatcha.in](https://trymatcha.in)
 
-## Using this example
+Matcha is a full-stack anonymous chat app that pairs strangers in real time using a vector-similarity matchmaking engine instead of random pairing.
 
-Run the following command:
+Every user is embedded into an interest vector after onboarding. When they join the queue, the API runs a Redis HNSW k-nearest-neighbor search (geo-filtered) to find the closest match by shared interests, locking the pair with an optimistic-locking transaction so two workers can never double-book the same person.
 
-```sh
-npx create-turbo@latest
+The Next.js UI connects to a horizontally scalable WebSocket layer backed by Redis pub/sub. Behind the scenes, a BullMQ-driven worker fleet handles emails, cron jobs, and a buffered write-behind cache to Postgres. The entire monorepo ships production-ready with its own zero-downtime CI/CD pipeline, Docker Compose deployment, and a Prometheus/Grafana observability stack.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph client["Client"]
+    Browser["User Browser"]
+  end
+
+  subgraph edge["Edge"]
+    CF["Cloudflare Tunnel"]
+  end
+
+  subgraph app["Application Layer"]
+    Web["Next.js Web Server"]
+    API["API Service (Express 5)"]
+    Socket["Socket Service (ws)"]
+    Workers["Workers (BullMQ + Match Loop)"]
+  end
+
+  subgraph data["Data Layer"]
+    Postgres[("PostgreSQL\n(Prisma)")]
+    Redis[("Redis Stack\nHNSW + Bloom + PubSub")]
+  end
+
+  subgraph obs["Observability"]
+    Prom["Prometheus"]
+    Grafana["Grafana"]
+  end
+
+  %% Client to Edge
+  Browser -->|"HTTPS / WSS"| CF
+
+  %% Edge Routing
+  CF -->|"UI rendering"| Web
+  CF -->|"/api/v1/*"| API
+  CF -.->|"WebSocket upgrade"| Socket
+  CF -->|"Admin dashboards"| Grafana
+
+  %% Application to Data
+  API -->|"Reads/Writes (users, connections)"| Postgres
+  API -->|"FT.SEARCH KNN (matchmaking)\nSession cache, Bloom filters"| Redis
+  API ==>|"Enqueue job (email, match cleanup)"| Redis
+
+  Socket -->|"Publish/Subscribe chat_router"| Redis
+  Socket -->|"Session & Presence validation"| Redis
+  Socket -.->|"Handle dropped match / fallback"| Postgres
+
+  %% Workers
+  Redis ==>|"Dequeue Jobs / Continuous Polling"| Workers
+  Workers -->|"Send emails, match cron,\nbuffered DB writes"| Postgres
+  Workers -->|"Lock matches, publish system events"| Redis
+
+  %% Observability
+  API -->|"/metrics"| Prom
+  Socket -->|"/metrics"| Prom
+  Workers -->|"/metrics"| Prom
+  Prom -->|"Data Source"| Grafana
 ```
 
-## What's inside?
+## Tech stack
 
-This Turborepo includes the following packages/apps:
+| Layer | Technology |
+|---|---|
+| **Frontend** | Next.js 16, React 19, Tailwind CSS 4, shadcn/ui, Framer Motion, Lenis, Zustand, TanStack Query, React Hook Form |
+| **API & Monolith** | Node.js, Express 5, Passport (Local, Google OAuth 2.0, JWT), Helmet, Zod validation |
+| **Real-time Engine** | `ws` (raw WebSockets), Redis Pub/Sub for cross-instance routing |
+| **Matchmaking & Cache** | Redis Stack — HNSW vector search (`FT.SEARCH`), geo-filtering, RedisBloom |
+| **Async Queues** | BullMQ (task queues, DB write-behind buffer, cron, DLQ), Bull Board (`@bull-board/express` monitoring UI) |
+| **Database** | PostgreSQL, Prisma ORM |
+| **Email Subsystem** | Resend API, React Email (`@react-email/render`) |
+| **Observability** | Pino / `pino-http` (structured logging), Prometheus (`prom-client`), Grafana, redis-exporter, postgres-exporter, node-exporter |
+| **Testing** | Vitest + Testcontainers (Dockerized Postgres/Redis), Artillery (scenario-driven load tests) |
+| **Infra & DevOps** | Docker, Docker Compose, Cloudflare Tunnel, GitHub Actions CI/CD |
+| **Monorepo Tooling** | Turborepo, pnpm workspaces, TypeScript 5.9, ESLint 9, `@matcha/env` (boot-time Zod validator) |
 
-### Apps and Packages
+## Local setup
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+**Prerequisites:** Node.js ≥18, pnpm, Docker.
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+```bash
+# 1. Clone and install
+git clone https://github.com/nulVector/matcha.git
+cd matcha
+pnpm install
 
-### Utilities
+# 2. Configure environment
+cp .env.example .env
+# fill in DATABASE_URL, JWT_SECRET, REDIS_URL, GOOGLE_CLIENT_ID/SECRET, RESEND_API_KEY, etc.
 
-This Turborepo has some additional tools already setup for you:
+# 3. Start Postgres + Redis Stack and set up the database
+pnpm docker:dev:setup
 
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
-```
-
-You can build a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
-
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build --filter=docs
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
+# 4. Run everything (web, api, socket, workers) in dev mode
+pnpm dev
 ```
 
-### Develop
+## Testing & Load Verification
 
-To develop all apps and packages, run the following command:
+### Integration Tests (Testcontainers)
+Runs isolated, non-mocked tests against ephemeral PostgreSQL and Redis containers via `testcontainers`.
 
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
+```bash
+# Run full suite using Vitest + Testcontainers
+pnpm test
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+### Scenario Load Testing (Artillery)
+Stress-tests WebSocket heartbeats, messaging, receipts, and Redis matchmaking under high concurrency. 
 
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
+```bash
+# 1. Configure the test environment
+cp .env.example .env.test
+# Note: Open .env.test and change the following variables:
+# - ARTILLERY_TEST="true"
+# - DATABASE_URL="postgresql://test_user:test_password@localhost:5433/matcha_test"
+# - REDIS_URL="redis://127.0.0.1:6380"
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
+# 2. Start the test infrastructure (Postgres + Redis Stack)
+pnpm docker:test:setup
 
-### Remote Caching
+# 3. Seed the databases for your target scenario
+pnpm loadtest test:seed-app
+# Available seeds: seed-app, seed-matchmaking, seed-messaging
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+# 4. Start the application in test mode (RUN IN A NEW TAB)
+pnpm dev:test
 
-Turborepo can use a technique known as [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
+# 5. Execute the Artillery scenario
+pnpm run loadtest test:heartbeats -- -e smoke
+# Available scenarios: heartbeats, messaging, receipts, matchmaking, real-world
+# Available environments: smoke, capacity, endurance, flood, chaos, extreme, soak
 
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo login
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
+# 6. Teardown test infrastructure when finished
+pnpm docker:test:down
 ```
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
+## What I built vs. what's scaffolded
 
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
+The monorepo shell (Turborepo config, pnpm workspaces, shared ESLint/TypeScript configs) started from the standard `create-turbo` starter. Everything on top of that shell is custom:
 
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo link
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.com/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.com/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.com/docs/reference/configuration)
-- [CLI Usage](https://turborepo.com/docs/reference/command-line-reference)
+- **Built from scratch:**
+  - **Frontend UI:** Next.js 16 / React 19 architecture featuring Tailwind CSS 4, `shadcn/ui`, Zustand, and TanStack Query.
+  - **Matchmaking & Real-time:** The HNSW vector generation + KNN search engine (with optimistic-lock pairing) and the custom WebSocket presence/chat layer.
+  - **Async & Data:** All BullMQ producers/consumers and DLQ workflows, plus the complete Prisma schema and auth flows (local + Google OAuth, sliding sessions, JWTs).
+  - **Infrastructure:** Rate limiting, idempotency middleware, a full observability stack (Pino, Prometheus, custom Grafana dashboards, Bull Board UI), and a zero-downtime CI/CD deployment pipeline.
+  - **Tooling:** Artillery load test scenarios, Testcontainers integration suite, custom React Email templates, and the strict `@matcha/env` boot-time validator.
+- **Scaffolded/off-the-shelf:** The Turborepo/pnpm workspace foundation, Next.js / Tailwind CSS v4 project bootstrap, `shadcn/ui` component generation, plug-and-play observability containers (Prometheus, Grafana, Exporters), and standard ecosystem libraries utilized as intended (Zod, Prisma, BullMQ, Passport, Helmet, Pino).
